@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.text.*?>
+<?import javafx.scene.control.*?>
+<?import java.lang.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.layout.AnchorPane?>
+
+<SplitPane fx:id="rootPane" dividerPositions="0.7920892494929006" orientation="VERTICAL" prefHeight="988.0" prefWidth="1200.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bandcamp.explorer.ui.ReleaseTableView">
+  <items>
+      <AnchorPane>
+         <children>
+            <TableView fx:id="releaseTableView" maxWidth="1.7976931348623157E308" onKeyPressed="#onReleaseTableKeyPress" onMouseClicked="#onReleaseTableMouseClick" prefHeight="700.0" prefWidth="1650.0" tableMenuButtonVisible="true" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" SplitPane.resizableWithParent="false">
+               <columns>
+                  <TableColumn fx:id="artistColumn" prefWidth="300.0" text="Artist" />
+                  <TableColumn fx:id="titleColumn" prefWidth="300.0" text="Title" />
+                  <TableColumn fx:id="dlTypeColumn" maxWidth="150.0" minWidth="150.0" prefWidth="150.0" text="Download Type" />
+                  <TableColumn fx:id="releaseDateColumn" maxWidth="125.0" minWidth="125.0" prefWidth="125.0" text="Released" />
+                  <TableColumn fx:id="publishDateColumn" maxWidth="125.0" minWidth="125.0" prefWidth="125.0" text="Published" />
+                  <TableColumn fx:id="tagsColumn" prefWidth="350.0" text="Tags" />
+                  <TableColumn fx:id="urlColumn" minWidth="200.0" prefWidth="400.0" text="URL" />
+               </columns>
+            </TableView>
+         </children>
+      </AnchorPane>
+    <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="100.0" prefWidth="160.0">
+         <children>
+            <TextArea fx:id="releaseInfo" editable="false" prefHeight="200.0" prefWidth="1202.0" wrapText="true" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+               <font>
+                  <Font name="Arial" size="16.0" />
+               </font></TextArea>
+         </children>
+      </AnchorPane>
+  </items>
+</SplitPane>
