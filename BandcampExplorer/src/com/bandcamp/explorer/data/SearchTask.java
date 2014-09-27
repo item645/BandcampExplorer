@@ -31,8 +31,8 @@ public final class SearchTask extends Task<Set<Release>> {
 	private Instant startTime;
 	private String requestingDataMsg;
 	private String loadingReleasesMsg;
-	
-	
+
+
 	/**
 	 * Creates a search task.
 	 * 
@@ -47,8 +47,8 @@ public final class SearchTask extends Task<Set<Release>> {
 		this.searchEngine = Objects.requireNonNull(searchEngine);
 		this.executor = Objects.requireNonNull(executor);
 	}
-	
-	
+
+
 	/**
 	 * Sets a string to update a message property with when data requesting
 	 * operation is performed.
@@ -58,8 +58,8 @@ public final class SearchTask extends Task<Set<Release>> {
 	public void setRequestingDataMessage(String msg) {
 		requestingDataMsg = msg;
 	}
-	
-	
+
+
 	/**
 	 * Sets a string to update a message property with when release loading
 	 * operation is performed.
@@ -69,7 +69,7 @@ public final class SearchTask extends Task<Set<Release>> {
 	public void setLoadingReleasesMessage(String msg) {
 		loadingReleasesMsg = msg;
 	}
-	
+
 
 	/**
 	 * Returns an instant of time when this task started executing (that is,
@@ -80,8 +80,8 @@ public final class SearchTask extends Task<Set<Release>> {
 	public Instant getStartTime() {
 		return startTime;
 	}
-	
-	
+
+
 	/** 
 	 * Implements the actual logic of search.
 	 */
@@ -93,7 +93,7 @@ public final class SearchTask extends Task<Set<Release>> {
 		try {
 			if (requestingDataMsg != null)
 				updateMessage(requestingDataMsg);
-			
+
 			// Loading and processing search pages
 			List<Future<Page>> pages = new ArrayList<>();
 			int numPages = searchParams.searchType.isMultiPage ? searchParams.pages : 1;
@@ -102,25 +102,25 @@ public final class SearchTask extends Task<Set<Release>> {
 				pages.add(executor.submit(
 						() -> searchParams.searchType.loadPage(searchParams.searchQuery, pageNum, this)));
 			}
-			
+
 			// Collecting loaders for all releases found during search
 			List<Callable<Release>> releaseLoaders = new ArrayList<>();
 			for (Future<Page> page : pages)
 				releaseLoaders.addAll(page.get().getReleaseLoaders());
-			
+
 			if (isCancelled())
 				return Collections.emptySet();
-			
+
 			int numTasks = releaseLoaders.size();
 			updateProgress(0, numTasks);
 			if (loadingReleasesMsg != null)
 				updateMessage(loadingReleasesMsg);
-			
+
 			// Submitting loaders to completion service so that results can be
 			// processed upon completion
 			ExecutorCompletionService<Release> completionService = new ExecutorCompletionService<>(executor);
 			releaseLoaders.forEach(completionService::submit);
-			
+
 			// Gathering loaded Release objects
 			Set<Release> results = new HashSet<>();
 			for (int i = 1; i <= numTasks; i++) {
@@ -131,15 +131,15 @@ public final class SearchTask extends Task<Set<Release>> {
 					results.add(release);
 				updateProgress(i, numTasks);
 			}
-			
+
 			if (isCancelled())
 				return Collections.emptySet();
-			
+
 			// Updating search engine with new results
 			if (!searchParams.combineResults)
 				searchEngine.clearResults();
 			searchEngine.addResults(results);
-			
+
 			return results;
 		}
 		finally {

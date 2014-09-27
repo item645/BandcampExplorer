@@ -7,7 +7,7 @@ import java.util.Locale;
  * Enumerates available search types, that is, a ways to find and load releases.
  */
 public enum SearchType {
-	
+
 	/**
 	 * This type employs a standard Bandcamp search feature to find releases,
 	 * using http://bandcamp.com/search page to supply a query string
@@ -27,8 +27,8 @@ public enum SearchType {
 			return new Page(url, parentTask);
 		}
 	},
-	
-	
+
+
 	/**
 	 * This search type works by browsing Bandcamp tag pages (http://bandcamp.com/tag/your-favorite-tag)
 	 * and collecting all releases encountered on those pages.
@@ -52,8 +52,8 @@ public enum SearchType {
 			return new Page(url, parentTask);
 		}
 	},
-	
-	
+
+
 	/**
 	 * This type can be used to directly browse any page on Bandcamp to collect all releases 
 	 * this page contains. This will work not only for Bandcamp, but also for
@@ -72,19 +72,19 @@ public enum SearchType {
 			return new Page(url, parentTask);
 		}
 	};
-	
-	
+
+
 	/**
 	 * Indicates whether search type supports using multiple pages.
 	 */
 	boolean isMultiPage;
-	
-	
+
+
 	private SearchType(boolean isMultiPage) {
 		this.isMultiPage = isMultiPage;
 	}
-	
-	
+
+
 	/**
 	 * Creates and loads Page object appropriate to the search type.
 	 * Each enum constant has its own implementation of this method to load the page

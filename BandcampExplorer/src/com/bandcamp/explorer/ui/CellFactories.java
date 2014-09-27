@@ -18,8 +18,8 @@ import javafx.util.Callback;
 class CellFactories {
 
 	private CellFactories() {};
-	
-	
+
+
 	/**
 	 * Returns a wrapper around specified cell factory adding an
 	 * ability to set content alignment.
@@ -31,14 +31,14 @@ class CellFactories {
 	 */
 	static <S,T> Callback<TableColumn<S,T>, TableCell<S,T>> alignedCellFactory(
 			Callback<TableColumn<S,T>, TableCell<S,T>> cellFactory, Pos alignment) {
-    	return column -> {
+		return column -> {
 			TableCell<S,T> cell = cellFactory.call(column);
 			cell.setAlignment(alignment);
 			return cell;
 		};
 	}
-	
-	
+
+
 	/**
 	 * Returns a wrapper around specified cell factory that adds
 	 * a tooltip displaying text representation of cell's content.
@@ -58,8 +58,8 @@ class CellFactories {
 			return cell;
 		};
 	}
-	
-	
+
+
 	/**
 	 * Returns a cell factory for creating cells whose content type is URI,
 	 * displaying the value of URI as clickable hyperlink. If hyperlink
@@ -76,8 +76,8 @@ class CellFactories {
 			return link;
 		});
 	}
-	
-	
+
+
 	/**
 	 * Returns a cell factory for creating cells to display an arbitrary
 	 * Node object instead of text. Nodes to display as cells content are
@@ -107,5 +107,5 @@ class CellFactories {
 			};
 		};
 	}
-	
+
 }

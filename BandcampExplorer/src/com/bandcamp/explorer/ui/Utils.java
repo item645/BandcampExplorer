@@ -10,7 +10,7 @@ class Utils {
 
 	private Utils() {}
 
-	
+
 	/**
 	 * Launches the default browser and navigates to specified URI.
 	 * If java.awt.Desktop is not supported, does nothing.
@@ -27,5 +27,5 @@ class Utils {
 			}
 		}
 	}
-	
+
 }

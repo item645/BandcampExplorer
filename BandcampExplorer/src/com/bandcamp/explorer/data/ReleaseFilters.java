@@ -16,16 +16,16 @@ import java.util.function.Predicate;
 public class ReleaseFilters {
 
 	private ReleaseFilters() {}
-	
-	
+
+
 	/**
 	 * Returns a filter that matches any release.
 	 */
 	public static Predicate<Release> any() {
 		return release -> true;
 	}
-	
-	
+
+
 	/**
 	 * Returns a filter that matches only releases whose artist name
 	 * contains given string (case insensitive).
@@ -36,8 +36,8 @@ public class ReleaseFilters {
 	public static Predicate<Release> artistContains(String s) {
 		return release -> containsString(release.getArtist(), s);
 	}
-	
-	
+
+
 	/**
 	 * Returns a filter that matches only releases whose title
 	 * contains given string (case insensitive).
@@ -48,8 +48,8 @@ public class ReleaseFilters {
 	public static Predicate<Release> titleContains(String s) {
 		return release -> containsString(release.getTitle(), s);
 	}
-	
-	
+
+
 	/**
 	 * Returns a filter that matches only releases whose URL property
 	 * contains given string (case insensitive).
@@ -60,8 +60,8 @@ public class ReleaseFilters {
 	public static Predicate<Release> urlContains(String s) {
 		return release -> containsString(release.getURI().toString(), s);
 	}
-	
-	
+
+
 	/**
 	 * Helper method to check whether some release string contains another,
 	 * not taking characters case into account.
@@ -72,8 +72,8 @@ public class ReleaseFilters {
 	private static boolean containsString(String releaseStr, String checkStr) {
 		return releaseStr.toLowerCase(Locale.ENGLISH).contains(checkStr.toLowerCase(Locale.ENGLISH));
 	}
-	
-	
+
+
 	/**
 	 * Returns a filter that matches only releases whose download type is
 	 * contained by specified downloadTypes set. 
@@ -84,8 +84,8 @@ public class ReleaseFilters {
 	public static Predicate<Release> byDownloadType(EnumSet<Release.DownloadType> downloadTypes) {
 		return release -> downloadTypes.contains(release.getDownloadType());
 	}
-	
-	
+
+
 	/**
 	 * Returns a filter that matches only releases whose release date satisfies
 	 * a condition: from >= releaseDate <= to.
@@ -102,8 +102,8 @@ public class ReleaseFilters {
 	public static Predicate<Release> byReleaseDate(LocalDate from, LocalDate to) {
 		return release -> isWithinDates(release.getReleaseDate(), from, to);
 	}
-		
-	
+
+
 	/**
 	 * Returns a filter that matches only releases whose publish date satisfies
 	 * a condition: from >= publishDate <= to.
@@ -118,8 +118,8 @@ public class ReleaseFilters {
 	public static Predicate<Release> byPublishDate(LocalDate from, LocalDate to) {
 		return release -> isWithinDates(release.getPublishDate(), from, to);
 	}
-	
-	
+
+
 	/**
 	 * Helper method to check that given date is contained within from and to date
 	 * on time scale.
@@ -129,8 +129,8 @@ public class ReleaseFilters {
 		int c2 = to != null ? to.compareTo(releaseDate) : 0;
 		return c1 <= 0 && c2 >= 0;
 	}
-	
-	
+
+
 	/**
 	 * Returns a filter that matches only releases whose set of tags contains
 	 * all strings from include collection and does not contain any string from
@@ -158,5 +158,5 @@ public class ReleaseFilters {
 			}
 		};
 	}
-	
+
 }

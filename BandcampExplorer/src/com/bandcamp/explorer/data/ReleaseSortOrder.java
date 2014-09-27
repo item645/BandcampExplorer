@@ -8,7 +8,7 @@ import java.util.Comparator;
  * release table view, but there will likely be other uses in future versions. 
  */
 public enum ReleaseSortOrder implements Comparator<Release> {
-	
+
 	/**
 	 * Sorts releases by publish date in ascending order.
 	 */
@@ -18,7 +18,7 @@ public enum ReleaseSortOrder implements Comparator<Release> {
 			return r1.getPublishDate().compareTo(r2.getPublishDate());
 		}
 	},
-	
+
 	/**
 	 * Sorts releases by publish date in descending order.
 	 */
@@ -28,7 +28,7 @@ public enum ReleaseSortOrder implements Comparator<Release> {
 			return r2.getPublishDate().compareTo(r1.getPublishDate());
 		}
 	},
-	
+
 	/**
 	 * Sorts releases by release date in ascending order.
 	 */
@@ -38,7 +38,7 @@ public enum ReleaseSortOrder implements Comparator<Release> {
 			return r1.getReleaseDate().compareTo(r2.getReleaseDate());
 		}
 	},
-	
+
 	/**
 	 * Sorts releases by release date in descending order.
 	 */
@@ -48,7 +48,7 @@ public enum ReleaseSortOrder implements Comparator<Release> {
 			return r2.getReleaseDate().compareTo(r1.getReleaseDate());
 		}
 	},
-	
+
 	/**
 	 * Sorts releases by artist name and title in ascending order.
 	 */
@@ -59,8 +59,8 @@ public enum ReleaseSortOrder implements Comparator<Release> {
 			return result != 0 ? result : r1.getTitle().compareToIgnoreCase(r2.getTitle());
 		}
 	};
-	
-	
+
+
 	/**
 	 * Implements comparison operation. Each sort option has its own implementation.
 	 */

@@ -19,14 +19,14 @@ import java.util.regex.Pattern;
  * of Callable objects.
  */
 class Page {
-	
+
 	private static final Pattern RELEASE_LINK = Pattern.compile("(https?://[^/]+\\.[^/\\+\"]+)??/(album|track)/[^/\\+]+?(?=(\"|\\?|<))", Pattern.CASE_INSENSITIVE);
-	
+
 	private final List<Callable<Release>> releaseLoaders = new ArrayList<>();
 	private final Set<String> links = new HashSet<>();
 	private final SearchTask parentTask;
-	
-	
+
+
 	/**
 	 * Constructs a page using specified URL string and loads it.
 	 * 
@@ -40,8 +40,8 @@ class Page {
 		this.parentTask = Objects.requireNonNull(parentTask);
 		load(new URL(url));
 	}
-	
-	
+
+
 	/**
 	 * Loads a page using URL and creates a loader for every unique release 
 	 * link found on this page.
@@ -60,8 +60,8 @@ class Page {
 			}
 		}
 	}
-	
-	
+
+
 	/**
 	 * Creates a loader for the specified release link.
 	 * 
@@ -81,7 +81,7 @@ class Page {
 		};
 	}
 
-	
+
 	/**
 	 * Returns a list of loaders, each corresponding to every unique release link
 	 * found on this page. Loader is an instance of Callable which, when invoked,
@@ -91,5 +91,5 @@ class Page {
 	List<Callable<Release>> getReleaseLoaders() {
 		return releaseLoaders;
 	}
-	
+
 }

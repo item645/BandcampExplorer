@@ -36,23 +36,23 @@ import javax.script.ScriptException;
  * album or single track.
  */
 public final class Release {
-	
+
 	/**
 	 * Pattern to locate a release data within HTML page. The data is defined in JSON format
 	 * and assigned to JavaScript variable.
 	 */
 	private static final Pattern RELEASE_DATA = Pattern.compile("var TralbumData = \\{.+?\\};", Pattern.DOTALL);
-	
+
 	/**
 	 * Pattern for locating tags
 	 */
 	private static final Pattern TAG_DATA = Pattern.compile("<a class=\"tag\".+?>.+?(?=(</a>))", Pattern.DOTALL);
-	
+
 	/**
 	 * Pattern for numeric HTML escape codes
 	 */
 	private static final Pattern HTML_ESCAPE_CODE = Pattern.compile("&#\\d+;");
-	
+
 	/**
 	 * Sets some mappings for HTML escape chars to use in tags unescaping operation
 	 */
@@ -63,7 +63,7 @@ public final class Release {
 		HTML_SPECIALS.put("&lt;", "<");
 		HTML_SPECIALS.put("&gt;", ">");
 	}
-	
+
 	/**
 	 * A factory for JavaScript engines allowing to reuse instantiated engines on per-thread basis
 	 */
@@ -73,13 +73,13 @@ public final class Release {
 			return new ScriptEngineManager().getEngineByName("JavaScript");
 		}
 	};
-	
-	
+
+
 	/**
 	 * An instance of JavaScript engine is used to extract necessary stuff from JSON data.
 	 */
 	private final ScriptEngine JS = JS_ENGINES.get();
-	
+
 	private final ReadOnlyStringProperty artist;
 	private final ReadOnlyStringProperty title;
 	private final ReadOnlyObjectProperty<DownloadType> downloadType;
@@ -92,29 +92,29 @@ public final class Release {
 	private final String artworkThumbLink;
 	private final List<Track> tracks;
 	private final String information;
-	
-	
+
+
 	/**
 	 * Defines possible download types for release.
 	 */
 	public static enum DownloadType {
-		
+
 		/**
 		 * Release is free for download.
 		 */
 		FREE,
-		
+
 		/**
 		 * Release can be bought for any amount you choose or can be downloaded
 		 * for free when you specify a price of 0.
 		 */
 		NAME_YOUR_PRICE,
-		
+
 		/**
 		 * Means that you have actually pay some minimal amount to download the release.
 		 */
 		PAID,
-		
+
 		/**
 		 * Release is unavailable. This basically means that there's no
 		 * digital version of a release available for download, while there
@@ -124,7 +124,7 @@ public final class Release {
 		UNAVAILABLE
 	}
 
-	
+
 	/** 
 	 * Loads the release using specified URL string.
 	 * 
@@ -136,7 +136,7 @@ public final class Release {
 	 */
 	public Release(String url) throws IOException {
 		URI uri_ = URI.create(url);
-		
+
 		try (Scanner input = new Scanner(uri_.toURL().openStream(), StandardCharsets.UTF_8.name())) {
 			String artist_ = null, title_ = null;
 			DownloadType downloadType_;
@@ -159,7 +159,7 @@ public final class Release {
 			Set<String> tags_ = loadTags(input);
 			artworkThumbLink = loadArtworkThumbLink();
 			information = Objects.toString(property("current.about", String.class), "");
-						
+
 			// Wrapping all necessary stuff in JFX-compliant properties
 			artist = new ReadOnlyStringWrapper(Objects.toString(artist_)).getReadOnlyProperty();
 			title = new ReadOnlyStringWrapper(Objects.toString(title_)).getReadOnlyProperty();
@@ -169,15 +169,15 @@ public final class Release {
 			tags = new ReadOnlySetWrapper<>(FXCollections.unmodifiableObservableSet(FXCollections.observableSet(tags_)));
 			tagsString = new ReadOnlyStringWrapper(tags_.stream().collect(Collectors.joining(", "))).getReadOnlyProperty();
 			uri = new ReadOnlyObjectWrapper<>(uri_).getReadOnlyProperty();
-			
+
 			tracks = loadTracks(); // can be called only after this.artist is set
-			
+
 			// This serves as sort of unique identifier for release and is used for equals/hashcode
 			link = (uri_.getHost() + uri_.getPath()).toLowerCase(Locale.ROOT);
 		}
 	}
 
-	
+
 	/**
 	 * Determines the download type.
 	 */
@@ -204,8 +204,8 @@ public final class Release {
 		}
 		return result;
 	}
-	
-	
+
+
 	/**
 	 * Loads a set of tags for this release.
 	 */
@@ -252,21 +252,21 @@ public final class Release {
 			return s;
 		}
 	}	
-	
-	
+
+
 	/**
 	 * Loads all the tracks from JSON data and returns them as unmodifiable
 	 * list of Track objects.
 	 */
 	private List<Track> loadTracks() {
 		List<Track> result = new ArrayList<>();
-		
+
 		Pattern splitter = null;
 		Number numTracks = property("trackinfo.length", Number.class);
 		if (numTracks != null) {
 			for (int i = 0; i < numTracks.intValue(); i++) {
 				String trackDataID = "trackinfo[" + i + "].";
-				
+
 				String artist = null, title = null;
 				String artistTitle = property(trackDataID + "title", String.class);
 				if (artistTitle != null) {
@@ -287,24 +287,24 @@ public final class Release {
 						title = artistTitle;
 					}
 				}
-				
+
 				Number duration = property(trackDataID + "duration", Number.class);
 				float durationValue = duration != null ? duration.floatValue() : 0.0f;
 				if (durationValue < 0.0f || Float.isNaN(durationValue))
 					durationValue = 0.0f;
-				
+
 				String fileLink = null;
 				if (property(trackDataID + "file", Object.class) != null)
 					fileLink = property(trackDataID + "file['mp3-128']", String.class);
-				
+
 				result.add(new Track(i + 1,	Objects.toString(artist), Objects.toString(title), durationValue, fileLink));
 			}
 		}
-		
+
 		return Collections.unmodifiableList(result);
 	}
-	
-	
+
+
 	/**
 	 * Gets a link to release artwork thumbnail image.
 	 */
@@ -324,8 +324,8 @@ public final class Release {
 		else
 			return s;
 	}
-	
-	
+
+
 	/**
 	 * Helper method for reading dates from JSON data.
 	 * Returns LocalDate.MIN if date is invalid or absent.
@@ -344,7 +344,7 @@ public final class Release {
 		return result;
 	}
 
-	
+
 	/**
 	 * Helper method for extracting the value of named JSON property in typesafe manner. 
 	 * @param name property name
@@ -359,16 +359,16 @@ public final class Release {
 			return null;
 		}
 	}
-	
-	
+
+
 	/**
 	 * To log errors encountered when reading individual properties from JSON.
 	 */
 	private void logError(Exception e) {
 		System.err.println("Error processing release data: " + uri.get() + " (" + e + ")");
 	}
-	
-	
+
+
 	/**
 	 * Returns a hash code for this release.
 	 */
@@ -407,7 +407,7 @@ public final class Release {
 				.append(tags.get()).append(" (").append(uri.get()).append(")").toString();
 	}
 
-	
+
 	/**
 	 * Returns an artist of this release.
 	 */
@@ -415,7 +415,7 @@ public final class Release {
 		return artist.get();
 	}
 
-	
+
 	/**
 	 * Returns an artist as read-only JavaFX property.
 	 */
@@ -423,7 +423,7 @@ public final class Release {
 		return artist;
 	}
 
-	
+
 	/**
 	 * Returns a title of this release.
 	 */
@@ -431,7 +431,7 @@ public final class Release {
 		return title.get();
 	}
 
-	
+
 	/**
 	 * Returns a title as read-only JavaFX property.
 	 */
@@ -446,8 +446,8 @@ public final class Release {
 	public DownloadType getDownloadType() {
 		return downloadType.get();
 	}
-	
-	
+
+
 	/**
 	 * Returns a download type as read-only JavaFX property.
 	 */
@@ -455,7 +455,7 @@ public final class Release {
 		return downloadType;
 	}
 
-	
+
 	/**
 	 * Returns a release date.
 	 * On some releases the date is not specified, in that case LocalDate.MIN is returned.
@@ -464,7 +464,7 @@ public final class Release {
 		return releaseDate.get();
 	}
 
-	
+
 	/**
 	 * Returns a release date as read-only JavaFX property.
 	 */
@@ -472,7 +472,7 @@ public final class Release {
 		return releaseDate;
 	}
 
-	
+
 	/**
 	 * Returns a publish date, that is, the date when release was 
 	 * originally published on Bandcamp.
@@ -481,7 +481,7 @@ public final class Release {
 		return publishDate.get();
 	}
 
-	
+
 	/**
 	 * Returns a publish date as read-only JavaFX property.
 	 */
@@ -489,15 +489,15 @@ public final class Release {
 		return publishDate;
 	}
 
-	
+
 	/**
 	 * Returns a URI of this release.
 	 */
 	public URI getURI() {
 		return uri.get();
 	}
-	
-	
+
+
 	/**
 	 * Returns a URI as read-only JavaFX property.
 	 */
@@ -505,7 +505,7 @@ public final class Release {
 		return uri;
 	}
 
-	
+
 	/**
 	 * Returns a set of tags describing this release.
 	 */
@@ -513,7 +513,7 @@ public final class Release {
 		return tags.get();
 	}
 
-	
+
 	/**
 	 * Returns a set of tags as read-only JavaFX property.
 	 */
@@ -521,7 +521,7 @@ public final class Release {
 		return tags;
 	}
 
-	
+
 	/**
 	 * Returns a set of tags as string where individual tags
 	 * are separated by comma and space.
@@ -530,7 +530,7 @@ public final class Release {
 		return tagsString.get();
 	}
 
-	
+
 	/**
 	 * Returns a set of tags in string form as read-only JavaFX property.
 	 */
@@ -538,7 +538,7 @@ public final class Release {
 		return tagsString;
 	}
 
-	
+
 	/**
 	 * Returns an unmodifiable list of all tracks on this release.
 	 * If no tracks were found, returns empty list.
@@ -566,5 +566,5 @@ public final class Release {
 	public String getInformation() {
 		return information;
 	}
-	
+
 }

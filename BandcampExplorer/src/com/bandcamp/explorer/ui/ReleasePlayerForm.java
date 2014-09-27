@@ -45,7 +45,7 @@ import com.bandcamp.explorer.data.Track;
  * Controller class for release player form.
  */
 public class ReleasePlayerForm {
-	
+
 	private Stage stage;
 	@FXML private SplitPane rootPane;
 	@FXML private Button previousButton;
@@ -65,38 +65,38 @@ public class ReleasePlayerForm {
 	@FXML private TableColumn<Track, String> artistColumn;
 	@FXML private TableColumn<Track, String> titleColumn;
 	@FXML private TableColumn<Track, Track.Time> timeColumn;
-	
+
 	// Icons for player control buttons
 	private static final ImageView PLAY_ICON     = loadIcon("player_play.png");
 	private static final ImageView PAUSE_ICON    = loadIcon("player_pause.png");
 	private static final ImageView STOP_ICON     = loadIcon("player_stop.png");
 	private static final ImageView PREVIOUS_ICON = loadIcon("player_previous.png");
 	private static final ImageView NEXT_ICON     = loadIcon("player_next.png");
-	
+
 	// For play buttons in a track list view we use text instead
 	private static final String PLAY_TEXT = "\u25BA";
 	private static final String PAUSE_TEXT = "||";
-	
+
 
 	private final AudioPlayer audioPlayer = new AudioPlayer();
 	private final TrackList trackList = new TrackList();
 	private TrackListView trackListView;
 	private Release release;
-	
-	
+
+
 	/**
 	 * Thin wrapper around tracks table view also encapsulating and providing access
 	 * to some associated stuff, like observable items list and list of play buttons 
 	 * from first column.
 	 */
 	private static class TrackListView {
-		
+
 		private final TableView<Track> tableView;
 		private final ObservableList<Track> observableTracks = FXCollections.observableArrayList();
 		private final SortedList<Track> sortedTracks = new SortedList<>(observableTracks);
 		private final List<Button> playButtons = new ArrayList<>();
-		
-		
+
+
 		/**
 		 * Creates a wrapper around specified table view.
 		 * 
@@ -107,16 +107,16 @@ public class ReleasePlayerForm {
 			this.tableView.setItems(sortedTracks);
 			sortedTracks.comparatorProperty().bind(tableView.comparatorProperty());
 		}
-		
-		
+
+
 		/**
 		 * Removes all items from this track list view.
 		 */
 		void clear() {
 			observableTracks.clear();
 		}
-		
-		
+
+
 		/**
 		 * Adds a collection of tracks as items to this track list view.
 		 * 
@@ -125,27 +125,27 @@ public class ReleasePlayerForm {
 		void addAll(Collection<Track> tracks) {
 			observableTracks.addAll(tracks);
 		}
-		
-		
+
+
 		/**
 		 * Returns a list of play buttons from table's first column.
 		 */
 		List<Button> getPlayPuttons() {
 			return playButtons;
 		}
-		
+
 	}
-	
-	
+
+
 	/**
 	 * A subclass of ArrayList representing a list of tracks and providing
 	 * additional methods for playable tracks lookup.
 	 */
 	private static class TrackList extends ArrayList<Track> {
-		
+
 		private static final long serialVersionUID = 2980118610902127703L;
-		
-		
+
+
 		/**
 		 * Finds a first playable track in this list.
 		 * 
@@ -157,8 +157,8 @@ public class ReleasePlayerForm {
 					return t;
 			return null;
 		}
-		
-		
+
+
 		/**
 		 * Returns the closest playable track previous to
 		 * the given track.
@@ -176,7 +176,7 @@ public class ReleasePlayerForm {
 			}
 			return null;
 		}
-		
+
 
 		/**
 		 * Returns the closest playable track next to
@@ -195,10 +195,10 @@ public class ReleasePlayerForm {
 			}
 			return null;
 		}
-		
+
 	}
-	
-	
+
+
 	/**
 	 * AudioPlayer is used to actually play audio tracks on release.
 	 * This class employs JavaFX MediaPlayer to play audio and works with associated
@@ -207,9 +207,9 @@ public class ReleasePlayerForm {
 	 * adjusting track's position and changing sound volume level.
 	 */
 	private class AudioPlayer {
-		
+
 		private final String LOADING_TRACK_MSG = "Loading track...";
-		
+
 		private MediaPlayer player;
 		private Track track;
 		private Duration duration;
@@ -217,8 +217,8 @@ public class ReleasePlayerForm {
 		private ChangeListener<? super Number> volumeSliderValueListener;
 		private long currentSecond = -1;
 		private boolean preventTimeSliderSeek;
-		
-		
+
+
 		/**
 		 * Sets up a track to play in this audio player.
 		 * This method triggers a load of track's audio data and prepares
@@ -233,18 +233,18 @@ public class ReleasePlayerForm {
 				return;
 			if (!track.isPlayable())
 				throw new IllegalArgumentException("Track is not playable: " + track);
-			
+
 			if (player != null)
 				quit();
 			player = new MediaPlayer(new Media(track.getFileLink()));
 			this.track = track;
-			
+
 			player.setVolume(volumeSlider.getValue() / volumeSlider.getMax());
 			player.currentTimeProperty().addListener(observable -> updateTrackProgress());
 			nowPlayingInfo.setText(LOADING_TRACK_MSG);
-			
+
 			setStateTransitionHandlers();
-			
+
 			timeSlider.setDisable(false);
 			timeSlider.valueProperty().addListener(
 					timeSliderValueListener = (observable, oldValue, newValue) -> {
@@ -256,17 +256,17 @@ public class ReleasePlayerForm {
 					volumeSliderValueListener = (observable, oldValue, newValue) -> {
 						player.setVolume(newValue.doubleValue() / volumeSlider.getMax());
 					});
-			
+
 			disablePlayerButtons(false);
 			playButton.setOnAction(event -> play());
 			stopButton.setOnAction(event -> stop());
 			prepareSwitchButton(previousButton, trackList.getPreviousPlayableTrack(track));
 			prepareSwitchButton(nextButton, trackList.getNextPlayableTrack(track));
-			
+
 			currentSecond = -1;
 		}
-		
-		
+
+
 		/**
 		 * Assigns handlers for media player state transition events.
 		 */
@@ -313,7 +313,7 @@ public class ReleasePlayerForm {
 				quit();
 			});
 		}
-		
+
 
 		/**
 		 * Checks if player is currently playing audio.
@@ -321,8 +321,8 @@ public class ReleasePlayerForm {
 		boolean isPlaying() {
 			return player != null && player.getStatus() == Status.PLAYING;
 		}
-		
-		
+
+
 		/**
 		 * Checks if player is currently playing specified track.
 		 * 
@@ -331,8 +331,8 @@ public class ReleasePlayerForm {
 		boolean isPlayingTrack(Track track) {
 			return isPlaying() && this.track == track;
 		}
-		
-		
+
+
 		/**
 		 * Starts playback for current track.
 		 */
@@ -345,8 +345,8 @@ public class ReleasePlayerForm {
 				}
 			}
 		}
-		
-		
+
+
 		/**
 		 * Pauses currently playing track.
 		 */
@@ -354,8 +354,8 @@ public class ReleasePlayerForm {
 			if (isPlaying())
 				player.pause();
 		}
-		
-		
+
+
 		/**
 		 * Stop playback for current track.
 		 */
@@ -368,8 +368,8 @@ public class ReleasePlayerForm {
 				}
 			}
 		}
-		
-		
+
+
 		/**
 		 * Quits this player, unloading media for current track, disabling controls
 		 * and resetting its state values to default.
@@ -391,7 +391,7 @@ public class ReleasePlayerForm {
 			disablePlayerButtons(true);
 		}
 
-		
+
 		/**
 		 * Disables/enable player's control buttons
 		 */
@@ -401,8 +401,8 @@ public class ReleasePlayerForm {
 			previousButton.setDisable(disable);
 			nextButton.setDisable(disable);
 		}
-		
-		
+
+
 		/**
 		 * Sets up previous/next button for playing specified track.
 		 * 
@@ -422,8 +422,8 @@ public class ReleasePlayerForm {
 				});
 			}
 		}
-		
-		
+
+
 		/**
 		 * Updates play buttons in a tracklist view so that they conform to
 		 * audio player current state.
@@ -458,8 +458,8 @@ public class ReleasePlayerForm {
 				}
 			}
 		}
-		
-		
+
+
 		/**
 		 * Updates information about current track's progress.
 		 * This includes updating of time slider to reflect current track time as
@@ -470,22 +470,22 @@ public class ReleasePlayerForm {
 			Duration currentTime = player.getCurrentTime();
 			long second = currentTime.equals(player.getStopTime()) 
 					? Math.round(currentTime.toSeconds()) : (long)currentTime.toSeconds();
-			if (second == currentSecond)
-				return; // prevents updating more than once in a second
-			else
-				currentSecond = second;
-			
-			nowPlayingInfo.setText(getNowPlayingInfo(currentTime));
-			
-			timeSlider.setDisable(duration.isUnknown());
-			if (!timeSlider.isDisabled() && duration.greaterThan(Duration.ZERO) && !timeSlider.isValueChanging()) {
-				preventTimeSliderSeek = true; // prevents unnecessary firing of time slider seek listener
-				timeSlider.setValue(currentTime.divide(duration.toMillis()).toMillis() * timeSlider.getMax());
-				preventTimeSliderSeek = false;
-			}
+					if (second == currentSecond)
+						return; // prevents updating more than once in a second
+					else
+						currentSecond = second;
+
+					nowPlayingInfo.setText(getNowPlayingInfo(currentTime));
+
+					timeSlider.setDisable(duration.isUnknown());
+					if (!timeSlider.isDisabled() && duration.greaterThan(Duration.ZERO) && !timeSlider.isValueChanging()) {
+						preventTimeSliderSeek = true; // prevents unnecessary firing of time slider seek listener
+						timeSlider.setValue(currentTime.divide(duration.toMillis()).toMillis() * timeSlider.getMax());
+						preventTimeSliderSeek = false;
+					}
 		}
-		
-		
+
+
 		/**
 		 * Builds a string to display in nowPlayingInfo label using current track time.
 		 * 
@@ -498,7 +498,7 @@ public class ReleasePlayerForm {
 					.append(formatTime(duration)).append(")").toString();
 		}
 
-		
+
 		/**
 		 * Converts given duration to a string representation using HH:mm:ss or
 		 * mm:ss format, depending on its length.
@@ -511,10 +511,10 @@ public class ReleasePlayerForm {
 			return LocalTime.ofSecondOfDay(seconds)
 					.format(seconds >= 3600 ? Track.Time.HH_mm_ss : Track.Time.mm_ss);
 		}
-				
+
 	}
 
-	
+
 	/**
 	 * Loads an icon for player control button.
 	 * 
@@ -525,8 +525,8 @@ public class ReleasePlayerForm {
 		URL url = ReleasePlayerForm.class.getResource(name);
 		return url != null ? new ImageView(url.toString()) : null;
 	}
-	
-	
+
+
 	/**
 	 * Sets the owner window for player's top stage.
 	 * This method is used to set the primary stage as an owner to ensure
@@ -540,8 +540,8 @@ public class ReleasePlayerForm {
 	public void setOwner(Window owner) {
 		stage.initOwner(owner);
 	}
-	
-	
+
+
 	/**
 	 * Sets a release to play in this player.
 	 * 
@@ -571,17 +571,17 @@ public class ReleasePlayerForm {
 		}
 		else
 			this.release = release;
-		
+
 		if (release != null) {
 			audioPlayer.quit();
-			
+
 			// Loading artwork
 			String artworkLink = release.getArtworkThumbLink();
 			artworkView.setImage(artworkLink != null ? new Image(artworkLink, true) : null);
-			
+
 			// Setting release page link
 			releaseLink.setText(release.getURI().toString());
-			
+
 			// Setting release info
 			String tagsStr = release.getTagsString();
 			if (!tagsStr.isEmpty()) {
@@ -590,7 +590,7 @@ public class ReleasePlayerForm {
 			}
 			else
 				releaseInfo.setText(release.getInformation());
-			
+
 			// Setting the tracklist
 			trackList.clear();
 			trackList.addAll(release.getTracks());
@@ -602,12 +602,12 @@ public class ReleasePlayerForm {
 			List<Button> playButtons = trackListView.getPlayPuttons();
 			playButtons.clear();
 			trackList.forEach(track -> playButtons.add(null));
-			
+
 			// Prepare the first playable track to play
 			Track first = trackList.getFirstPlayableTrack();
 			if (first != null)
 				audioPlayer.setTrack(first);
-			
+
 			// Show the window
 			stage.setTitle(release.getArtist() + " - " + release.getTitle());
 			stage.setIconified(false);
@@ -627,44 +627,44 @@ public class ReleasePlayerForm {
 		}
 	}
 
-	
+
 	/**
 	 * Helper method to check if all components defined by FXML file have been injected.
 	 */
 	private void checkComponents() {
 		// copy-pasted from SceneBuilder's "sample controller skeleton" window
-        assert volumeLevel != null : "fx:id=\"volumeLevel\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert artistColumn != null : "fx:id=\"artistColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert tracksTableView != null : "fx:id=\"tracksTableView\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert previousButton != null : "fx:id=\"previousButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert rootPane != null : "fx:id=\"rootPane\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert releaseInfo != null : "fx:id=\"releaseInfo\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert artworkView != null : "fx:id=\"artworkView\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert playButton != null : "fx:id=\"playButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert nextButton != null : "fx:id=\"nextButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert timeColumn != null : "fx:id=\"timeColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert releaseLink != null : "fx:id=\"releaseLink\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert volumeSlider != null : "fx:id=\"volumeSlider\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert playButtonColumn != null : "fx:id=\"playButtonColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert titleColumn != null : "fx:id=\"titleColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert nowPlayingInfo != null : "fx:id=\"nowPlayingInfo\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert stopButton != null : "fx:id=\"stopButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert timeSlider != null : "fx:id=\"timeSlider\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-        assert trackNumberColumn != null : "fx:id=\"trackNumberColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert volumeLevel != null : "fx:id=\"volumeLevel\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert artistColumn != null : "fx:id=\"artistColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert tracksTableView != null : "fx:id=\"tracksTableView\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert previousButton != null : "fx:id=\"previousButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert rootPane != null : "fx:id=\"rootPane\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert releaseInfo != null : "fx:id=\"releaseInfo\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert artworkView != null : "fx:id=\"artworkView\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert playButton != null : "fx:id=\"playButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert nextButton != null : "fx:id=\"nextButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert timeColumn != null : "fx:id=\"timeColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert releaseLink != null : "fx:id=\"releaseLink\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert volumeSlider != null : "fx:id=\"volumeSlider\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert playButtonColumn != null : "fx:id=\"playButtonColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert titleColumn != null : "fx:id=\"titleColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert nowPlayingInfo != null : "fx:id=\"nowPlayingInfo\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert stopButton != null : "fx:id=\"stopButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert timeSlider != null : "fx:id=\"timeSlider\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert trackNumberColumn != null : "fx:id=\"trackNumberColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 	}
-	
-	
-    /**
-     * Initialization method invoked by FXML loader, provides initial setup for components.
-     */
+
+
+	/**
+	 * Initialization method invoked by FXML loader, provides initial setup for components.
+	 */
 	@FXML
 	private void initialize() {
 		checkComponents();
-		
+
 		initStage();
-		
+
 		trackListView = new TrackListView(tracksTableView);
-		
+
 		// Setting a custom cell factory to display a play/pause button 
 		// for each playable track
 		playButtonColumn.setCellFactory(CellFactories.nodeCellFactory(track -> {
@@ -694,31 +694,31 @@ public class ReleasePlayerForm {
 				return null; // don't create buttons for unplayable tracks
 		}));
 		playButtonColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue()));
-		
+
 		trackNumberColumn.setCellValueFactory(cellData -> cellData.getValue().numberProperty());
-		
-        artistColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
-        artistColumn.setCellFactory(CellFactories.tooltipCellFactory(artistColumn.getCellFactory()));
-        artistColumn.setCellValueFactory(cellData -> cellData.getValue().artistProperty());
-        
-        titleColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
-        titleColumn.setCellFactory(CellFactories.tooltipCellFactory(titleColumn.getCellFactory()));
-        titleColumn.setCellValueFactory(cellData -> cellData.getValue().titleProperty());
-        
-        timeColumn.setCellValueFactory(cellData -> cellData.getValue().timeProperty());
-        
-        playButton.setGraphic(PLAY_ICON);
-        stopButton.setGraphic(STOP_ICON);
-        previousButton.setGraphic(PREVIOUS_ICON);
-        nextButton.setGraphic(NEXT_ICON);
-        
-        // Make the volume label display volume percentage
-        volumeLevel.textProperty().bind(
-        		Bindings.createStringBinding(
-        				() -> Math.round(volumeSlider.getValue()) + "%", volumeSlider.valueProperty()));
+
+		artistColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
+		artistColumn.setCellFactory(CellFactories.tooltipCellFactory(artistColumn.getCellFactory()));
+		artistColumn.setCellValueFactory(cellData -> cellData.getValue().artistProperty());
+
+		titleColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
+		titleColumn.setCellFactory(CellFactories.tooltipCellFactory(titleColumn.getCellFactory()));
+		titleColumn.setCellValueFactory(cellData -> cellData.getValue().titleProperty());
+
+		timeColumn.setCellValueFactory(cellData -> cellData.getValue().timeProperty());
+
+		playButton.setGraphic(PLAY_ICON);
+		stopButton.setGraphic(STOP_ICON);
+		previousButton.setGraphic(PREVIOUS_ICON);
+		nextButton.setGraphic(NEXT_ICON);
+
+		// Make the volume label display volume percentage
+		volumeLevel.textProperty().bind(
+				Bindings.createStringBinding(
+						() -> Math.round(volumeSlider.getValue()) + "%", volumeSlider.valueProperty()));
 	}
-	
-	
+
+
 	/**
 	 * Loads a top level stage for this player.
 	 */
@@ -732,8 +732,8 @@ public class ReleasePlayerForm {
 		});
 		stage.setScene(new Scene(rootPane));
 	}
-	
-	
+
+
 	/**
 	 * Plays a track selected in track list view.
 	 */
@@ -744,36 +744,36 @@ public class ReleasePlayerForm {
 			audioPlayer.play();
 		}
 	}
-	
 
-    /**
-     * Handler for key press on table view.
-     * If Enter was pressed, plays selected track.
-     */
-    @FXML
-    private void onTracksTableKeyPress(KeyEvent event) {
-    	if (event.getCode() == KeyCode.ENTER)
-    		playSelectedTrack();
-    }
-	
-    
-    /**
-     * Handler for mouse click on a table view.
-     * If double-clicked , plays selected track.
-     */
-    @FXML
-    private void onTracksTableMouseClick(MouseEvent event) {
-    	if (event.getClickCount() > 1)
-    		playSelectedTrack();
-    }
-	
-    
-    /**
-     * Opens release web page on Bandcamp using default web browser.
-     */
-    @FXML
-    private void openReleasePage() {
-    	if (release != null)
-    		Utils.browse(release.getURI());
-    }
+
+	/**
+	 * Handler for key press on table view.
+	 * If Enter was pressed, plays selected track.
+	 */
+	@FXML
+	private void onTracksTableKeyPress(KeyEvent event) {
+		if (event.getCode() == KeyCode.ENTER)
+			playSelectedTrack();
+	}
+
+
+	/**
+	 * Handler for mouse click on a table view.
+	 * If double-clicked , plays selected track.
+	 */
+	@FXML
+	private void onTracksTableMouseClick(MouseEvent event) {
+		if (event.getClickCount() > 1)
+			playSelectedTrack();
+	}
+
+
+	/**
+	 * Opens release web page on Bandcamp using default web browser.
+	 */
+	@FXML
+	private void openReleasePage() {
+		if (release != null)
+			Utils.browse(release.getURI());
+	}
 }

@@ -15,26 +15,26 @@ import javafx.beans.property.ReadOnlyStringWrapper;
  * Represents an individual audio track on release.
  */
 public final class Track {
-	
+
 	private final ReadOnlyIntegerProperty number;
 	private final ReadOnlyStringProperty artist;
 	private final ReadOnlyStringProperty title;
 	private final ReadOnlyObjectProperty<Time> time;
 	private final String fileLink;
 
-	
+
 	/**
 	 * Class for representing a track time.
 	 */
 	public static final class Time implements Comparable<Time> {
-		
+
 		public static final DateTimeFormatter HH_mm_ss = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.ENGLISH);
 		public static final DateTimeFormatter mm_ss = DateTimeFormatter.ofPattern("mm:ss", Locale.ENGLISH);
-		
+
 		private final int seconds;
 		private final String asString;
-		
-		
+
+
 		/**
 		 * Constructs an instance of Time using specified duration in seconds.
 		 */
@@ -42,7 +42,7 @@ public final class Track {
 			this.seconds = seconds;
 			this.asString = LocalTime.ofSecondOfDay(seconds).format(seconds >= 3600 ? HH_mm_ss : mm_ss);
 		}
-		
+
 		/**
 		 * Returns a hash code for this time.
 		 */
@@ -50,8 +50,8 @@ public final class Track {
 		public int hashCode() {
 			return seconds;
 		}
-		
-		
+
+
 		/**
 		 * Tests this time object for equality with another.
 		 * Two time objects are equal if they contain same number of seconds.
@@ -61,7 +61,7 @@ public final class Track {
 			if (this == other) return true;
 			return other instanceof Time ? this.seconds == ((Time)other).seconds : false;
 		}
-		
+
 
 		/** 
 		 * Compares this time to another using their duration in seconds.
@@ -70,8 +70,8 @@ public final class Track {
 		public int compareTo(Time other) {
 			return Integer.compare(this.seconds, other.seconds);
 		}
-		
-		
+
+
 		/**
 		 * Returns a string representation of this time, which can be either in
 		 * HH:mm:ss format (if duration >= 1 hour) or mm:ss format (if duration < 1 hour). 
@@ -80,18 +80,18 @@ public final class Track {
 		public String toString() {
 			return asString;
 		}
-		
-		
+
+
 		/**
-		 * Returns a duration of this time is seconds.
+		 * Returns a duration of this time in seconds.
 		 */
 		public int getSeconds() {
 			return seconds;
 		}
-		
+
 	}
 
-	
+
 	/**
 	 * Constructs a track instance using specified parameters.
 	 * 
@@ -106,7 +106,7 @@ public final class Track {
 		assert artist != null;
 		assert title != null;
 		assert seconds >= 0.0 && !Float.isNaN(seconds);
-		
+
 		this.number = new ReadOnlyIntegerWrapper(number).getReadOnlyProperty();
 		this.artist = new ReadOnlyStringWrapper(artist).getReadOnlyProperty();
 		this.title = new ReadOnlyStringWrapper(title).getReadOnlyProperty();
@@ -114,7 +114,7 @@ public final class Track {
 		this.fileLink = fileLink;
 	}
 
-	
+
 	/**
 	 * Returns a string representation of this track.
 	 */
@@ -140,7 +140,7 @@ public final class Track {
 	public ReadOnlyIntegerProperty numberProperty() {
 		return number;
 	}
-	
+
 
 	/**
 	 * Returns artist name.
@@ -149,7 +149,7 @@ public final class Track {
 		return artist.get();
 	}
 
-	
+
 	/**
 	 * Returns artist name as read-only JavaFX property.
 	 */
@@ -157,7 +157,7 @@ public final class Track {
 		return artist;
 	}
 
-	
+
 	/**
 	 * Returns a title of this track.
 	 */
@@ -165,7 +165,7 @@ public final class Track {
 		return title.get();
 	}
 
-	
+
 	/**
 	 * Returns a title of this track as read-only JavaFX property.
 	 */
@@ -173,7 +173,7 @@ public final class Track {
 		return title;
 	}
 
-	
+
 	/**
 	 * Returns track time.
 	 */
@@ -181,15 +181,15 @@ public final class Track {
 		return time.get();
 	}
 
-	
+
 	/**
 	 * Returns track time as read-only JavaFX property.
 	 */
 	public ReadOnlyObjectProperty<Time> timeProperty() {
 		return time;
 	}
-	
-	
+
+
 	/**
 	 * Returns an URL string that points to this track's actual audio file.
 	 * If no audio file is available, returns null.
@@ -197,13 +197,13 @@ public final class Track {
 	public String getFileLink() {
 		return fileLink;
 	}
-	
-	
+
+
 	/**
 	 * Returns true if this track can be played (i.e. if this track has associated audio data).
 	 */
 	public boolean isPlayable() {
 		return fileLink != null;
 	}
-	
+
 }

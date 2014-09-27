@@ -22,24 +22,24 @@ public final class SearchEngine {
 	 * An executor service to be passed to created search tasks
 	 */
 	private final ExecutorService executor;
-	
+
 	/**
 	 * A set of search results
 	 */
 	private final Set<Release> releases = Collections.newSetFromMap(new ConcurrentHashMap<>());
-	
+
 	/**
 	 * Simple mutex to serialize a running of search tasks
 	 */
 	private final Semaphore searchMutex = new Semaphore(1);
-	
-	
+
+
 	/**
 	 * A reference to currently running search task
 	 */
 	private volatile SearchTask runningTask;
-	
-	
+
+
 	/**
 	 * Creates a search engine with the specified executor service.
 	 * 
@@ -51,7 +51,7 @@ public final class SearchEngine {
 		this.executor = Objects.requireNonNull(executor);
 	}
 
-	
+
 	/**
 	 * Creates a new search task for the specified parameters.
 	 * 
@@ -61,8 +61,8 @@ public final class SearchEngine {
 	public SearchTask newTaskFor(SearchParams params) {
 		return new SearchTask(params, this, executor);
 	}
-	
-	
+
+
 	/**
 	 * Cancels currently running task, if any.
 	 */
@@ -71,16 +71,16 @@ public final class SearchEngine {
 		if (task != null)
 			task.cancel(false);
 	}
-	
-	
+
+
 	/**
 	 * Checks if there is a task running now.
 	 */
 	public boolean isTaskRunning() {
 		return runningTask != null;
 	}
-	
-	
+
+
 	/**
 	 * Returns a list of unique releases comprising current search results,
 	 * optionally allowing to sort them using specified comparator.
@@ -99,23 +99,23 @@ public final class SearchEngine {
 		return results;
 	}
 
-	
+
 	/**
 	 * Returns a number of releases in current search results.
 	 */
 	public int getResultsCount() {
 		return releases.size();
 	}
-	
-	
+
+
 	/**
 	 * Clears current search results.
 	 */
 	public void clearResults() {
 		releases.clear();
 	}
-	
-	
+
+
 	/**
 	 * Adds new set of releases to the current results, eliminating duplicate
 	 * entries, if any.
@@ -125,8 +125,8 @@ public final class SearchEngine {
 	void addResults(Set<Release> results) {
 		releases.addAll(results);
 	}
-	
-	
+
+
 	/**
 	 * Registers search task as running within context of this search engine.
 	 * This method is called from search task just after it has started to execute.
@@ -144,8 +144,8 @@ public final class SearchEngine {
 		searchMutex.acquireUninterruptibly();
 		runningTask = task;
 	}
-	
-	
+
+
 	/**
 	 * Unregisters search task as running in this search engine.
 	 * If {@link SearchEngine#setRunningTask()} was invoked, this method must
@@ -160,5 +160,5 @@ public final class SearchEngine {
 			searchMutex.release();
 		}
 	}
-	
+
 }

@@ -6,13 +6,13 @@ import java.util.Objects;
  * Simple container class to provide parameters for creating search tasks.
  */
 public class SearchParams {
-	
+
 	final String searchQuery;
 	final SearchType searchType;
 	final int pages;
 	final boolean combineResults;
 
-	
+
 	/**
 	 * A builder to supply search parameters in convenient way.
 	 */
@@ -21,8 +21,8 @@ public class SearchParams {
 		private final SearchType searchType;
 		private int pages = 1;
 		private boolean combineResults = false;
-		
-		
+
+
 		/**
 		 * Constructs a builer with mandatory parameters.
 		 * 
@@ -35,7 +35,7 @@ public class SearchParams {
 			this.searchQuery = Objects.requireNonNull(searchQuery);
 			this.searchType = Objects.requireNonNull(searchType);
 		}
-		
+
 		/**
 		 * A number of pages to search.
 		 * Default is 1.
@@ -47,8 +47,8 @@ public class SearchParams {
 			this.pages = value;
 			return this;
 		}
-		
-		
+
+
 		/**
 		 * Indicates whether current search results must be combined with preceding results.
 		 * Default is false.
@@ -61,18 +61,18 @@ public class SearchParams {
 			this.combineResults = value;
 			return this;
 		}
-		
-		
+
+
 		/**
 		 * Creates an instance of SearchParams using parameters passed to this builder.
 		 */
 		public SearchParams build() {
 			return new SearchParams(this);
 		}
-		
+
 	}
-	
-	
+
+
 	/**
 	 * Creates an instance of SearchParams.
 	 */
