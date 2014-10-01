@@ -43,6 +43,7 @@ public final class Track {
 			this.asString = LocalTime.ofSecondOfDay(seconds).format(seconds >= 3600 ? HH_mm_ss : mm_ss);
 		}
 
+		
 		/**
 		 * Returns a hash code for this time.
 		 */

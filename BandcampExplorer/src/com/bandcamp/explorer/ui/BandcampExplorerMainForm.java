@@ -93,8 +93,8 @@ public class BandcampExplorerMainForm {
 	 * 
 	 * @param searchEngine a search engine
 	 * @throws NullPointerException if searchEngine is null
-	 * @throws IllegalStateException if search engine currently used by this form 
-	 * 		   has a task running now
+	 * @throws IllegalStateException if search engine currently used by this form
+	 *         has a task running now
 	 */
 	public void setSearchEngine(SearchEngine searchEngine) {
 		Objects.requireNonNull(searchEngine);

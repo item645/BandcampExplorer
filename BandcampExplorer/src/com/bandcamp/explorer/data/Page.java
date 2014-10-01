@@ -33,7 +33,7 @@ class Page {
 	 * @param url URL string
 	 * @param parentTask an instance of SearchTask that requests a page loading
 	 * @throws IOException if page cannot be loaded for some reason 
-	 * 		   or supplied URL string is not valid
+	 *         or supplied URL string is not valid
 	 * @throws NullPointerException if parent task is null
 	 */
 	Page(String url, SearchTask parentTask) throws IOException {
@@ -67,7 +67,7 @@ class Page {
 	 * 
 	 * @param link a link (http URL string, pointing to a release)
 	 * @return a Callable object, containing code to load the release; null, if
-	 * 		   parent task has been cancelled
+	 *         parent task has been cancelled
 	 */
 	private Callable<Release> createReleaseLoader(String link) {	
 		return () -> {

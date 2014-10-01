@@ -44,7 +44,7 @@ public final class SearchEngine {
 	 * Creates a search engine with the specified executor service.
 	 * 
 	 * @param executor an executor service to be used by search tasks
-	 * 		  for loading operations
+	 *        for loading operations
 	 * @throws NullPointerException if executor is null
 	 */
 	public SearchEngine(ExecutorService executor) {

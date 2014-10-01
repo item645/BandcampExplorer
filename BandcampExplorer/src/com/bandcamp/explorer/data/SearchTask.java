@@ -39,7 +39,7 @@ public final class SearchTask extends Task<Set<Release>> {
 	 * @param params search parameters
 	 * @param searchEngine a search engine that was used to create this task
 	 * @param executor an instance of executor service that will be employed
-	 * 		  to execute all loading operations 
+	 *        to execute all loading operations 
 	 * @throws NullPointerException if params, search engine or executor is null 
 	 */
 	SearchTask(SearchParams params, SearchEngine searchEngine, ExecutorService executor) {

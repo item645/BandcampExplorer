@@ -27,7 +27,7 @@ public class SearchParams {
 		 * Constructs a builer with mandatory parameters.
 		 * 
 		 * @param searchQuery a string representing search query; the actual meaning of
-		 * 		  search query depends on specified search type
+		 *        search query depends on specified search type
 		 * @param searchType a search type option as provided by SearchType enum
 		 * @throws NullPointerException of search query or search type is null
 		 */
@@ -36,6 +36,7 @@ public class SearchParams {
 			this.searchType = Objects.requireNonNull(searchType);
 		}
 
+		
 		/**
 		 * A number of pages to search.
 		 * Default is 1.
@@ -54,7 +55,7 @@ public class SearchParams {
 		 * Default is false.
 		 * 
 		 * @param value if true, results will be combined, else - new search result
-		 * 		  will replace any preceding one
+		 *        will replace any preceding one
 		 * @return this builder
 		 */
 		public Builder combineResults(boolean value) {

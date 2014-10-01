@@ -247,15 +247,15 @@ public class ReleasePlayerForm {
 
 			timeSlider.setDisable(false);
 			timeSlider.valueProperty().addListener(
-					timeSliderValueListener = (observable, oldValue, newValue) -> {
-						if (!preventTimeSliderSeek)
-							player.seek(duration.multiply(newValue.doubleValue() / timeSlider.getMax()));
-					});
+				timeSliderValueListener = (observable, oldValue, newValue) -> {
+					if (!preventTimeSliderSeek)
+						player.seek(duration.multiply(newValue.doubleValue() / timeSlider.getMax()));
+			});
 			volumeSlider.setDisable(false);
 			volumeSlider.valueProperty().addListener(
-					volumeSliderValueListener = (observable, oldValue, newValue) -> {
-						player.setVolume(newValue.doubleValue() / volumeSlider.getMax());
-					});
+				volumeSliderValueListener = (observable, oldValue, newValue) -> {
+					player.setVolume(newValue.doubleValue() / volumeSlider.getMax());
+			});
 
 			disablePlayerButtons(false);
 			playButton.setOnAction(event -> play());
@@ -470,19 +470,19 @@ public class ReleasePlayerForm {
 			Duration currentTime = player.getCurrentTime();
 			long second = currentTime.equals(player.getStopTime()) 
 					? Math.round(currentTime.toSeconds()) : (long)currentTime.toSeconds();
-					if (second == currentSecond)
-						return; // prevents updating more than once in a second
-					else
-						currentSecond = second;
+			if (second == currentSecond)
+				return; // prevents updating more than once in a second
+			else
+				currentSecond = second;
 
-					nowPlayingInfo.setText(getNowPlayingInfo(currentTime));
+			nowPlayingInfo.setText(getNowPlayingInfo(currentTime));
 
-					timeSlider.setDisable(duration.isUnknown());
-					if (!timeSlider.isDisabled() && duration.greaterThan(Duration.ZERO) && !timeSlider.isValueChanging()) {
-						preventTimeSliderSeek = true; // prevents unnecessary firing of time slider seek listener
-						timeSlider.setValue(currentTime.divide(duration.toMillis()).toMillis() * timeSlider.getMax());
-						preventTimeSliderSeek = false;
-					}
+			timeSlider.setDisable(duration.isUnknown());
+			if (!timeSlider.isDisabled() && duration.greaterThan(Duration.ZERO) && !timeSlider.isValueChanging()) {
+				preventTimeSliderSeek = true; // prevents unnecessary firing of time slider seek listener
+				timeSlider.setValue(currentTime.divide(duration.toMillis()).toMillis() * timeSlider.getMax());
+				preventTimeSliderSeek = false;
+			}
 		}
 
 
@@ -667,7 +667,7 @@ public class ReleasePlayerForm {
 
 		// Setting a custom cell factory to display a play/pause button 
 		// for each playable track
-		playButtonColumn.setCellFactory(CellFactories.nodeCellFactory(track -> {
+		playButtonColumn.setCellFactory(new CellFactory<Track, Track>(track -> {
 			if (track.isPlayable()) {
 				// Since this factory will be invoked not only during table initial
 				// fill but also on any column sort actions, we need to adjust our
@@ -692,17 +692,20 @@ public class ReleasePlayerForm {
 			}
 			else
 				return null; // don't create buttons for unplayable tracks
-		}));
+		}, null));
 		playButtonColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue()));
+		playButtonColumn.setSortable(false);
 
 		trackNumberColumn.setCellValueFactory(cellData -> cellData.getValue().numberProperty());
 
+		CellFactory<Track, String> tooltipFactory = CellFactory.tooltip();
+		
 		artistColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
-		artistColumn.setCellFactory(CellFactories.tooltipCellFactory(artistColumn.getCellFactory()));
+		artistColumn.setCellFactory(tooltipFactory);
 		artistColumn.setCellValueFactory(cellData -> cellData.getValue().artistProperty());
 
 		titleColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
-		titleColumn.setCellFactory(CellFactories.tooltipCellFactory(titleColumn.getCellFactory()));
+		titleColumn.setCellFactory(tooltipFactory);
 		titleColumn.setCellValueFactory(cellData -> cellData.getValue().titleProperty());
 
 		timeColumn.setCellValueFactory(cellData -> cellData.getValue().timeProperty());

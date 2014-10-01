@@ -145,7 +145,7 @@ public class ReleaseTableView {
 		 * table's width.
 		 * 
 		 * @param padding denotes a size of extra space to put between right border
-		 * 		  of last column and left side of a table during resize   
+		 *        of last column and left side of a table during resize   
 		 */
 		private void updateLastColumnWidth(double padding) {
 			if (preventUpdate || columns.size() == 0)
@@ -239,32 +239,32 @@ public class ReleaseTableView {
 		releaseTableView.setItems(sortedTableData);
 		sortedTableData.comparatorProperty().bind(releaseTableView.comparatorProperty());
 
+		CellFactory<Release, String> tooltipFactory = CellFactory.tooltip();
+		
 		artistColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
-		artistColumn.setCellFactory(CellFactories.tooltipCellFactory(artistColumn.getCellFactory()));
+		artistColumn.setCellFactory(tooltipFactory);
 		artistColumn.setCellValueFactory(cellData -> cellData.getValue().artistProperty());
 
 		titleColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
-		titleColumn.setCellFactory(CellFactories.tooltipCellFactory(titleColumn.getCellFactory()));
+		titleColumn.setCellFactory(tooltipFactory);
 		titleColumn.setCellValueFactory(cellData -> cellData.getValue().titleProperty());
 
 		dlTypeColumn.setCellValueFactory(cellData -> cellData.getValue().downloadTypeProperty());
 
-		releaseDateColumn.setCellFactory(
-				CellFactories.alignedCellFactory(releaseDateColumn.getCellFactory(), Pos.CENTER));
+		releaseDateColumn.setCellFactory(CellFactory.aligned(Pos.CENTER));
 		releaseDateColumn.setCellValueFactory(cellData -> {
 			// display empty cell instead of LocalDate.MIN
 			Release release =  cellData.getValue();
 			return release.getReleaseDate().equals(LocalDate.MIN) ? null : release.releaseDateProperty();
 		});
 
-		publishDateColumn.setCellFactory(
-				CellFactories.alignedCellFactory(publishDateColumn.getCellFactory(), Pos.CENTER));
+		publishDateColumn.setCellFactory(CellFactory.aligned(Pos.CENTER));
 		publishDateColumn.setCellValueFactory(cellData -> cellData.getValue().publishDateProperty());
 
-		tagsColumn.setCellFactory(CellFactories.tooltipCellFactory(tagsColumn.getCellFactory()));
+		tagsColumn.setCellFactory(tooltipFactory);
 		tagsColumn.setCellValueFactory(cellData -> cellData.getValue().tagsStringProperty());
 
-		urlColumn.setCellFactory(CellFactories.hyperlinkCellFactory());
+		urlColumn.setCellFactory(CellFactory.tooltippedHyperlink());
 		urlColumn.setCellValueFactory(cellData -> cellData.getValue().uriProperty());
 
 		// Setting a callback to display an information about selected
