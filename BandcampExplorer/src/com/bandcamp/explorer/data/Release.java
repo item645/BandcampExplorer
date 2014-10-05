@@ -130,8 +130,8 @@ public final class Release {
 	 * 
 	 * @param url URL string
 	 * @throws IOException if release web page cannot be loaded for some reason 
-	 *         or supplied URL string is not valid
 	 * @throws IllegalArgumentException if release web page does not contain valid data
+	 *         or supplied URL string is not valid
 	 * @throws NullPointerException if url is null
 	 */
 	public Release(String url) throws IOException {

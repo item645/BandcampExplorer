@@ -15,9 +15,9 @@
                <columns>
                   <TableColumn fx:id="artistColumn" prefWidth="300.0" text="Artist" />
                   <TableColumn fx:id="titleColumn" prefWidth="300.0" text="Title" />
-                  <TableColumn fx:id="dlTypeColumn" maxWidth="150.0" minWidth="150.0" prefWidth="150.0" text="Download Type" />
-                  <TableColumn fx:id="releaseDateColumn" maxWidth="125.0" minWidth="125.0" prefWidth="125.0" text="Released" />
-                  <TableColumn fx:id="publishDateColumn" maxWidth="125.0" minWidth="125.0" prefWidth="125.0" text="Published" />
+                  <TableColumn fx:id="dlTypeColumn" prefWidth="150.0" text="Download Type" />
+                  <TableColumn fx:id="releaseDateColumn" prefWidth="125.0" text="Released" />
+                  <TableColumn fx:id="publishDateColumn" prefWidth="125.0" text="Published" />
                   <TableColumn fx:id="tagsColumn" prefWidth="350.0" text="Tags" />
                   <TableColumn fx:id="urlColumn" minWidth="200.0" prefWidth="400.0" text="URL" />
                </columns>

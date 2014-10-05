@@ -57,7 +57,7 @@ class CellFactory<S,T> implements Callback<TableColumn<S,T>, TableCell<S,T>> {
 	 *        in a usual manner, displaying cell's item value converted to text 
 	 *        via item.toString() 
 	 * @param cellCustomizer An instance of CellCustomizer to be invoked every time
-	 * 		  cell item is updated, to customize a cell. If null, then this factory
+	 *        cell item is updated, to customize a cell. If null, then this factory
 	 *        won't make any additional customizations for cells it creates
 	 */
 	CellFactory(Function<T, Node> cellNodeProvider, CellCustomizer<S,T> cellCustomizer) {

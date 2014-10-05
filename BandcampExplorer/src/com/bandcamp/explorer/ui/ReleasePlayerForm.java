@@ -667,7 +667,7 @@ public class ReleasePlayerForm {
 
 		// Setting a custom cell factory to display a play/pause button 
 		// for each playable track
-		playButtonColumn.setCellFactory(new CellFactory<Track, Track>(track -> {
+		playButtonColumn.setCellFactory(new CellFactory<>(track -> {
 			if (track.isPlayable()) {
 				// Since this factory will be invoked not only during table initial
 				// fill but also on any column sort actions, we need to adjust our

@@ -3,19 +3,12 @@ package com.bandcamp.explorer.ui;
 import java.net.URI;
 import java.time.LocalDate;
 
-import javafx.beans.Observable;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleDoubleProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
-import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.ScrollBar;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
@@ -44,125 +37,8 @@ public class ReleaseTableView {
 
 	private final ObservableList<Release> tableData = FXCollections.observableArrayList();
 	private final SortedList<Release> sortedTableData = new SortedList<>(tableData);
-
 	private ReleasePlayerForm releasePlayer;
-
-	@SuppressWarnings("unused")
-	private ResizeHelper resizeHelper;
-
-
-	/**
-	 * This helper class attempts to solve well-known "extra column" problem in TableView
-	 * without having to stick to using CONSTRAINED_RESIZE_POLICY (this policy has its
-	 * downsides since it won't let you use horizontal scrollbar and it also resizes all columns
-	 * at once, which is rather cumbersome).
-	 * 
-	 * The basic idea here is to track changes in widths of table and individual columns 
-	 * and resize only the last column so that total width of all columns matches
-	 * that of a table. When table is narrowed or other columns are resized to the
-	 * point that last column has finally shrinked to its minimum width, resizing
-	 * is no longer performed for last column and horizontal scrollbar now appears and
-	 * can be used instead. In oppposite scenario, when table is stretched and horizontal
-	 * scrollbar disappears, last column starts automatically resizing again, thus guaranteeing
-	 * that extra column never visually appears on the screen.
-	 */
-	private class ResizeHelper {
-
-		private final ObservableList<TableColumn<Release,?>> columns;
-		private final DoubleProperty tableWidth;
-		private final DoubleProperty[] columnWidths;
-		private ScrollBar tableVBar;
-		private BooleanProperty tableVBarVisible;
-		private boolean preventUpdate;
-
-
-		ResizeHelper() {
-			tableWidth = new SimpleDoubleProperty(releaseTableView.getWidth());
-			tableWidth.bind(releaseTableView.widthProperty());
-			tableWidth.addListener(this::onChangeWidth);
-
-			columns = releaseTableView.getColumns();
-
-			columnWidths = new DoubleProperty[columns.size()];
-			for (int i = 0; i < columnWidths.length; i++) {
-				TableColumn<Release,?> col = columns.get(i);
-				columnWidths[i] = new SimpleDoubleProperty(col.getWidth());
-				columnWidths[i].bind(col.widthProperty());
-				columnWidths[i].addListener(this::onChangeWidth);
-			}
-		}
-
-
-		/**
-		 * Obtains an instance of TableView's internal vertical scrollbar and
-		 * adds a listener to track its visibility.
-		 */
-		private void initTableVBar() {
-			for (Node node : releaseTableView.lookupAll(".scroll-bar")) {
-				if (node instanceof ScrollBar) {
-					ScrollBar sb = (ScrollBar)node;
-					if (sb.getOrientation() == Orientation.VERTICAL) {
-						tableVBar = sb;
-						break;
-					}
-				}
-			}
-			if (tableVBar != null) {
-				tableVBarVisible = new SimpleBooleanProperty(tableVBar.isVisible());
-				tableVBarVisible.bind(tableVBar.visibleProperty());
-				tableVBarVisible.addListener(this::onTableVBarVisible);
-			}
-		}
-
-
-		/**
-		 * Called when vertical scrollbar changes its visibility (which is a result 
-		 * of table's fill or height change). Updates last column's width using padding
-		 * value based on scrollbar's visibility.
-		 * The reason we do this is that vertical scrollbar takes some extra space
-		 * at table's right side which means we should update last column's width
-		 * accordingly (if scrollbar is visible then padding value must be larger).
-		 */
-		private void onTableVBarVisible(Observable observable, Boolean oldValue, Boolean newValue) {
-			updateLastColumnWidth(newValue ? tableVBar.getWidth() + 2 : 2);
-		}
-
-
-		/** 
-		 * Called when table or column width changes.
-		 * Updates last column's width according to changed width, also taking into
-		 * account vertical scrollbar visibility to properly calculate padding.
-		 */
-		private void onChangeWidth(Observable o) {
-			if (tableVBar == null)
-				initTableVBar();
-			updateLastColumnWidth(tableVBar != null && tableVBar.isVisible() ? tableVBar.getWidth() + 2 : 2);
-		}
-
-
-		/**
-		 * Updates last column's width to ensure that total width of all columns matches
-		 * table's width.
-		 * 
-		 * @param padding denotes a size of extra space to put between right border
-		 *        of last column and left side of a table during resize   
-		 */
-		private void updateLastColumnWidth(double padding) {
-			if (preventUpdate || columns.size() == 0)
-				return;
-			// prevents recursive update on last column width change
-			preventUpdate = true;
-
-			double columnWidthTotal = 0.0;
-			for (int i = 0; i < columnWidths.length; i++)
-				columnWidthTotal += columnWidths[i].get();
-			TableColumn<Release,?> lastColumn = columns.get(columns.size() - 1);
-			lastColumn.setPrefWidth(lastColumn.getWidth() + (tableWidth.get() - columnWidthTotal) - padding);
-
-			preventUpdate = false;
-		}
-
-	}
+	private TableViewResizeHelper resizeHelper;
 
 
 	/**
@@ -286,7 +162,8 @@ public class ReleaseTableView {
 
 		});
 
-		resizeHelper = new ResizeHelper();
+		resizeHelper = new TableViewResizeHelper(releaseTableView);
+		resizeHelper.enable();
 	}
 
 
