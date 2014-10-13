@@ -1,16 +1,17 @@
 package com.bandcamp.explorer.data;
 
+import java.util.Comparator;
 import java.util.Objects;
 
 /**
- * Simple container class to provide parameters for creating search tasks.
+ * Simple container class to provide parameters for search tasks.
  */
 public class SearchParams {
 
-	final String searchQuery;
-	final SearchType searchType;
-	final int pages;
-	final boolean combineResults;
+	private final String searchQuery;
+	private final SearchType searchType;
+	private final int pages;
+	private final Comparator<Release> sortOrder;
 
 
 	/**
@@ -20,7 +21,7 @@ public class SearchParams {
 		private final String searchQuery;
 		private final SearchType searchType;
 		private int pages = 1;
-		private boolean combineResults = false;
+		private Comparator<Release> sortOrder = ReleaseSortOrder.PUBLISH_DATE_DESC;
 
 
 		/**
@@ -36,7 +37,7 @@ public class SearchParams {
 			this.searchType = Objects.requireNonNull(searchType);
 		}
 
-		
+
 		/**
 		 * A number of pages to search.
 		 * Default is 1.
@@ -51,15 +52,15 @@ public class SearchParams {
 
 
 		/**
-		 * Indicates whether current search results must be combined with preceding results.
-		 * Default is false.
+		 * Sort order for search result.
+		 * By default releases in search result will be sorted by publish date
+		 * in descending order.
 		 * 
-		 * @param value if true, results will be combined, else - new search result
-		 *        will replace any preceding one
+		 * @param value comparator that sets a sort order for results
 		 * @return this builder
 		 */
-		public Builder combineResults(boolean value) {
-			this.combineResults = value;
+		public Builder sortOrder(Comparator<Release> value) {
+			this.sortOrder = value;
 			return this;
 		}
 
@@ -81,7 +82,39 @@ public class SearchParams {
 		this.searchQuery = builder.searchQuery;
 		this.searchType = builder.searchType;
 		this.pages = builder.pages;
-		this.combineResults = builder.combineResults;
+		this.sortOrder = builder.sortOrder;
+	}
+
+
+	/**
+	 * Returns a string representing search query.
+	 */
+	public String searchQuery() {
+		return searchQuery;
+	}
+
+
+	/**
+	 * Returns a search type.
+	 */
+	public SearchType searchType() {
+		return searchType;
+	}
+
+
+	/**
+	 * Returns the number of pages to search.
+	 */
+	public int pages() {
+		return pages;
+	}
+
+
+	/**
+	 * Returns a comparator that sets a sort order for results.
+	 */
+	public Comparator<Release> sortOrder() {
+		return sortOrder;
 	}
 
 }

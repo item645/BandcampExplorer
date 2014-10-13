@@ -1,7 +1,16 @@
 package com.bandcamp.explorer.ui;
 
 import java.awt.Desktop;
+import java.io.InputStream;
 import java.net.URI;
+import java.net.URL;
+import java.util.Objects;
+import java.util.function.Supplier;
+
+import com.bandcamp.explorer.util.ExceptionUnchecker;
+
+import javafx.fxml.FXMLLoader;
+import javafx.scene.layout.Region;
 
 /**
  * Contains some general utility stuff for UI.
@@ -9,6 +18,68 @@ import java.net.URI;
 class Utils {
 
 	private Utils() {}
+
+
+	/**
+	 * Loads a custom UI component from FXML at specified location
+	 * using supplied instantiation function.
+	 * The component object returned by instantiator is assigned as both
+	 * controller and root of the object hierarchy defined by FXML, so
+	 * its class must match the class specified by fx:root type FXML attribute
+	 * and also must be a direct subclass of {@link javafx.scene.layout.Region} or one of its
+	 * subclasses.
+	 * 
+	 * @param location an URL to load FXML from
+	 * @param instantiator a function that returns instantiated component object,
+	 *        which is then gets injected by controls hierarchy from FXML and set up
+	 *        as a root of that hierarchy
+	 * @return a component object with all of its associated controls as defined
+	 *         by FXML
+	 * @throws NullPointerException if location is null or instantiator is null
+	 *         or if instantiator returns null when invoked
+	 * @throws RuntimeException wraps any checked exceptions that take place during
+	 *         the load of FXML
+	 */
+	static <T extends Region> T loadFXMLComponent(URL location, Supplier<T> instantiator) {
+		return ExceptionUnchecker.uncheck(() -> {
+			try (InputStream input = location.openStream()) {
+				return loadFXMLComponent(input, instantiator);
+			}
+		});
+	}
+
+
+	/**
+	 * Loads a custom UI component from FXML contained in a specified input stream
+	 * using supplied instantiation function.
+	 * The component object returned by instantiator is assigned as both
+	 * controller and root of the object hierarchy defined by FXML, so
+	 * its class must match the class specified by fx:root type FXML attribute
+	 * and also must be a direct subclass of {@link javafx.scene.layout.Region} or one of its
+	 * subclasses.
+	 * 
+	 * @param input an input stream to read FXML from
+	 * @param instantiator a function that returns instantiated component object,
+	 *        which is then gets injected by controls hierarchy from FXML and set up
+	 *        as a root of that hierarchy
+	 * @return a component object with all of its associated controls as defined
+	 *         by FXML
+	 * @throws NullPointerException if input is null or instantiator is null
+	 *         or if instantiator returns null when invoked
+	 * @throws RuntimeException wraps any checked exceptions that take place during
+	 *         the load of FXML
+	 */
+	static <T extends Region> T loadFXMLComponent(InputStream input, Supplier<T> instantiator) {
+		Objects.requireNonNull(input);
+		T component = Objects.requireNonNull(instantiator.get());
+
+		FXMLLoader loader = new FXMLLoader();
+		loader.setRoot(component);
+		loader.setController(component);
+		ExceptionUnchecker.uncheck(() -> loader.load(input));
+
+		return component;
+	}
 
 
 	/**

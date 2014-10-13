@@ -7,30 +7,227 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.layout.AnchorPane?>
 
-<SplitPane fx:id="rootPane" dividerPositions="0.7920892494929006" orientation="VERTICAL" prefHeight="988.0" prefWidth="1200.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bandcamp.explorer.ui.ReleaseTableView">
-  <items>
-      <AnchorPane>
-         <children>
-            <TableView fx:id="releaseTableView" maxWidth="1.7976931348623157E308" onKeyPressed="#onReleaseTableKeyPress" onMouseClicked="#onReleaseTableMouseClick" prefHeight="700.0" prefWidth="1650.0" tableMenuButtonVisible="true" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" SplitPane.resizableWithParent="false">
-               <columns>
-                  <TableColumn fx:id="artistColumn" prefWidth="300.0" text="Artist" />
-                  <TableColumn fx:id="titleColumn" prefWidth="300.0" text="Title" />
-                  <TableColumn fx:id="dlTypeColumn" prefWidth="150.0" text="Download Type" />
-                  <TableColumn fx:id="releaseDateColumn" prefWidth="125.0" text="Released" />
-                  <TableColumn fx:id="publishDateColumn" prefWidth="125.0" text="Published" />
-                  <TableColumn fx:id="tagsColumn" prefWidth="350.0" text="Tags" />
-                  <TableColumn fx:id="urlColumn" minWidth="200.0" prefWidth="400.0" text="URL" />
-               </columns>
-            </TableView>
-         </children>
-      </AnchorPane>
-    <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="100.0" prefWidth="160.0">
-         <children>
-            <TextArea fx:id="releaseInfo" editable="false" prefHeight="200.0" prefWidth="1202.0" wrapText="true" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-               <font>
-                  <Font name="Arial" size="16.0" />
-               </font></TextArea>
-         </children>
-      </AnchorPane>
-  </items>
-</SplitPane>
+<fx:root type="AnchorPane" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1">
+   <children>
+      <SplitPane dividerPositions="0.7920892494929006" orientation="VERTICAL" prefHeight="988.0" prefWidth="1200.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+        <items>
+            <AnchorPane maxHeight="1.7976931348623157E308">
+               <children>
+                  <VBox AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                     <children>
+                        <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" prefHeight="118.0" prefWidth="1269.0" spacing="10.0" VBox.vgrow="NEVER">
+                           <children>
+                              <HBox prefHeight="62.0" prefWidth="1269.0">
+                                 <children>
+                                    <VBox spacing="1.0">
+                                       <children>
+                                          <Label layoutX="26.0" prefHeight="18.0" prefWidth="61.0" text="Artist">
+                                             <font>
+                                                <Font name="Arial Bold Italic" size="14.0" />
+                                             </font>
+                                          </Label>
+                                          <TextField fx:id="artistFilter" layoutX="26.0" layoutY="18.0" onKeyPressed="#onFilterKeyPress" prefHeight="20.0" prefWidth="200.0" GridPane.rowIndex="1" />
+                                       </children>
+                                       <padding>
+                                          <Insets left="10.0" right="10.0" />
+                                       </padding>
+                                    </VBox>
+                                    <VBox spacing="1.0">
+                                       <children>
+                                          <Label layoutX="249.0" text="Title" GridPane.columnIndex="1">
+                                             <font>
+                                                <Font name="Arial Bold Italic" size="14.0" />
+                                             </font>
+                                          </Label>
+                                          <TextField fx:id="titleFilter" layoutX="249.0" layoutY="18.0" onKeyPressed="#onFilterKeyPress" prefHeight="20.0" prefWidth="200.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                                       </children>
+                                       <padding>
+                                          <Insets left="10.0" right="10.0" />
+                                       </padding>
+                                    </VBox>
+                                    <VBox spacing="1.0">
+                                       <children>
+                                          <Label prefHeight="18.0" prefWidth="44.0" text="Tags">
+                                             <font>
+                                                <Font name="Arial Bold Italic" size="14.0" />
+                                             </font>
+                                          </Label>
+                                          <TextField fx:id="tagsFilter" onKeyPressed="#onFilterKeyPress" prefHeight="20.0" prefWidth="200.0" />
+                                       </children>
+                                       <padding>
+                                          <Insets left="10.0" right="10.0" />
+                                       </padding>
+                                    </VBox>
+                                    <VBox spacing="1.0">
+                                       <children>
+                                          <Label prefHeight="18.0" prefWidth="44.0" text="URL">
+                                             <font>
+                                                <Font name="Arial Bold Italic" size="14.0" />
+                                             </font>
+                                          </Label>
+                                          <TextField fx:id="urlFilter" onKeyPressed="#onFilterKeyPress" prefHeight="20.0" prefWidth="200.0" />
+                                       </children>
+                                       <padding>
+                                          <Insets left="10.0" right="10.0" />
+                                       </padding>
+                                    </VBox>
+                                    <VBox alignment="CENTER_LEFT" spacing="1.0">
+                                       <children>
+                                          <Label text="Download Type">
+                                             <font>
+                                                <Font name="Arial Bold Italic" size="14.0" />
+                                             </font>
+                                          </Label>
+                                          <HBox alignment="CENTER_LEFT" spacing="5.0">
+                                             <children>
+                                                <CheckBox fx:id="dlTypeFree" mnemonicParsing="false" selected="true" text="Free">
+                                                   <font>
+                                                      <Font name="Arial Italic" size="14.0" />
+                                                   </font>
+                                                </CheckBox>
+                                                <CheckBox fx:id="dlTypeNameYourPrice" layoutX="10.0" layoutY="10.0" mnemonicParsing="false" selected="true" text="Name Your Price">
+                                                   <font>
+                                                      <Font name="Arial Italic" size="14.0" />
+                                                   </font>
+                                                </CheckBox>
+                                                <CheckBox fx:id="dlTypePaid" layoutX="63.0" layoutY="10.0" mnemonicParsing="false" selected="true" text="Paid">
+                                                   <font>
+                                                      <Font name="Arial Italic" size="14.0" />
+                                                   </font>
+                                                </CheckBox>
+                                                <CheckBox fx:id="dlTypeUnavailable" layoutX="169.0" layoutY="10.0" mnemonicParsing="false" selected="true" text="Unavailable">
+                                                   <font>
+                                                      <Font name="Arial Italic" size="14.0" />
+                                                   </font>
+                                                </CheckBox>
+                                             </children>
+                                          </HBox>
+                                       </children>
+                                       <padding>
+                                          <Insets left="10.0" right="10.0" />
+                                       </padding>
+                                    </VBox>
+                                 </children>
+                              </HBox>
+                              <HBox prefHeight="51.0" prefWidth="1269.0">
+                                 <children>
+                                    <VBox spacing="1.0">
+                                       <children>
+                                          <Label text="Publish Date">
+                                             <font>
+                                                <Font name="Arial Bold Italic" size="14.0" />
+                                             </font>
+                                             <VBox.margin>
+                                                <Insets />
+                                             </VBox.margin>
+                                          </Label>
+                                          <HBox alignment="CENTER_LEFT" spacing="5.0">
+                                             <children>
+                                                <Label layoutX="20.0" layoutY="85.0" text="from">
+                                                   <font>
+                                                      <Font name="Arial Italic" size="14.0" />
+                                                   </font>
+                                                </Label>
+                                                <DatePicker fx:id="publishDateFilterFrom" prefWidth="150.0" />
+                                                <Label layoutX="20.0" layoutY="10.0" text="to">
+                                                   <font>
+                                                      <Font name="Arial Italic" size="14.0" />
+                                                   </font>
+                                                </Label>
+                                                <DatePicker fx:id="publishDateFilterTo" layoutX="20.0" layoutY="27.0" prefWidth="150.0" />
+                                             </children>
+                                          </HBox>
+                                       </children>
+                                       <padding>
+                                          <Insets left="10.0" right="10.0" />
+                                       </padding>
+                                    </VBox>
+                                    <VBox layoutX="214.0" layoutY="10.0" spacing="1.0">
+                                       <children>
+                                          <Label text="Release Date">
+                                             <font>
+                                                <Font name="Arial Bold Italic" size="14.0" />
+                                             </font>
+                                             <VBox.margin>
+                                                <Insets />
+                                             </VBox.margin>
+                                          </Label>
+                                          <HBox alignment="CENTER_LEFT" spacing="5.0">
+                                             <children>
+                                                <Label layoutX="20.0" layoutY="85.0" text="from">
+                                                   <font>
+                                                      <Font name="Arial Italic" size="14.0" />
+                                                   </font>
+                                                </Label>
+                                                <DatePicker fx:id="releaseDateFilterFrom" prefWidth="150.0" />
+                                                <Label layoutX="20.0" layoutY="10.0" text="to">
+                                                   <font>
+                                                      <Font name="Arial Italic" size="14.0" />
+                                                   </font>
+                                                </Label>
+                                                <DatePicker fx:id="releaseDateFilterTo" layoutX="20.0" layoutY="27.0" prefWidth="150.0" />
+                                             </children>
+                                          </HBox>
+                                       </children>
+                                       <padding>
+                                          <Insets left="10.0" right="10.0" />
+                                       </padding>
+                                    </VBox>
+                                    <VBox spacing="1.0">
+                                       <children>
+                                          <Label text=" ">
+                                             <font>
+                                                <Font name="Arial" size="14.0" />
+                                             </font>
+                                          </Label>
+                                          <HBox spacing="5.0">
+                                             <children>
+                                                <Button fx:id="applyFilter" mnemonicParsing="false" onAction="#applyFilter" prefHeight="20.0" prefWidth="137.0" text="Apply Filter">
+                                                   <VBox.margin>
+                                                      <Insets left="20.0" />
+                                                   </VBox.margin>
+                                                </Button>
+                                                <Button fx:id="resetFilter" layoutX="40.0" layoutY="27.0" mnemonicParsing="false" onAction="#resetFilter" prefHeight="20.0" prefWidth="137.0" text="Reset Filter" />
+                                                <Button fx:id="playSelected" mnemonicParsing="false" onAction="#playSelectedRelease" text="Play Selected..." />
+                                             </children>
+                                          </HBox>
+                                       </children>
+                                       <padding>
+                                          <Insets left="10.0" right="10.0" />
+                                       </padding>
+                                    </VBox>
+                                 </children>
+                              </HBox>
+                           </children>
+                           <padding>
+                              <Insets bottom="10.0" left="5.0" right="5.0" top="5.0" />
+                           </padding>
+                        </VBox>
+                        <TableView fx:id="releaseTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" onKeyPressed="#onReleaseTableKeyPress" onMouseClicked="#onReleaseTableMouseClick" prefHeight="700.0" prefWidth="1650.0" tableMenuButtonVisible="true" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" SplitPane.resizableWithParent="false" VBox.vgrow="ALWAYS">
+                           <columns>
+                              <TableColumn fx:id="artistColumn" prefWidth="300.0" text="Artist" />
+                              <TableColumn fx:id="titleColumn" prefWidth="300.0" text="Title" />
+                              <TableColumn fx:id="dlTypeColumn" prefWidth="150.0" text="Download Type" />
+                              <TableColumn fx:id="releaseDateColumn" prefWidth="125.0" text="Released" />
+                              <TableColumn fx:id="publishDateColumn" prefWidth="125.0" text="Published" />
+                              <TableColumn fx:id="tagsColumn" prefWidth="350.0" text="Tags" />
+                              <TableColumn fx:id="urlColumn" minWidth="200.0" prefWidth="400.0" text="URL" />
+                           </columns>
+                        </TableView>
+                     </children>
+                  </VBox>
+               </children>
+            </AnchorPane>
+          <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="100.0" prefWidth="160.0">
+               <children>
+                  <TextArea fx:id="releaseInfo" editable="false" prefHeight="200.0" prefWidth="1202.0" wrapText="true" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                     <font>
+                        <Font name="Arial" size="16.0" />
+                     </font>
+                  </TextArea>
+               </children>
+            </AnchorPane>
+        </items>
+      </SplitPane>
+   </children>
+</fx:root>

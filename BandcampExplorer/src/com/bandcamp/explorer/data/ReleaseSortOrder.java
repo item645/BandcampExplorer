@@ -5,7 +5,7 @@ import java.util.Comparator;
 /**
  * Convenience enum to provide some useful options for sorting releases.
  * At the moment this enum is used only to set a default sort order for
- * release table view, but there will likely be other uses in future versions. 
+ * search result, but there will likely be other uses in future versions. 
  */
 public enum ReleaseSortOrder implements Comparator<Release> {
 

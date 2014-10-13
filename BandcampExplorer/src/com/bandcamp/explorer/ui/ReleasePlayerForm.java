@@ -44,10 +44,9 @@ import com.bandcamp.explorer.data.Track;
 /**
  * Controller class for release player form.
  */
-public class ReleasePlayerForm {
+public class ReleasePlayerForm extends SplitPane {
 
 	private Stage stage;
-	@FXML private SplitPane rootPane;
 	@FXML private Button previousButton;
 	@FXML private Button nextButton;
 	@FXML private Button playButton;
@@ -514,7 +513,10 @@ public class ReleasePlayerForm {
 
 	}
 
+	
+	private ReleasePlayerForm() {}
 
+	
 	/**
 	 * Loads an icon for player control button.
 	 * 
@@ -526,6 +528,16 @@ public class ReleasePlayerForm {
 		return url != null ? new ImageView(url.toString()) : null;
 	}
 
+	
+	/**
+	 * Loads a release player form component.
+	 */
+	public static ReleasePlayerForm load() {
+		return Utils.loadFXMLComponent(
+				ReleasePlayerForm.class.getResource("ReleasePlayerForm.fxml"),
+				ReleasePlayerForm::new);
+	}
+	
 
 	/**
 	 * Sets the owner window for player's top stage.
@@ -629,28 +641,61 @@ public class ReleasePlayerForm {
 
 
 	/**
-	 * Helper method to check if all components defined by FXML file have been injected.
+	 * Loads a top level stage for this player.
 	 */
-	private void checkComponents() {
-		// copy-pasted from SceneBuilder's "sample controller skeleton" window
-		assert volumeLevel != null : "fx:id=\"volumeLevel\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert artistColumn != null : "fx:id=\"artistColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert tracksTableView != null : "fx:id=\"tracksTableView\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert previousButton != null : "fx:id=\"previousButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert rootPane != null : "fx:id=\"rootPane\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert releaseInfo != null : "fx:id=\"releaseInfo\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert artworkView != null : "fx:id=\"artworkView\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert playButton != null : "fx:id=\"playButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert nextButton != null : "fx:id=\"nextButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert timeColumn != null : "fx:id=\"timeColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert releaseLink != null : "fx:id=\"releaseLink\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert volumeSlider != null : "fx:id=\"volumeSlider\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert playButtonColumn != null : "fx:id=\"playButtonColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert titleColumn != null : "fx:id=\"titleColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert nowPlayingInfo != null : "fx:id=\"nowPlayingInfo\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert stopButton != null : "fx:id=\"stopButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert timeSlider != null : "fx:id=\"timeSlider\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
-		assert trackNumberColumn != null : "fx:id=\"trackNumberColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+	private void initStage() {
+		stage = new Stage();
+		stage.setResizable(false);
+		stage.setOnCloseRequest(event -> {
+			setRelease(null);
+			stage.hide();
+			event.consume();
+		});
+		stage.setScene(new Scene(this));
+	}
+
+
+	/**
+	 * Plays a track selected in track list view.
+	 */
+	private void playSelectedTrack() {
+		Track track = tracksTableView.getSelectionModel().getSelectedItem();
+		if (track != null && track.isPlayable()) {
+			audioPlayer.setTrack(track);
+			audioPlayer.play();
+		}
+	}
+
+
+	/**
+	 * Handler for key press on table view.
+	 * If Enter was pressed, plays selected track.
+	 */
+	@FXML
+	private void onTracksTableKeyPress(KeyEvent event) {
+		if (event.getCode() == KeyCode.ENTER)
+			playSelectedTrack();
+	}
+
+
+	/**
+	 * Handler for mouse click on a table view.
+	 * If double-clicked , plays selected track.
+	 */
+	@FXML
+	private void onTracksTableMouseClick(MouseEvent event) {
+		if (event.getClickCount() > 1)
+			playSelectedTrack();
+	}
+
+
+	/**
+	 * Opens release web page on Bandcamp using default web browser.
+	 */
+	@FXML
+	private void openReleasePage() {
+		if (release != null)
+			Utils.browse(release.getURI());
 	}
 
 
@@ -723,60 +768,27 @@ public class ReleasePlayerForm {
 
 
 	/**
-	 * Loads a top level stage for this player.
+	 * Helper method to check if all components defined by FXML file have been injected.
 	 */
-	private void initStage() {
-		stage = new Stage();
-		stage.setResizable(false);
-		stage.setOnCloseRequest(event -> {
-			setRelease(null);
-			stage.hide();
-			event.consume();
-		});
-		stage.setScene(new Scene(rootPane));
+	private void checkComponents() {
+		// copy-pasted from SceneBuilder's "sample controller skeleton" window
+		assert volumeLevel != null : "fx:id=\"volumeLevel\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert artistColumn != null : "fx:id=\"artistColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert tracksTableView != null : "fx:id=\"tracksTableView\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert previousButton != null : "fx:id=\"previousButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert releaseInfo != null : "fx:id=\"releaseInfo\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert artworkView != null : "fx:id=\"artworkView\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert playButton != null : "fx:id=\"playButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert nextButton != null : "fx:id=\"nextButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert timeColumn != null : "fx:id=\"timeColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert releaseLink != null : "fx:id=\"releaseLink\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert volumeSlider != null : "fx:id=\"volumeSlider\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert playButtonColumn != null : "fx:id=\"playButtonColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert titleColumn != null : "fx:id=\"titleColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert nowPlayingInfo != null : "fx:id=\"nowPlayingInfo\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert stopButton != null : "fx:id=\"stopButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert timeSlider != null : "fx:id=\"timeSlider\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert trackNumberColumn != null : "fx:id=\"trackNumberColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 	}
 
-
-	/**
-	 * Plays a track selected in track list view.
-	 */
-	private void playSelectedTrack() {
-		Track track = tracksTableView.getSelectionModel().getSelectedItem();
-		if (track != null && track.isPlayable()) {
-			audioPlayer.setTrack(track);
-			audioPlayer.play();
-		}
-	}
-
-
-	/**
-	 * Handler for key press on table view.
-	 * If Enter was pressed, plays selected track.
-	 */
-	@FXML
-	private void onTracksTableKeyPress(KeyEvent event) {
-		if (event.getCode() == KeyCode.ENTER)
-			playSelectedTrack();
-	}
-
-
-	/**
-	 * Handler for mouse click on a table view.
-	 * If double-clicked , plays selected track.
-	 */
-	@FXML
-	private void onTracksTableMouseClick(MouseEvent event) {
-		if (event.getClickCount() > 1)
-			playSelectedTrack();
-	}
-
-
-	/**
-	 * Opens release web page on Bandcamp using default web browser.
-	 */
-	@FXML
-	private void openReleasePage() {
-		if (release != null)
-			Utils.browse(release.getURI());
-	}
 }
