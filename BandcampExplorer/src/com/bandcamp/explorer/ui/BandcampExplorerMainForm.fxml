@@ -49,10 +49,11 @@
                   <HBox alignment="CENTER_LEFT" spacing="10.0">
                      <children>
                         <TextField fx:id="searchQuery" layoutX="230.0" layoutY="20.0" onKeyPressed="#onSearchQueryKeyPress" prefHeight="20.0" prefWidth="400.0" />
-                        <Button fx:id="findReleases" layoutX="916.0" layoutY="20.0" mnemonicParsing="false" onAction="#searchReleases" prefHeight="20.0" prefWidth="146.0" text="Find Releases" />
-                        <Button fx:id="cancelSearch" disable="true" layoutX="826.0" layoutY="18.0" mnemonicParsing="false" onAction="#cancelSearch" prefHeight="20.0" prefWidth="146.0" text="Cancel" />
-                        <Button fx:id="clearSelected" layoutX="981.0" layoutY="22.0" mnemonicParsing="false" onAction="#clearSelectedResult" prefHeight="20.0" prefWidth="146.0" text="Clear Selected" />
-                        <Button fx:id="clearAll" layoutX="737.0" layoutY="15.0" mnemonicParsing="false" onAction="#clearAllResults" prefHeight="20.0" prefWidth="146.0" text="Clear All" />
+                        <Button fx:id="findReleases" layoutX="916.0" layoutY="20.0" mnemonicParsing="false" onAction="#searchReleases" prefHeight="20.0" prefWidth="120.0" text="Find Releases" />
+                        <Button fx:id="cancelSearch" disable="true" layoutX="826.0" layoutY="18.0" mnemonicParsing="false" onAction="#cancelSearch" prefHeight="20.0" prefWidth="120.0" text="Cancel" />
+                        <Button fx:id="clearSelected" layoutX="981.0" layoutY="22.0" mnemonicParsing="false" onAction="#clearSelectedResult" prefHeight="20.0" prefWidth="120.0" text="Clear Selected" />
+                        <Button fx:id="clearAll" layoutX="737.0" layoutY="15.0" mnemonicParsing="false" onAction="#clearAllResults" prefHeight="20.0" prefWidth="120.0" text="Clear All" />
+                        <CheckBox fx:id="showCombinedResults" mnemonicParsing="false" onAction="#onShowCombinedResultsChange" text="Show combined results" />
                      </children>
                      <padding>
                         <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />

@@ -1,16 +1,15 @@
 package com.bandcamp.explorer;
 
-import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import javafx.application.Application;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
 
 import com.bandcamp.explorer.ui.BandcampExplorerMainForm;
 import com.bandcamp.explorer.ui.ReleasePlayerForm;
 import com.bandcamp.explorer.ui.ResultsView;
-
-import javafx.application.Application;
-import javafx.stage.Stage;
-import javafx.scene.Scene;
 
 
 /**
@@ -54,8 +53,6 @@ public final class BandcampExplorer extends Application {
 
 	/**
 	 * Provides loading, initialization and setup of app's UI components.
-	 * 
-	 * @throws IOException if IO error happened during components load
 	 */
 	private void initUI() {	
 		// Loading components

@@ -103,6 +103,7 @@ public class ReleasePlayerForm extends SplitPane {
 		 */
 		TrackListView(TableView<Track> tableView) {
 			this.tableView = tableView;
+			this.tableView.setPlaceholder(new Label());
 			this.tableView.setItems(sortedTracks);
 			sortedTracks.comparatorProperty().bind(tableView.comparatorProperty());
 		}

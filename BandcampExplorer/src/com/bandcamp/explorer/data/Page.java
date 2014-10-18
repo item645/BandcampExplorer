@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -66,8 +67,7 @@ class Page {
 	 * Creates a loader for the specified release link.
 	 * 
 	 * @param link a link (http URL string, pointing to a release)
-	 * @return a Callable object, containing code to load the release; null, if
-	 *         parent task has been cancelled
+	 * @return a Callable object, containing code to load the release
 	 */
 	private Callable<Release> createReleaseLoader(String link) {	
 		return () -> {
@@ -83,13 +83,13 @@ class Page {
 
 
 	/**
-	 * Returns a list of loaders, each corresponding to every unique release link
-	 * found on this page. Loader is an instance of Callable which, when invoked,
-	 * loads and returns the Release object. If parent search task was cancelled
-	 * or error occured on release loading, the loader returns null.
+	 * Returns an unmidofiable list of loaders, each corresponding to every unique
+	 * release link found on this page. Loader is an instance of Callable which, 
+	 * when invoked, loads and returns the Release object. If parent search task
+	 * was cancelled or error occured on release loading, the loader returns null.
 	 */
 	List<Callable<Release>> getReleaseLoaders() {
-		return releaseLoaders;
+		return Collections.unmodifiableList(releaseLoaders);
 	}
 
 }

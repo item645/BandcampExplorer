@@ -34,7 +34,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 	@FXML private ComboBox<SearchType> searchType;
 	@FXML private ComboBox<Integer> page;
 	@FXML private TextField searchQuery;
-	@FXML private CheckBox combineSearchResults;
+	@FXML private CheckBox showCombinedResults;
 	@FXML private Text statusText;
 	@FXML private Button findReleases;
 	@FXML private Button cancelSearch;
@@ -265,6 +265,16 @@ public class BandcampExplorerMainForm extends BorderPane {
 			page.setDisable(false);
 	}
 
+	
+	/**
+	 * Shows/hides the combined results tab in results view component
+	 * depending on current state of showCombinedResults checkbox.
+	 */
+	@FXML
+	private void onShowCombinedResultsChange() {
+		resultsView.showCombinedResults(showCombinedResults.isSelected());
+	}
+	
 
 	/**
 	 * Initialization method invoked by FXML loader, provides initial setup for components.
@@ -298,5 +308,6 @@ public class BandcampExplorerMainForm extends BorderPane {
 		assert page != null : "fx:id=\"page\" was not injected: check your FXML file 'BandcampExplorerMainForm.fxml'.";
 		assert clearSelected != null : "fx:id=\"clearSelected\" was not injected: check your FXML file 'BandcampExplorerMainForm.fxml'.";
 		assert clearAll != null : "fx:id=\"clearAll\" was not injected: check your FXML file 'BandcampExplorerMainForm.fxml'.";
+		assert showCombinedResults != null : "fx:id=\"showCombinedResults\" was not injected: check your FXML file 'BandcampExplorerMainForm.fxml'.";
 	}
 }

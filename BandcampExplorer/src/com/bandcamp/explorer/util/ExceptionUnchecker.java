@@ -21,7 +21,7 @@ public class ExceptionUnchecker {
 	 * not returning a value, to be passed into appropriate uncheck() method.
 	 */
 	@FunctionalInterface
-	public static interface VoidCallable {
+	public interface VoidCallable {
 
 		/**
 		 * Executes a wrapped code not returning any result.

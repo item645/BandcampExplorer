@@ -24,6 +24,7 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
+import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
@@ -273,7 +274,7 @@ public class ReleaseTableView extends AnchorPane {
 
 		releaseTableView.setItems(sortedItems);
 		sortedItems.comparatorProperty().bind(releaseTableView.comparatorProperty());
-
+		
 		CellFactory<Release, String> tooltipFactory = CellFactory.tooltip();
 
 		artistColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
@@ -321,6 +322,8 @@ public class ReleaseTableView extends AnchorPane {
 
 		});
 
+		releaseTableView.setPlaceholder(new Label());
+		
 		resizeHelper = new TableViewResizeHelper(releaseTableView);
 		resizeHelper.enable();
 	}
