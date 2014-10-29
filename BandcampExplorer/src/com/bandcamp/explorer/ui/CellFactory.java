@@ -1,12 +1,13 @@
 package com.bandcamp.explorer.ui;
 
-import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.ContentDisplay;
-import javafx.scene.control.Hyperlink;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.Tooltip;
@@ -20,11 +21,11 @@ import javafx.util.Callback;
  * @param <T> type of the item contained within the Cell
  */
 class CellFactory<S,T> implements Callback<TableColumn<S,T>, TableCell<S,T>> {
-	
+
 	private final Function<T, Node> cellNodeProvider;
-	private final CellCustomizer<S,T> cellCustomizer;
-	
-	
+	private final List<CellCustomizer<S,T>> cellCustomizers = new ArrayList<>();
+
+
 	/**
 	 * A functional interface that defines callback functions
 	 * to be applied on newly created or updated cell to customize
@@ -32,7 +33,7 @@ class CellFactory<S,T> implements Callback<TableColumn<S,T>, TableCell<S,T>> {
 	 */
 	@FunctionalInterface
 	interface CellCustomizer<S,T> {
-		
+
 		/**
 		 * Provides customization for specified cell depending on its content.
 		 * If cell customizer is installed on cell factory, this method gets 
@@ -44,28 +45,81 @@ class CellFactory<S,T> implements Callback<TableColumn<S,T>, TableCell<S,T>> {
 		 *        contain any domain data
 		 */
 		void apply(TableCell<S,T> cell, T newItem, boolean empty);
+
+
+		/**
+		 * Creates a customizer that adds specified alignment for cell's content.
+		 * 
+		 * @param alignment an option that specifies how cell content should be aligned
+		 */
+		static <S,T> CellCustomizer<S,T> alignment(Pos alignment) {
+			return (cell, newItem, empty) -> cell.setAlignment(alignment);
+		}
+
+
+		/**
+		 * Creates a customizer that adds a tooltip displaying text 
+		 * representation of cell's content.
+		 */
+		static <S,T> CellCustomizer<S,T> tooltip() {
+			return (cell, newItem, empty) -> {
+				if (newItem == null || empty) {
+					// remove tooltip (if any) when cell is empty
+					cell.setTooltip(null);
+				}
+				else {
+					if (cell.getTooltip() == null) {
+						Tooltip tooltip = new Tooltip();
+						tooltip.textProperty().bind(cell.textProperty());
+						cell.setTooltip(tooltip);
+					}
+				}
+			};
+		}
+
 	}
-	
-	
+
+
 	/**
-	 * Constructs a new cell factory.
+	 * Constructs a new cell factory that renders cells in a default manner,
+	 * displaying cell's item value converted to text via item.toString().
+	 * 
+	 * @param cellCustomizers An array of CellCustomizer callbacks to be invoked
+	 *        every time cell item is updated, to customize a cell. If passed array
+	 *        is empty (or zero arguments were passed in case of varargs), then this
+	 *        factory won't make any additional customizations for cells it creates.
+	 * @throws NullPointerException if cell customizers array or any of its elements is null
+	 */
+	@SafeVarargs
+	CellFactory(CellCustomizer<S,T>... cellCustomizers) {
+		this(null, cellCustomizers);
+	}
+
+
+	/**
+	 * Constructs a new cell factory that allows to replace cells content with an
+	 * arbitrary Node objects.
 	 * 
 	 * @param cellNodeProvider A callback function to return Node objects
 	 *        for displaying them as cells content. If non-null, this function
 	 *        will be invoked to convert cell item into a Node object for
-	 *        displaying it in a cell instead of text. If null, then cell will be rendered 
-	 *        in a usual manner, displaying cell's item value converted to text 
-	 *        via item.toString() 
-	 * @param cellCustomizer An instance of CellCustomizer to be invoked every time
-	 *        cell item is updated, to customize a cell. If null, then this factory
-	 *        won't make any additional customizations for cells it creates
+	 *        displaying it in a cell instead of text. If null, then cell will be
+	 *        rendered in a usual manner, displaying cell's item value converted to
+	 *        text via item.toString().
+	 * @param cellCustomizers An array of CellCustomizer callbacks to be invoked
+	 *        every time cell item is updated, to customize a cell. If passed array
+	 *        is empty (or zero arguments were passed in case of varargs), then
+	 *        this factory won't make any additional customizations for cells it creates.
+	 * @throws NullPointerException if cell customizers array or any of its elements is null
 	 */
-	CellFactory(Function<T, Node> cellNodeProvider, CellCustomizer<S,T> cellCustomizer) {
+	@SafeVarargs
+	CellFactory(Function<T, Node> cellNodeProvider, CellCustomizer<S,T>... cellCustomizers) {
 		this.cellNodeProvider = cellNodeProvider;
-		this.cellCustomizer = cellCustomizer;
+		for (CellCustomizer<S,T> customizer : cellCustomizers)
+			this.cellCustomizers.add(Objects.requireNonNull(customizer));
 	}
-	
-	
+
+
 	/** 
 	 * This method gets called to construct a new cell.
 	 * 
@@ -93,78 +147,9 @@ class CellFactory<S,T> implements Callback<TableColumn<S,T>, TableCell<S,T>> {
 					else
 						super.setGraphic(null);
 				}
-				if (cellCustomizer != null)
-					cellCustomizer.apply(this, item, empty);
+				cellCustomizers.forEach(customizer -> customizer.apply(this, item, empty));
 			}
 		};
 	}
 
-	
-	/**
-	 * Creates a cell factory that customizes cells by adding specified
-	 * alignment for cell's content.
-	 * 
-	 * @param alignment an option that specifies how cell content should be aligned
-	 * @return cell factory
-	 */
-	static <S,T> CellFactory<S,T> aligned(Pos alignment) {
-		return new CellFactory<>(null, (cell, newItem, empty) -> cell.setAlignment(alignment));
-	}
-	
-	
-	/**
-	 * Creates cell customizer that adds a tooltip displaying
-	 * text representation of cell's content.
-	 * 
-	 * @return cell customizer
-	 */
-	private static <S,T> CellCustomizer<S,T> tooltipper() {
-		return (cell, newItem, empty) -> {
-			if (newItem == null || empty) {
-				// remove tooltip (if any) when cell is empty
-				cell.setTooltip(null);
-			}
-			else {
-				if (cell.getTooltip() == null) {
-					Tooltip tooltip = new Tooltip();
-					tooltip.textProperty().bind(cell.textProperty());
-					cell.setTooltip(tooltip);
-				}
-			}
-		};
-	}
-
-	
-	/**
-	 * Creates a cell factory that customizes cells by adding a tooltip
-	 * displaying text representation of cell's content.
-	 * Tooltip is not displayed when cell is empty.
-	 * 
-	 * @return cell factory
-	 */
-	static <S,T> CellFactory<S,T> tooltip() {
-		return new CellFactory<>(null, tooltipper());
-	}
-	
-	
-	
-	/**
-	 * Creates a cell factory for cells whose content type is URI,
-	 * displaying the value of URI as clickable hyperlink. If hyperlink
-	 * is clicked, its underlying URI will be used to launch the
-	 * default browser and open a web page corresponding to this URI.
-	 * Additionally, this factory adds a tooltip, displaying text representation
-	 * of URI.
-	 * 
-	 * @return cell factory
-	 */
-	static <S> CellFactory<S, URI> tooltippedHyperlink() {
-		return new CellFactory<>(uri -> {
-			Hyperlink link = new Hyperlink(uri.toString());
-			link.setOnAction(event -> Utils.browse(uri));
-			link.setStyle("-fx-text-fill: blue;");
-			return link;
-		}, tooltipper());
-	}
-		
 }

@@ -38,6 +38,7 @@ public class ResultsView extends AnchorPane {
 	private final IntegerProperty numOfUnclosableTabs = new SimpleIntegerProperty();
 	private int tabIndex;
 
+	private BandcampExplorerMainForm mainForm;
 	private ReleasePlayerForm releasePlayer;
 
 
@@ -157,6 +158,17 @@ public class ResultsView extends AnchorPane {
 
 
 		/**
+		 * Sets a reference to app's main form component for release
+		 * table view on this tab.
+		 * 
+		 * @param mainForm a main form
+		 */
+		void setMainForm(BandcampExplorerMainForm mainForm) {
+			releaseTable.setMainForm(mainForm);
+		}
+
+
+		/**
 		 * Sets the release player for release table view on this tab.
 		 * 
 		 * @param releasePlayer the release player
@@ -179,6 +191,20 @@ public class ResultsView extends AnchorPane {
 		AnchorPane.setRightAnchor(tabPane, 0.0);
 		getChildren().add(tabPane);
 
+		// This listener sets a main form's reference for this results view and pushes
+		// it to all child release tables when results view is added to main form.
+		parentProperty().addListener((observable, oldValue, newValue) -> {
+			if (mainForm == null) {
+				if (newValue instanceof BandcampExplorerMainForm) {
+					mainForm = (BandcampExplorerMainForm)newValue;
+					combinedResultsTab.setMainForm(mainForm);
+					doForEachTab(tab -> getReleaseTableOnTab(tab).setMainForm(mainForm));
+				}
+				else
+					throw new IllegalArgumentException("Invalid container for ResultsView component: " + newValue);
+			}
+		});
+
 		// This is a fake tab which serves as a "button" to add new tabs
 		Tab addBtn = new Tab("+");
 		addBtn.setClosable(false);
@@ -186,7 +212,7 @@ public class ResultsView extends AnchorPane {
 		selectionModel.selectedItemProperty().addListener((observablem, oldTab, newTab) -> {
 			// If user hits "button" we create new result view tab and switch to it
 			if (newTab == addBtn)
-				addResultView();
+				addTab();
 		});
 
 		// Calculate the minimum number of tabs in a tab pane to prohibit closing, depending
@@ -195,7 +221,7 @@ public class ResultsView extends AnchorPane {
 		numOfUnclosableTabs.bind(Bindings.createIntegerBinding(
 				() -> combinedResultsTab.visibleProperty().get() ? 3 : 2, combinedResultsTab.visibleProperty()));
 
-		addResultView();
+		addTab();
 	}
 
 
@@ -220,6 +246,27 @@ public class ResultsView extends AnchorPane {
 
 
 	/**
+	 * Adds a new tab to this results view and creates new release table view
+	 * as its content to display search result.
+	 */
+	void addTab() {
+		Tab tab = new Tab("New search (" + ++tabIndex + ")");
+		tab.setOnCloseRequest(event -> selectionModel.selectLast());
+		tab.setOnClosed(event -> combinedResultsTab.updateReleases());
+		// Don't allow to close tabs if there's only one "normal" tab left
+		tab.closableProperty().bind(Bindings.size(tabs).greaterThan(numOfUnclosableTabs));
+
+		ReleaseTableView releaseTable = ReleaseTableView.load();
+		releaseTable.setMainForm(mainForm);
+		releaseTable.setReleasePlayer(releasePlayer);
+		tab.setContent(releaseTable);
+
+		tabs.add(tab);
+		selectionModel.select(tab);
+	}
+
+
+	/**
 	 * Sets a search result to display in a currently selected result view tab.
 	 * If selected tab already contains search result, the old result gets
 	 * replaced by a new one.
@@ -230,7 +277,7 @@ public class ResultsView extends AnchorPane {
 	void setSearchResult(SearchResult result) {
 		Tab selected = getSelectedTab();
 		if (selected == combinedResultsTab) {
-			addResultView();
+			addTab();
 			selected = getSelectedTab();
 		}
 
@@ -340,26 +387,6 @@ public class ResultsView extends AnchorPane {
 	 */
 	private ObservableList<Release> getReleasesOnTab(Tab tab) {
 		return getReleaseTableOnTab(tab).getReleases();
-	}
-
-
-	/**
-	 * Adds a new tab to this results view and creates new release table view
-	 * as its content to display search result.
-	 */
-	private void addResultView() {
-		Tab tab = new Tab("New search (" + ++tabIndex + ")");
-		tab.setOnCloseRequest(event -> selectionModel.selectLast());
-		tab.setOnClosed(event -> combinedResultsTab.updateReleases());
-		// Don't allow to close tabs if there's only one "normal" tab left
-		tab.closableProperty().bind(Bindings.size(tabs).greaterThan(numOfUnclosableTabs));
-
-		ReleaseTableView releaseTable = ReleaseTableView.load();
-		releaseTable.setReleasePlayer(releasePlayer);
-		tab.setContent(releaseTable);
-
-		tabs.add(tab);
-		selectionModel.select(tab);
 	}
 
 

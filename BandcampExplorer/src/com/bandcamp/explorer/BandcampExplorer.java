@@ -67,8 +67,7 @@ public final class BandcampExplorer extends Application {
 		mainForm.setSearchExecutor(searchExecutor);
 
 		// When everything's prepared, show app's window
-		Scene scene = new Scene(mainForm);
-		primaryStage.setScene(scene);
+		primaryStage.setScene(new Scene(mainForm));
 		primaryStage.setMaximized(true);
 		primaryStage.show();
 	}

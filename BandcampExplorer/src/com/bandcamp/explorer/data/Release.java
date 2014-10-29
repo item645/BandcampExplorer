@@ -140,7 +140,7 @@ public final class Release {
 		URI uri_ = URI.create(url);
 
 		try (Scanner input = new Scanner(uri_.toURL().openStream(), StandardCharsets.UTF_8.name())) {
-			String artist_ = null, title_ = null;
+			String artist_, title_;
 			DownloadType downloadType_;
 			LocalDate releaseDate_, publishDate_;
 
@@ -306,6 +306,7 @@ public final class Release {
 
 	/**
 	 * Gets a link to release artwork thumbnail image.
+	 * Returns null if there's not artwork for this release.
 	 */
 	private String loadArtworkThumbLink() {
 		// We get an url to small 100x100 thumbnail and modify that url
@@ -314,14 +315,15 @@ public final class Release {
 		// format specifier (after '_') from 3 to 2. Replacement is done at char 
 		// array level to avoid using slow regex-based methods of String.
 		String s = property("artThumbURL", String.class);
-		int i = s.lastIndexOf('_');
-		if (i != -1 && i < s.length() - 1 && s.charAt(i+1) == '3') {
-			char[] chars = s.toCharArray();
-			chars[i+1] = '2';
-			return String.valueOf(chars);
+		if (s != null) {
+			int i = s.lastIndexOf('_');
+			if (i != -1 && i < s.length() - 1 && s.charAt(i+1) == '3') {
+				char[] chars = s.toCharArray();
+				chars[i+1] = '2';
+				return String.valueOf(chars);
+			}
 		}
-		else
-			return s;
+		return s;
 	}
 
 
@@ -502,6 +504,16 @@ public final class Release {
 	 */
 	public ReadOnlyObjectProperty<URI> uriProperty() {
 		return uri;
+	}
+
+
+	/**
+	 * Returns a URI of a discography page on this release's parent domain.
+	 */
+	public URI getDiscographyURI() {
+		URI u = uri.get();
+		return URI.create(new StringBuilder(u.getScheme())
+		.append("://").append(u.getAuthority()).append("/music").toString());
 	}
 
 

@@ -40,6 +40,7 @@ import javafx.util.Duration;
 
 import com.bandcamp.explorer.data.Release;
 import com.bandcamp.explorer.data.Track;
+import com.bandcamp.explorer.ui.CellFactory.CellCustomizer;
 
 /**
  * Controller class for release player form.
@@ -713,7 +714,7 @@ public class ReleasePlayerForm extends SplitPane {
 
 		// Setting a custom cell factory to display a play/pause button 
 		// for each playable track
-		playButtonColumn.setCellFactory(new CellFactory<>(track -> {
+		playButtonColumn.setCellFactory(new CellFactory<Track, Track>(track -> {
 			if (track.isPlayable()) {
 				// Since this factory will be invoked not only during table initial
 				// fill but also on any column sort actions, we need to adjust our
@@ -738,20 +739,20 @@ public class ReleasePlayerForm extends SplitPane {
 			}
 			else
 				return null; // don't create buttons for unplayable tracks
-		}, null));
+		}));
 		playButtonColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue()));
 		playButtonColumn.setSortable(false);
 
 		trackNumberColumn.setCellValueFactory(cellData -> cellData.getValue().numberProperty());
 
-		CellFactory<Track, String> tooltipFactory = CellFactory.tooltip();
-		
+		CellFactory<Track, String> tooltip = new CellFactory<>(CellCustomizer.tooltip());
+
 		artistColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
-		artistColumn.setCellFactory(tooltipFactory);
+		artistColumn.setCellFactory(tooltip);
 		artistColumn.setCellValueFactory(cellData -> cellData.getValue().artistProperty());
 
 		titleColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
-		titleColumn.setCellFactory(tooltipFactory);
+		titleColumn.setCellFactory(tooltip);
 		titleColumn.setCellValueFactory(cellData -> cellData.getValue().titleProperty());
 
 		timeColumn.setCellValueFactory(cellData -> cellData.getValue().timeProperty());

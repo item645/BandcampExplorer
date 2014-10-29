@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -23,25 +24,33 @@ import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.DatePicker;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 
 import com.bandcamp.explorer.data.Release;
 import com.bandcamp.explorer.data.ReleaseFilters;
+import com.bandcamp.explorer.data.SearchType;
+import com.bandcamp.explorer.ui.CellFactory.CellCustomizer;
 import com.bandcamp.explorer.util.ExceptionUnchecker;
 
 /**
  * Controller class for release table view component.
  */
-public class ReleaseTableView extends AnchorPane {
+class ReleaseTableView extends AnchorPane {
 
 	@FXML private TextField artistFilter;
 	@FXML private TextField titleFilter;
@@ -57,7 +66,6 @@ public class ReleaseTableView extends AnchorPane {
 	@FXML private CheckBox dlTypeUnavailable;
 	@FXML private Button applyFilter;
 	@FXML private Button resetFilter;
-	@FXML private Button playSelected;
 	@FXML private TableView<Release> releaseTableView;
 	@FXML private TableColumn<Release, String> artistColumn;
 	@FXML private TableColumn<Release, String> titleColumn;
@@ -73,19 +81,16 @@ public class ReleaseTableView extends AnchorPane {
 	 * to open resource stream every time when new table view is created to be
 	 * added on ResultsView tab.
 	 */
-	private static final ByteArrayInputStream FXML_STREAM;
-	static {
-		FXML_STREAM = ExceptionUnchecker.uncheck(() -> {
-			try (InputStream in = new BufferedInputStream(
-					ReleaseTableView.class.getResourceAsStream("ReleaseTableView.fxml"))) {
-				ByteArrayOutputStream out = new ByteArrayOutputStream(16384);
-				int b;
-				while ((b = in.read()) != -1)
-					out.write(b);
-				return new ByteArrayInputStream(out.toByteArray());
-			}
-		});
-	}
+	private static final ByteArrayInputStream FXML_STREAM = ExceptionUnchecker.uncheck(() -> {
+		try (InputStream in = new BufferedInputStream(
+				ReleaseTableView.class.getResourceAsStream("ReleaseTableView.fxml"))) {
+			ByteArrayOutputStream out = new ByteArrayOutputStream(16384);
+			int b;
+			while ((b = in.read()) != -1)
+				out.write(b);
+			return new ByteArrayInputStream(out.toByteArray());
+		}
+	});
 
 	private final EnumSet<Release.DownloadType> selectedDownloadTypes = EnumSet.allOf(Release.DownloadType.class);
 
@@ -93,8 +98,135 @@ public class ReleaseTableView extends AnchorPane {
 	private final FilteredList<Release> filteredItems = new FilteredList<>(items);
 	private final SortedList<Release> sortedItems = new SortedList<>(filteredItems);
 
+	private final CellContextMenu cellContextMenu = new CellContextMenu();
+
+	private BandcampExplorerMainForm mainForm;
 	private ReleasePlayerForm releasePlayer;
 	private TableViewResizeHelper resizeHelper;
+
+
+
+	/**
+	 * This class provides a context menu for table cells.
+	 */
+	private class CellContextMenu extends ContextMenu {
+
+		/**
+		 * Holds a reference to a right-click mouse event that caused this menu to pop up
+		 */
+		private MouseEvent showMenuEvent;
+
+		/**
+		 * Cell customizer that attaches this context menu to table cells.
+		 */
+		private final CellCustomizer<?,?> customizer = (cell, newItem, empty) -> {
+			cell.setContextMenu(this);
+			cell.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
+				if (event.getButton() == MouseButton.SECONDARY)
+					showMenuEvent = event;
+			});
+		};
+
+
+		/**
+		 * Creates a context menu instance.
+		 */
+		CellContextMenu() {
+			setOnHidden(event -> showMenuEvent = null);
+			setConsumeAutoHidingEvents(false);
+			createItems();
+		}
+
+
+		/**
+		 * Returns a type-checked reference to cell customizer that adds this menu to a cell.
+		 */
+		@SuppressWarnings("unchecked")
+		<S,T> CellCustomizer<S,T> customizer() {
+			// Type cast is safe here because for this customizer type parameters don't matter.
+			return (CellCustomizer<S,T>)customizer;
+		}
+
+
+		/**
+		 * Creates items for this menu.
+		 */
+		private void createItems() {
+			MenuItem searchArtist = new MenuItem("Search this Artist");
+			searchArtist.setOnAction(event -> {
+				if (mainForm != null) {
+					Release release = getSelectedRelease();
+					if (release != null)
+						mainForm.searchReleases(release.getArtist(), SearchType.SEARCH, true);
+				}
+			});
+
+			MenuItem moreFromDomain = new MenuItem("More Releases from this Domain");
+			moreFromDomain.setOnAction(event -> {
+				if (mainForm != null) {
+					Release release = getSelectedRelease();
+					if (release != null)
+						mainForm.searchReleases(release.getDiscographyURI().toString(), SearchType.DIRECT, true);
+				}
+			});
+
+			MenuItem viewOnBandcamp = new MenuItem("View on Bandcamp");
+			viewOnBandcamp.setOnAction(event -> {
+				Release release = getSelectedRelease();
+				if (release != null)
+					Utils.browse(release.getURI());
+			});
+
+			MenuItem viewDiscogOnBandcamp = new MenuItem("View Discography on Bandcamp");
+			viewDiscogOnBandcamp.setOnAction(event -> {
+				Release release = getSelectedRelease();
+				if (release != null)
+					Utils.browse(release.getDiscographyURI());
+			});
+
+			MenuItem copyText = new MenuItem("Copy Text");
+			copyText.setOnAction(event -> {
+				TableCell<?,?> cell = getSelectedCell();
+				if (cell != null)
+					Utils.toClipboardAsString(cell.getItem());
+			});
+
+			MenuItem copyReleaseText = new MenuItem("Copy Release as Text");
+			copyReleaseText.setOnAction(event -> Utils.toClipboardAsString(getSelectedRelease()));
+
+			MenuItem copyAllReleasesText = new MenuItem("Copy All Releases as Text");
+			copyAllReleasesText.setOnAction(event -> {
+				// NOTE: we don't use System.lineSeparator() to separate lines here
+				// due to a possible bug in JavaFX clipboard.
+				// More details: http://stackoverflow.com/questions/18827217/javafx-clipboard-double-newlines
+				Utils.toClipboardAsString(sortedItems.stream()
+						.map(Release::toString)
+						.collect(Collectors.joining("\n")));
+			});
+
+			MenuItem playRelease = new MenuItem("Play Release...");
+			playRelease.setOnAction(event -> playSelectedRelease());
+
+			getItems().addAll(searchArtist, moreFromDomain, new SeparatorMenuItem(), viewOnBandcamp,
+					viewDiscogOnBandcamp, new SeparatorMenuItem(), copyText, copyReleaseText,
+					copyAllReleasesText, new SeparatorMenuItem(), playRelease);
+		}
+
+
+		/**
+		 * Returns a table cell on which this menu popped up after mouse right-click
+		 * event occured.
+		 */
+		private TableCell<?,?> getSelectedCell() {
+			if (showMenuEvent != null) {
+				Object source = showMenuEvent.getSource();
+				if (source instanceof TableCell)
+					return (TableCell<?,?>)source;
+			}
+			return null;
+		}
+
+	}
 
 
 	private ReleaseTableView() {}
@@ -106,6 +238,18 @@ public class ReleaseTableView extends AnchorPane {
 	public static ReleaseTableView load() {
 		FXML_STREAM.reset(); // for BAIS reset is always supported
 		return Utils.loadFXMLComponent(FXML_STREAM, ReleaseTableView::new);
+	}
+
+
+	/**
+	 * Sets a reference to app's main form component.
+	 * Does nothing if reference is already set or reference is null.
+	 * 
+	 * @param mainForm a main form
+	 */
+	void setMainForm(BandcampExplorerMainForm mainForm) {
+		if (this.mainForm == null && mainForm != null)
+			this.mainForm = mainForm;
 	}
 
 
@@ -147,11 +291,12 @@ public class ReleaseTableView extends AnchorPane {
 			filters.add(ReleaseFilters.titleContains(title));
 
 		String tags = tagsFilter.getCharacters().toString().trim();
-		if (!tags.isEmpty()) {
-			List<String> tagsList = Arrays.asList(tags.split(","));
-			tagsList.replaceAll(tag -> tag.trim().toLowerCase(Locale.ENGLISH));
-			filters.add(ReleaseFilters.byTags(tagsList, null));
-		}
+		if (!tags.isEmpty())
+			filters.add(ReleaseFilters.byTags(
+					Arrays.stream(tags.split(","))
+					.map(tag -> tag.trim().toLowerCase(Locale.ENGLISH))
+					.collect(Collectors.toSet()),
+					null));
 
 		String url = urlFilter.getCharacters().toString().trim();
 		if (!url.isEmpty())
@@ -235,13 +380,21 @@ public class ReleaseTableView extends AnchorPane {
 	/**
 	 * Opens a player window to play currently selected release.
 	 */
-	@FXML
 	private void playSelectedRelease() {
 		if (releasePlayer != null) {
-			Release release = releaseTableView.getSelectionModel().getSelectedItem();
+			Release release = getSelectedRelease();
 			if (release != null)
 				releasePlayer.setRelease(release);
 		}
+	}
+
+
+	/**
+	 * Returns a release currently selected in a table.
+	 * If there's no selected release, returns null.
+	 */
+	private Release getSelectedRelease() {
+		return releaseTableView.getSelectionModel().getSelectedItem();
 	}
 
 
@@ -274,33 +427,46 @@ public class ReleaseTableView extends AnchorPane {
 
 		releaseTableView.setItems(sortedItems);
 		sortedItems.comparatorProperty().bind(releaseTableView.comparatorProperty());
-		
-		CellFactory<Release, String> tooltipFactory = CellFactory.tooltip();
+
+		// Custom cell factories for text and date columns (each custom factory also
+		// adds a context menu to cells)
+		CellFactory<Release, String> tooltip = new CellFactory<>(
+				CellCustomizer.tooltip(), cellContextMenu.customizer());
+		CellFactory<Release, LocalDate> centered = new CellFactory<>(
+				CellCustomizer.alignment(Pos.CENTER), cellContextMenu.customizer());
 
 		artistColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
-		artistColumn.setCellFactory(tooltipFactory);
+		artistColumn.setCellFactory(tooltip);
 		artistColumn.setCellValueFactory(cellData -> cellData.getValue().artistProperty());
 
 		titleColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
-		titleColumn.setCellFactory(tooltipFactory);
+		titleColumn.setCellFactory(tooltip);
 		titleColumn.setCellValueFactory(cellData -> cellData.getValue().titleProperty());
 
+		dlTypeColumn.setCellFactory(new CellFactory<>(cellContextMenu.customizer()));
 		dlTypeColumn.setCellValueFactory(cellData -> cellData.getValue().downloadTypeProperty());
 
-		releaseDateColumn.setCellFactory(CellFactory.aligned(Pos.CENTER));
+		releaseDateColumn.setCellFactory(centered);
 		releaseDateColumn.setCellValueFactory(cellData -> {
 			// display empty cell instead of LocalDate.MIN
 			Release release =  cellData.getValue();
 			return release.getReleaseDate().equals(LocalDate.MIN) ? null : release.releaseDateProperty();
 		});
 
-		publishDateColumn.setCellFactory(CellFactory.aligned(Pos.CENTER));
+		publishDateColumn.setCellFactory(centered);
 		publishDateColumn.setCellValueFactory(cellData -> cellData.getValue().publishDateProperty());
 
-		tagsColumn.setCellFactory(tooltipFactory);
+		tagsColumn.setCellFactory(tooltip);
 		tagsColumn.setCellValueFactory(cellData -> cellData.getValue().tagsStringProperty());
 
-		urlColumn.setCellFactory(CellFactory.tooltippedHyperlink());
+		// For release URL column we create a hyperlink which can be used to open
+		// a release page on Bandcamp using the default browser.
+		urlColumn.setCellFactory(new CellFactory<Release, URI>(uri -> {
+			Hyperlink link = new Hyperlink(uri.toString());
+			link.setOnAction(event -> Utils.browse(uri));
+			link.setStyle("-fx-text-fill: blue;");
+			return link;
+		}, cellContextMenu.customizer()));
 		urlColumn.setCellValueFactory(cellData -> cellData.getValue().uriProperty());
 
 		// Setting a callback to display an information about selected
@@ -323,7 +489,7 @@ public class ReleaseTableView extends AnchorPane {
 		});
 
 		releaseTableView.setPlaceholder(new Label());
-		
+
 		resizeHelper = new TableViewResizeHelper(releaseTableView);
 		resizeHelper.enable();
 	}
@@ -344,7 +510,6 @@ public class ReleaseTableView extends AnchorPane {
 		assert releaseDateColumn != null : "fx:id=\"releaseDateColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert dlTypeUnavailable != null : "fx:id=\"dlTypeUnavailable\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert publishDateFilterTo != null : "fx:id=\"publishDateFilterTo\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
-		assert playSelected != null : "fx:id=\"playSelected\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert tagsColumn != null : "fx:id=\"tagsColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert titleFilter != null : "fx:id=\"titleFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert titleColumn != null : "fx:id=\"titleColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";

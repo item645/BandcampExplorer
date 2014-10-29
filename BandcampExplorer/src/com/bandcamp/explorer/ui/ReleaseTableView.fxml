@@ -188,7 +188,6 @@
                                                    </VBox.margin>
                                                 </Button>
                                                 <Button fx:id="resetFilter" layoutX="40.0" layoutY="27.0" mnemonicParsing="false" onAction="#resetFilter" prefHeight="20.0" prefWidth="137.0" text="Reset Filter" />
-                                                <Button fx:id="playSelected" mnemonicParsing="false" onAction="#playSelectedRelease" text="Play Selected..." />
                                              </children>
                                           </HBox>
                                        </children>

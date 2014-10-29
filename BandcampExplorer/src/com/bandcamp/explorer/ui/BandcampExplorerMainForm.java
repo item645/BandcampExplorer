@@ -96,29 +96,45 @@ public class BandcampExplorerMainForm extends BorderPane {
 
 
 	/**
-	 * Handler for key press on search query field, runs a search 
-	 * if Enter was pressed.
+	 * Puts specified query and search type as values into appropriate form fields and
+	 * runs a search using these values. After search is finished, passes the result
+	 * to a release view for display.
+	 * 
+	 * @param query search query
+	 * @param type search type
+	 * @param newResultTab if true, new tab will be opened in a results view component
+	 *        to hold the result of this search, otherwise currently selected tab will
+	 *        be used
+	 * @throws NullPointerException if search query or search type is null
+	 * @throws IllegalStateException if there's search task running now
 	 */
-	@FXML 
-	private void onSearchQueryKeyPress(KeyEvent event) {
-		if (event.getCode() == KeyCode.ENTER)
-			searchReleases();
+	void searchReleases(String query, SearchType type, boolean newResultTab) {
+		checkForRunningTask();
+
+		searchQuery.setText(Objects.requireNonNull(query));
+		searchType.setValue(Objects.requireNonNull(type));
+
+		if (newResultTab)
+			resultsView.addTab();
+
+		searchReleases();
 	}
 
 
 	/**
 	 * Runs a search using parameters provided by fields. After search is finished,
-	 * passes the result to a release view for display. 
+	 * passes the result to a release view for display.
+	 * 
+	 * @throws IllegalStateException if there's search task running now
 	 */
 	@FXML
 	private void searchReleases() {
-		if (runningTask != null)
-			return;
+		checkForRunningTask();
 
 		String query = searchQuery.getCharacters().toString().trim();
 		if (query.isEmpty())
 			return;
-		
+
 		SearchTask task = new SearchTask(
 				new SearchParams.Builder(query, searchType.getValue()).pages(page.getValue()).build(),
 				searchExecutor);
@@ -172,6 +188,27 @@ public class BandcampExplorerMainForm extends BorderPane {
 		});
 
 		new Thread(task).start();
+	}
+
+
+	/**
+	 * Helper to check whether the search task is running at the moment.
+	 * Throws IllegalStateException if it is.
+	 */
+	private void checkForRunningTask() {
+		if (runningTask != null)
+			throw new IllegalStateException("Can't start a new search when there is a search task running");
+	}
+
+
+	/**
+	 * Handler for key press on search query field, runs a search 
+	 * if Enter was pressed.
+	 */
+	@FXML 
+	private void onSearchQueryKeyPress(KeyEvent event) {
+		if (event.getCode() == KeyCode.ENTER)
+			searchReleases();
 	}
 
 
@@ -265,7 +302,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 			page.setDisable(false);
 	}
 
-	
+
 	/**
 	 * Shows/hides the combined results tab in results view component
 	 * depending on current state of showCombinedResults checkbox.
@@ -274,7 +311,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 	private void onShowCombinedResultsChange() {
 		resultsView.showCombinedResults(showCombinedResults.isSelected());
 	}
-	
+
 
 	/**
 	 * Initialization method invoked by FXML loader, provides initial setup for components.

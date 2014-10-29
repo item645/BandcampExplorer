@@ -10,6 +10,8 @@ import java.util.function.Supplier;
 import com.bandcamp.explorer.util.ExceptionUnchecker;
 
 import javafx.fxml.FXMLLoader;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.Region;
 
 /**
@@ -96,6 +98,22 @@ class Utils {
 			catch (Exception e) {
 				e.printStackTrace();
 			}
+		}
+	}
+	
+	
+	/**
+	 * Converts specified object to its string representation and
+	 * puts result string into a system clipboard.
+	 * Does nothing if object is null.
+	 * 
+	 * @param obj an object to put into a clipboard
+	 */
+	static void toClipboardAsString(Object obj) {
+		if (obj != null) {
+			ClipboardContent content = new ClipboardContent();
+			content.putString(obj.toString());
+			Clipboard.getSystemClipboard().setContent(content);
 		}
 	}
 
