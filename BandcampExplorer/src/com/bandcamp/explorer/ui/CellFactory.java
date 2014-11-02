@@ -5,12 +5,14 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
+import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.Tooltip;
+import javafx.scene.text.Text;
 import javafx.util.Callback;
 
 /**
@@ -59,21 +61,35 @@ class CellFactory<S,T> implements Callback<TableColumn<S,T>, TableCell<S,T>> {
 
 		/**
 		 * Creates a customizer that adds a tooltip displaying text 
-		 * representation of cell's content.
+		 * representation of cell content when cell text is clipped by
+		 * parent column's border.
 		 */
 		static <S,T> CellCustomizer<S,T> tooltip() {
 			return (cell, newItem, empty) -> {
-				if (newItem == null || empty) {
-					// remove tooltip (if any) when cell is empty
-					cell.setTooltip(null);
-				}
-				else {
-					if (cell.getTooltip() == null) {
-						Tooltip tooltip = new Tooltip();
-						tooltip.textProperty().bind(cell.textProperty());
-						cell.setTooltip(tooltip);
+				cell.setOnMouseEntered(enterEvent -> {
+					// Get a screen point of cell's lower right corner
+					Point2D lowerRightCorner = cell.localToScreen(
+							cell.getLayoutBounds().getMaxX(), cell.getLayoutBounds().getMaxY());
+
+					// Little hack to determine whether the cell text is clipped.
+					// Clipping operation does not change the actual text property of a cell,
+					// what really gets changed instead is a labeled text (an instance of
+					// com.sun.javafx.scene.control.skin.LabeledText) that is used internally 
+					// by a cell skin implementation (com.sun.javafx.scene.control.skin.LabeledSkinBase)
+					// to actually display its content as a styled text.
+					// LabeledText has the style class "text" and is reachable via node lookup.
+					Text displayedText = (Text)cell.lookup(".text");
+					String cellText = newItem != null ? newItem.toString() : "";
+
+					// If text is clipped, display the tooltip at cell's lower right corner
+					if (displayedText != null && !cellText.isEmpty() && !displayedText.getText().equals(cellText)) {
+						Tooltip tooltip = new Tooltip(cell.getText());
+						tooltip.show(cell, lowerRightCorner.getX(), lowerRightCorner.getY());
+						cell.setOnMouseExited(exitEvent -> tooltip.hide());
 					}
-				}
+					else
+						cell.setOnMouseExited(null);
+				});
 			};
 		}
 

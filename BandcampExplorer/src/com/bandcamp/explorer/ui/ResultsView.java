@@ -14,6 +14,7 @@ import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.ObservableList;
+import javafx.event.Event;
 import javafx.scene.control.Label;
 import javafx.scene.control.SingleSelectionModel;
 import javafx.scene.control.Tab;
@@ -40,7 +41,6 @@ public class ResultsView extends AnchorPane {
 
 	private BandcampExplorerMainForm mainForm;
 	private ReleasePlayerForm releasePlayer;
-
 
 
 	/**
@@ -208,6 +208,7 @@ public class ResultsView extends AnchorPane {
 		// This is a fake tab which serves as a "button" to add new tabs
 		Tab addBtn = new Tab("+");
 		addBtn.setClosable(false);
+		addBtn.setTooltip(new Tooltip("Open a new tab (Ctrl+T)"));
 		tabs.add(addBtn);
 		selectionModel.selectedItemProperty().addListener((observablem, oldTab, newTab) -> {
 			// If user hits "button" we create new result view tab and switch to it
@@ -251,7 +252,12 @@ public class ResultsView extends AnchorPane {
 	 */
 	void addTab() {
 		Tab tab = new Tab("New search (" + ++tabIndex + ")");
-		tab.setOnCloseRequest(event -> selectionModel.selectLast());
+		tab.setOnCloseRequest(event -> {
+			if (isLastTab(tab))
+				selectionModel.selectPrevious();
+			else
+				selectionModel.selectLast();
+		});
 		tab.setOnClosed(event -> combinedResultsTab.updateReleases());
 		// Don't allow to close tabs if there's only one "normal" tab left
 		tab.closableProperty().bind(Bindings.size(tabs).greaterThan(numOfUnclosableTabs));
@@ -305,6 +311,49 @@ public class ResultsView extends AnchorPane {
 	 */
 	void showCombinedResults(boolean show) {
 		combinedResultsTab.visibleProperty().set(show);
+	}
+
+
+	/**
+	 * Closes currently selected tab.
+	 * Does nothing if selected tab is a combined results tab or selected tab
+	 * is the only "normal" tab left in a tab pane.
+	 */
+	void closeSelectedTab() {
+		Tab tab = getSelectedTab();
+		if (tab == combinedResultsTab)
+			return;
+		if (!tab.isClosable())
+			return;
+
+		// Since there's no native JavaFX support (yet) to close tab programmatically
+		// we mimic tab closing behavior by removing tab from a list of tabs and
+		// firing appropriate events to let handlers do their job.
+		if (tab.getOnCloseRequest() != null) {
+			Event closeRequest = new Event(Tab.TAB_CLOSE_REQUEST_EVENT);
+			Event.fireEvent(tab, closeRequest);
+			if (closeRequest.isConsumed())
+				return;
+		}
+		tabs.remove(tab);
+		if (tab.getOnClosed() != null)
+			Event.fireEvent(tab, new Event(Tab.CLOSED_EVENT));
+
+		tabPane.requestFocus();
+	}
+
+
+	/**
+	 * Switches to the tab next to selected in this results view.
+	 * If selected tab is the last tab, then switches to either first "normal" tab
+	 * or to combined results tab (if it's visible at the moment).
+	 */
+	void switchTab() {
+		tabPane.requestFocus();
+		if (isLastTab(getSelectedTab()))
+			selectionModel.select(1);
+		else
+			selectionModel.selectNext();
 	}
 
 
@@ -398,6 +447,16 @@ public class ResultsView extends AnchorPane {
 			if (t.isSelected())
 				return t;
 		throw new AssertionError();
+	}
+
+
+	/**
+	 * Returns true if given tab is a last tab in this results view.
+	 * 
+	 * @param tab a tab to check
+	 */
+	private boolean isLastTab(Tab tab) {
+		return tab == tabs.get(tabs.size() - 1);
 	}
 
 }

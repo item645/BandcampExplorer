@@ -197,7 +197,7 @@ class ReleaseTableView extends AnchorPane {
 			MenuItem copyAllReleasesText = new MenuItem("Copy All Releases as Text");
 			copyAllReleasesText.setOnAction(event -> {
 				// NOTE: we don't use System.lineSeparator() to separate lines here
-				// due to a possible bug in JavaFX clipboard.
+				// due to a possible bug in JavaFX clipboard implementation.
 				// More details: http://stackoverflow.com/questions/18827217/javafx-clipboard-double-newlines
 				Utils.toClipboardAsString(sortedItems.stream()
 						.map(Release::toString)
@@ -425,6 +425,14 @@ class ReleaseTableView extends AnchorPane {
 			});
 		});
 
+		// Ensure that filter is applied when Enter is pressed on datepicker fields.
+		// Regular approach with FXML handlers won't work cause datepicker consumes
+		// key events internally.
+		publishDateFilterFrom.addEventFilter(KeyEvent.KEY_PRESSED, this::onFilterKeyPress);
+		publishDateFilterTo.addEventFilter(KeyEvent.KEY_PRESSED, this::onFilterKeyPress);
+		releaseDateFilterFrom.addEventFilter(KeyEvent.KEY_PRESSED, this::onFilterKeyPress);
+		releaseDateFilterTo.addEventFilter(KeyEvent.KEY_PRESSED, this::onFilterKeyPress);
+		
 		releaseTableView.setItems(sortedItems);
 		sortedItems.comparatorProperty().bind(releaseTableView.comparatorProperty());
 

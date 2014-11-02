@@ -16,6 +16,8 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.text.Text;
@@ -58,8 +60,31 @@ public class BandcampExplorerMainForm extends BorderPane {
 	private SearchTask runningTask; // doesn't need to be volatile since accessed only from JavaFX thread
 
 
+	/**
+	 * Creates an instance of main form.
+	 */
+	private BandcampExplorerMainForm() {
+		KeyCombination CTRL_T   = new KeyCodeCombination(KeyCode.T, KeyCombination.SHORTCUT_DOWN);
+		KeyCombination CTRL_W   = new KeyCodeCombination(KeyCode.W, KeyCombination.SHORTCUT_DOWN);
+		KeyCombination CTRL_TAB = new KeyCodeCombination(KeyCode.TAB, KeyCombination.SHORTCUT_DOWN);
 
-	private BandcampExplorerMainForm() {}
+		// top level filter for hotkeys
+		addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+			if (CTRL_T.match(event)) {
+				resultsView.addTab();
+				searchQuery.requestFocus();
+				event.consume();
+			}
+			else if (CTRL_W.match(event)) {
+				resultsView.closeSelectedTab();
+				event.consume();
+			}
+			else if (CTRL_TAB.match(event)) {
+				resultsView.switchTab();
+				event.consume();
+			}
+		});
+	}
 
 
 	/**
@@ -347,4 +372,5 @@ public class BandcampExplorerMainForm extends BorderPane {
 		assert clearAll != null : "fx:id=\"clearAll\" was not injected: check your FXML file 'BandcampExplorerMainForm.fxml'.";
 		assert showCombinedResults != null : "fx:id=\"showCombinedResults\" was not injected: check your FXML file 'BandcampExplorerMainForm.fxml'.";
 	}
+
 }
