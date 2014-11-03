@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
@@ -205,7 +206,7 @@ class ReleaseTableView extends AnchorPane {
 			});
 
 			MenuItem playRelease = new MenuItem("Play Release...");
-			playRelease.setOnAction(event -> playSelectedRelease());
+			playRelease.setOnAction(event -> Platform.runLater(() -> playSelectedRelease()));
 
 			getItems().addAll(searchArtist, moreFromDomain, new SeparatorMenuItem(), viewOnBandcamp,
 					viewDiscogOnBandcamp, new SeparatorMenuItem(), copyText, copyReleaseText,
