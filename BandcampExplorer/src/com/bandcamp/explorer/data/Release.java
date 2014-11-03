@@ -31,8 +31,6 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
-import com.bandcamp.explorer.util.ExceptionUnchecker;
-
 /**
  * Represents a release on Bandcamp website which can be either
  * album or single track.
@@ -146,9 +144,12 @@ public final class Release {
 
 			// Finding a variable containing release data and feeding it to JS engine so that we could
 			// then handily read any property values we need.
-			ExceptionUnchecker.uncheck(
-					() -> JS.eval(input.findWithinHorizon(RELEASE_DATA, 0)),
-					e -> new IllegalArgumentException("Release data is not valid or cannot be located", e));
+			try {
+				JS.eval(input.findWithinHorizon(RELEASE_DATA, 0));
+			}
+			catch (Exception e) {
+				throw new IllegalArgumentException("Release data is not valid or cannot be located", e);
+			}
 
 			artist_ = property("artist", String.class);
 			title_ = property("current.title", String.class);

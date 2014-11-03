@@ -67,9 +67,9 @@ class CellFactory<S,T> implements Callback<TableColumn<S,T>, TableCell<S,T>> {
 		static <S,T> CellCustomizer<S,T> tooltip() {
 			return (cell, newItem, empty) -> {
 				cell.setOnMouseEntered(enterEvent -> {
-					// Get a screen point of cell's lower right corner
-					Point2D lowerRightCorner = cell.localToScreen(
-							cell.getLayoutBounds().getMaxX(), cell.getLayoutBounds().getMaxY());
+					// Get a screen point of cell's lower left corner
+					Point2D lowerLeftCorner = cell.localToScreen(
+							cell.getLayoutBounds().getMinX(), cell.getLayoutBounds().getMaxY());
 
 					// Little hack to determine whether the cell text is clipped.
 					// Clipping operation does not change the actual text property of a cell,
@@ -81,10 +81,10 @@ class CellFactory<S,T> implements Callback<TableColumn<S,T>, TableCell<S,T>> {
 					Text displayedText = (Text)cell.lookup(".text");
 					String cellText = newItem != null ? newItem.toString() : "";
 
-					// If text is clipped, display the tooltip at cell's lower right corner
+					// If text is clipped, display the tooltip at cell's lower left corner
 					if (displayedText != null && !cellText.isEmpty() && !displayedText.getText().equals(cellText)) {
 						Tooltip tooltip = new Tooltip(cell.getText());
-						tooltip.show(cell, lowerRightCorner.getX(), lowerRightCorner.getY());
+						tooltip.show(cell, lowerLeftCorner.getX(), lowerLeftCorner.getY());
 						cell.setOnMouseExited(exitEvent -> tooltip.hide());
 					}
 					else

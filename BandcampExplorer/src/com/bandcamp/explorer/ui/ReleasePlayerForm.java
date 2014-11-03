@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Objects;
+import java.util.Optional;
 
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ReadOnlyObjectWrapper;
@@ -48,6 +49,7 @@ import com.bandcamp.explorer.ui.CellFactory.CellCustomizer;
 public class ReleasePlayerForm extends SplitPane {
 
 	private Stage stage;
+	@FXML private Button loadReleaseButton;
 	@FXML private Button previousButton;
 	@FXML private Button nextButton;
 	@FXML private Button playButton;
@@ -692,6 +694,30 @@ public class ReleasePlayerForm extends SplitPane {
 
 
 	/**
+	 * Prompts user to enter a URL to a release, loads the release using supplied
+	 * URL and sets it to play in this player.
+	 * If there's an error loading release, displays message box with information
+	 * about error.
+	 * If empty URL was supplied or cancel pressed, does nothing.
+	 */
+	@FXML
+	private void loadRelease() {
+		Optional<String> url = Dialogs.inputBox("Enter a release URL to load:", "Load Release", stage);
+		if (url.isPresent()) {
+			String u = url.get().trim();
+			if (!u.isEmpty()) {
+				try {
+					setRelease(new Release(u));
+				} 
+				catch (Exception e) {
+					Dialogs.messageBox("Error loading release: " + e, "Error", stage);
+				}
+			}
+		}
+	}
+
+
+	/**
 	 * Opens release web page on Bandcamp using default web browser.
 	 */
 	@FXML
@@ -781,6 +807,7 @@ public class ReleasePlayerForm extends SplitPane {
 		assert releaseInfo != null : "fx:id=\"releaseInfo\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert artworkView != null : "fx:id=\"artworkView\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert playButton != null : "fx:id=\"playButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert loadReleaseButton != null : "fx:id=\"loadReleaseButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert nextButton != null : "fx:id=\"nextButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert timeColumn != null : "fx:id=\"timeColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert releaseLink != null : "fx:id=\"releaseLink\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
