@@ -1,9 +1,5 @@
 package com.bandcamp.explorer.data;
 
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Locale;
-
 import javafx.beans.property.ReadOnlyIntegerProperty;
 import javafx.beans.property.ReadOnlyIntegerWrapper;
 import javafx.beans.property.ReadOnlyObjectProperty;
@@ -24,76 +20,6 @@ public final class Track {
 
 
 	/**
-	 * Class for representing a track time.
-	 */
-	public static final class Time implements Comparable<Time> {
-
-		public static final DateTimeFormatter HH_mm_ss = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.ENGLISH);
-		public static final DateTimeFormatter mm_ss = DateTimeFormatter.ofPattern("mm:ss", Locale.ENGLISH);
-
-		private final int seconds;
-		private final String asString;
-
-
-		/**
-		 * Constructs an instance of Time using specified duration in seconds.
-		 */
-		Time(int seconds) {
-			this.seconds = seconds;
-			this.asString = LocalTime.ofSecondOfDay(seconds).format(seconds >= 3600 ? HH_mm_ss : mm_ss);
-		}
-
-		
-		/**
-		 * Returns a hash code for this time.
-		 */
-		@Override
-		public int hashCode() {
-			return seconds;
-		}
-
-
-		/**
-		 * Tests this time object for equality with another.
-		 * Two time objects are equal if they contain same number of seconds.
-		 */
-		@Override
-		public boolean equals(Object other) {
-			if (this == other) return true;
-			return other instanceof Time ? this.seconds == ((Time)other).seconds : false;
-		}
-
-
-		/** 
-		 * Compares this time to another using their duration in seconds.
-		 */
-		@Override
-		public int compareTo(Time other) {
-			return Integer.compare(this.seconds, other.seconds);
-		}
-
-
-		/**
-		 * Returns a string representation of this time, which can be either in
-		 * HH:mm:ss format (if duration >= 1 hour) or mm:ss format (if duration < 1 hour). 
-		 */
-		@Override
-		public String toString() {
-			return asString;
-		}
-
-
-		/**
-		 * Returns a duration of this time in seconds.
-		 */
-		public int getSeconds() {
-			return seconds;
-		}
-
-	}
-
-
-	/**
 	 * Constructs a track instance using specified parameters.
 	 * 
 	 * @param number track number (should be > 0)
@@ -106,7 +32,7 @@ public final class Track {
 		assert number > 0;
 		assert artist != null;
 		assert title != null;
-		assert seconds >= 0.0 && !Float.isNaN(seconds);
+		assert seconds >= 0.0;
 
 		this.number = new ReadOnlyIntegerWrapper(number).getReadOnlyProperty();
 		this.artist = new ReadOnlyStringWrapper(artist).getReadOnlyProperty();

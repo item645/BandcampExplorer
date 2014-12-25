@@ -83,6 +83,7 @@ public final class Release {
 	private final ReadOnlyStringProperty artist;
 	private final ReadOnlyStringProperty title;
 	private final ReadOnlyObjectProperty<DownloadType> downloadType;
+	private final ReadOnlyObjectProperty<Time> time;
 	private final ReadOnlyObjectProperty<LocalDate> releaseDate;
 	private final ReadOnlyObjectProperty<LocalDate> publishDate;
 	private final ReadOnlySetProperty<String> tags;
@@ -151,26 +152,27 @@ public final class Release {
 				throw new IllegalArgumentException("Release data is not valid or cannot be located", e);
 			}
 
-			artist_ = property("artist", String.class);
-			title_ = property("current.title", String.class);
+			artist_ = Objects.toString(property("artist", String.class));
+			title_ = Objects.toString(property("current.title", String.class));
 			releaseDate_ = propertyDate("album_release_date");
 			publishDate_ = propertyDate("current.publish_date");
 			downloadType_ = determineDownloadType();
 			Set<String> tags_ = loadTags(input);
+			tracks = loadTracks(artist_);
 			artworkThumbLink = loadArtworkThumbLink();
 			information = Objects.toString(property("current.about", String.class), "");
+			int time_ = tracks.stream().collect(Collectors.summingInt(track -> track.getTime().getSeconds()));
 
 			// Wrapping all necessary stuff in JFX-compliant properties
-			artist = new ReadOnlyStringWrapper(Objects.toString(artist_)).getReadOnlyProperty();
-			title = new ReadOnlyStringWrapper(Objects.toString(title_)).getReadOnlyProperty();
+			artist = new ReadOnlyStringWrapper(artist_).getReadOnlyProperty();
+			title = new ReadOnlyStringWrapper(title_).getReadOnlyProperty();
 			downloadType = new ReadOnlyObjectWrapper<>(downloadType_).getReadOnlyProperty();
+			time = new ReadOnlyObjectWrapper<Time>(new Time(time_)).getReadOnlyProperty();
 			releaseDate = new ReadOnlyObjectWrapper<>(releaseDate_).getReadOnlyProperty();
 			publishDate = new ReadOnlyObjectWrapper<>(publishDate_).getReadOnlyProperty();
 			tags = new ReadOnlySetWrapper<>(FXCollections.unmodifiableObservableSet(FXCollections.observableSet(tags_)));
 			tagsString = new ReadOnlyStringWrapper(tags_.stream().collect(Collectors.joining(", "))).getReadOnlyProperty();
 			uri = new ReadOnlyObjectWrapper<>(uri_).getReadOnlyProperty();
-
-			tracks = loadTracks(); // can be called only after this.artist is set
 
 			// This serves as sort of unique identifier for release and is used for equals/hashcode
 			link = (uri_.getHost() + uri_.getPath()).toLowerCase(Locale.ROOT);
@@ -258,7 +260,7 @@ public final class Release {
 	 * Loads all the tracks from JSON data and returns them as unmodifiable
 	 * list of Track objects.
 	 */
-	private List<Track> loadTracks() {
+	private List<Track> loadTracks(String releaseArtist) {
 		List<Track> result = new ArrayList<>();
 
 		Pattern splitter = null;
@@ -283,7 +285,7 @@ public final class Release {
 						// example: http://maxscordamaglia.bandcamp.com/album/eetudes-on-the-run
 					}
 					else {
-						artist = this.artist.get();
+						artist = releaseArtist;
 						title = artistTitle;
 					}
 				}
@@ -311,7 +313,7 @@ public final class Release {
 	 */
 	private String loadArtworkThumbLink() {
 		// We get an url to small 100x100 thumbnail and modify that url
-		// so it will point to a bigger 350x350 image (a standart image used
+		// so it will point to a bigger 350x350 image (a standard image used
 		// to display artwork on release html page). The url is changed by replacing 
 		// format specifier (after '_') from 3 to 2. Replacement is done at char 
 		// array level to avoid using slow regex-based methods of String.
@@ -404,9 +406,19 @@ public final class Release {
 	 */
 	@Override
 	public String toString() {
-		return new StringBuilder(artist.get()).append(" - ").append(title.get()).append(" [")
-				.append(publishDate.get()).append("] [").append(downloadType.get()).append("] ")
-				.append(tags.get()).append(" (").append(uri.get()).append(")").toString();
+		String artist_ = artist.get();
+		String title_ = title.get();
+		Time time_ = time.get();
+		LocalDate releaseDate_ = releaseDate.get();
+		LocalDate publishDate_ = publishDate.get();
+		DownloadType downloadType_ = downloadType.get();
+		String tagsString_ = tagsString.get();
+		URI uri_ = uri.get();
+		return new StringBuilder(artist_).append(" - ").append(title_).append(" (")
+				.append(time_).append(") [").append(releaseDate_.equals(LocalDate.MIN) ? "-" : releaseDate_)
+				.append(", ").append(publishDate_).append(", ").append(downloadType_)
+				.append("] [").append(tagsString_).append("] (").append(uri_).append(")")
+				.toString();
 	}
 
 
@@ -455,6 +467,23 @@ public final class Release {
 	 */
 	public ReadOnlyObjectProperty<DownloadType> downloadTypeProperty() {
 		return downloadType;
+	}
+
+
+	/**
+	 * Returns a total time of this release. The returned instance of time represents
+	 * a total duration of all playable tracks on this release.
+	 */
+	public Time getTime() {
+		return time.get();
+	}
+
+
+	/**
+	 * Returns a release time as read-only JavaFX property.
+	 */
+	public ReadOnlyObjectProperty<Time> timeProperty() {
+		return time;
 	}
 
 

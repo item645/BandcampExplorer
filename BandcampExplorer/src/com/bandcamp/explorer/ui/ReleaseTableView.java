@@ -45,6 +45,7 @@ import javafx.scene.layout.AnchorPane;
 import com.bandcamp.explorer.data.Release;
 import com.bandcamp.explorer.data.ReleaseFilters;
 import com.bandcamp.explorer.data.SearchType;
+import com.bandcamp.explorer.data.Time;
 import com.bandcamp.explorer.ui.CellFactory.CellCustomizer;
 import com.bandcamp.explorer.util.ExceptionUnchecker;
 
@@ -67,9 +68,11 @@ class ReleaseTableView extends AnchorPane {
 	@FXML private CheckBox dlTypeUnavailable;
 	@FXML private Button applyFilter;
 	@FXML private Button resetFilter;
+	@FXML private Button showPlayer;
 	@FXML private TableView<Release> releaseTableView;
 	@FXML private TableColumn<Release, String> artistColumn;
 	@FXML private TableColumn<Release, String> titleColumn;
+	@FXML private TableColumn<Release, Time> timeColumn;
 	@FXML private TableColumn<Release, Release.DownloadType> dlTypeColumn;
 	@FXML private TableColumn<Release, LocalDate> releaseDateColumn;
 	@FXML private TableColumn<Release, LocalDate> publishDateColumn;
@@ -206,7 +209,7 @@ class ReleaseTableView extends AnchorPane {
 			});
 
 			MenuItem playRelease = new MenuItem("Play Release...");
-			playRelease.setOnAction(event -> Platform.runLater(() -> playSelectedRelease()));
+			playRelease.setOnAction(event -> playSelectedRelease());
 
 			getItems().addAll(searchArtist, moreFromDomain, new SeparatorMenuItem(), viewOnBandcamp,
 					viewDiscogOnBandcamp, new SeparatorMenuItem(), copyText, copyReleaseText,
@@ -385,7 +388,7 @@ class ReleaseTableView extends AnchorPane {
 		if (releasePlayer != null) {
 			Release release = getSelectedRelease();
 			if (release != null)
-				releasePlayer.setRelease(release);
+				Platform.runLater(() -> releasePlayer.setRelease(release));
 		}
 	}
 
@@ -396,6 +399,16 @@ class ReleaseTableView extends AnchorPane {
 	 */
 	private Release getSelectedRelease() {
 		return releaseTableView.getSelectionModel().getSelectedItem();
+	}
+
+
+	/**
+	 * Shows and brings to front a release player window if it was hidden or iconified.
+	 */
+	@FXML
+	private void showPlayer() {
+		if (releasePlayer != null)
+			releasePlayer.show();
 	}
 
 
@@ -430,10 +443,10 @@ class ReleaseTableView extends AnchorPane {
 		// Regular approach with FXML handlers won't work cause datepicker consumes
 		// key events internally.
 		publishDateFilterFrom.addEventFilter(KeyEvent.KEY_PRESSED, this::onFilterKeyPress);
-		publishDateFilterTo.addEventFilter(KeyEvent.KEY_PRESSED, this::onFilterKeyPress);
 		releaseDateFilterFrom.addEventFilter(KeyEvent.KEY_PRESSED, this::onFilterKeyPress);
+		publishDateFilterTo.addEventFilter(KeyEvent.KEY_PRESSED, this::onFilterKeyPress);
 		releaseDateFilterTo.addEventFilter(KeyEvent.KEY_PRESSED, this::onFilterKeyPress);
-		
+
 		releaseTableView.setItems(sortedItems);
 		sortedItems.comparatorProperty().bind(releaseTableView.comparatorProperty());
 
@@ -451,6 +464,10 @@ class ReleaseTableView extends AnchorPane {
 		titleColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
 		titleColumn.setCellFactory(tooltip);
 		titleColumn.setCellValueFactory(cellData -> cellData.getValue().titleProperty());
+
+		timeColumn.setCellFactory(new CellFactory<>(
+				CellCustomizer.alignment(Pos.CENTER_RIGHT), cellContextMenu.customizer()));
+		timeColumn.setCellValueFactory(cellData -> cellData.getValue().timeProperty());
 
 		dlTypeColumn.setCellFactory(new CellFactory<>(cellContextMenu.customizer()));
 		dlTypeColumn.setCellValueFactory(cellData -> cellData.getValue().downloadTypeProperty());
@@ -510,28 +527,30 @@ class ReleaseTableView extends AnchorPane {
 	private void checkComponents() {
 		// copy-pasted from SceneBuilder's "sample controller skeleton" window
 		assert publishDateFilterFrom != null : "fx:id=\"publishDateFilterFrom\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
+		assert resetFilter != null : "fx:id=\"resetFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
+		assert publishDateFilterTo != null : "fx:id=\"publishDateFilterTo\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
+		assert tagsColumn != null : "fx:id=\"tagsColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
+		assert dlTypeColumn != null : "fx:id=\"dlTypeColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
+		assert tagsFilter != null : "fx:id=\"tagsFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
+		assert dlTypePaid != null : "fx:id=\"dlTypePaid\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
+		assert urlFilter != null : "fx:id=\"urlFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
+		assert releaseDateFilterTo != null : "fx:id=\"releaseDateFilterTo\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert artistColumn != null : "fx:id=\"artistColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert dlTypeNameYourPrice != null : "fx:id=\"dlTypeNameYourPrice\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
-		assert resetFilter != null : "fx:id=\"resetFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert publishDateColumn != null : "fx:id=\"publishDateColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert releaseInfo != null : "fx:id=\"releaseInfo\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
+		assert showPlayer != null : "fx:id=\"showPlayer\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert releaseDateFilterFrom != null : "fx:id=\"releaseDateFilterFrom\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert releaseDateColumn != null : "fx:id=\"releaseDateColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert dlTypeUnavailable != null : "fx:id=\"dlTypeUnavailable\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
-		assert publishDateFilterTo != null : "fx:id=\"publishDateFilterTo\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
-		assert tagsColumn != null : "fx:id=\"tagsColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
+		assert timeColumn != null : "fx:id=\"timeColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert titleFilter != null : "fx:id=\"titleFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert titleColumn != null : "fx:id=\"titleColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert urlColumn != null : "fx:id=\"urlColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert releaseTableView != null : "fx:id=\"releaseTableView\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
-		assert dlTypeColumn != null : "fx:id=\"dlTypeColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert artistFilter != null : "fx:id=\"artistFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
-		assert tagsFilter != null : "fx:id=\"tagsFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
-		assert dlTypePaid != null : "fx:id=\"dlTypePaid\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
-		assert urlFilter != null : "fx:id=\"urlFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert dlTypeFree != null : "fx:id=\"dlTypeFree\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert applyFilter != null : "fx:id=\"applyFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
-		assert releaseDateFilterTo != null : "fx:id=\"releaseDateFilterTo\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 	}
 
 }

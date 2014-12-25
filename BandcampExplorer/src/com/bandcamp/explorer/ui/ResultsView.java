@@ -321,8 +321,6 @@ public class ResultsView extends AnchorPane {
 	 */
 	void closeSelectedTab() {
 		Tab tab = getSelectedTab();
-		if (tab == combinedResultsTab)
-			return;
 		if (!tab.isClosable())
 			return;
 
@@ -347,8 +345,12 @@ public class ResultsView extends AnchorPane {
 	 * Switches to the tab next to selected in this results view.
 	 * If selected tab is the last tab, then switches to either first "normal" tab
 	 * or to combined results tab (if it's visible at the moment).
+	 * Does nothing if tabs are disabled.
 	 */
 	void switchTab() {
+		if (getSelectedTab().isDisabled())
+			return;
+		
 		tabPane.requestFocus();
 		if (isLastTab(getSelectedTab()))
 			selectionModel.select(1);
@@ -397,8 +399,7 @@ public class ResultsView extends AnchorPane {
 	 * @throws NullPointerException if tab is null
 	 */
 	private void clearTab(Tab tab) {
-		ObservableList<Release> releases = getReleasesOnTab(tab);
-		releases.clear();
+		getReleasesOnTab(tab).clear();
 		Tooltip tooltip = tab.getTooltip();
 		if (tooltip != null)
 			tooltip.setText("(DELETED) " + tooltip.getText());

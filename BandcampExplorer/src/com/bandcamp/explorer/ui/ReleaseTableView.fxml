@@ -182,12 +182,13 @@
                                           </Label>
                                           <HBox spacing="5.0">
                                              <children>
-                                                <Button fx:id="applyFilter" mnemonicParsing="false" onAction="#applyFilter" prefHeight="20.0" prefWidth="137.0" text="Apply Filter">
+                                                <Button fx:id="applyFilter" mnemonicParsing="false" onAction="#applyFilter" prefHeight="20.0" prefWidth="110.0" text="Apply Filter">
                                                    <VBox.margin>
                                                       <Insets left="20.0" />
                                                    </VBox.margin>
                                                 </Button>
-                                                <Button fx:id="resetFilter" layoutX="40.0" layoutY="27.0" mnemonicParsing="false" onAction="#resetFilter" prefHeight="20.0" prefWidth="137.0" text="Reset Filter" />
+                                                <Button fx:id="resetFilter" layoutX="40.0" layoutY="27.0" mnemonicParsing="false" onAction="#resetFilter" prefHeight="20.0" prefWidth="110.0" text="Reset Filter" />
+                                                <Button fx:id="showPlayer" layoutX="125.0" layoutY="10.0" mnemonicParsing="false" onAction="#showPlayer" prefHeight="20.0" prefWidth="110.0" text="Show Player" />
                                              </children>
                                           </HBox>
                                        </children>
@@ -207,10 +208,11 @@
                               <TableColumn fx:id="artistColumn" prefWidth="300.0" text="Artist" />
                               <TableColumn fx:id="titleColumn" prefWidth="300.0" text="Title" />
                               <TableColumn fx:id="dlTypeColumn" prefWidth="150.0" text="Download Type" />
+                              <TableColumn fx:id="timeColumn" prefWidth="80.0" text="Time" />
                               <TableColumn fx:id="releaseDateColumn" prefWidth="125.0" text="Released" />
                               <TableColumn fx:id="publishDateColumn" prefWidth="125.0" text="Published" />
                               <TableColumn fx:id="tagsColumn" prefWidth="350.0" text="Tags" />
-                              <TableColumn fx:id="urlColumn" minWidth="200.0" prefWidth="400.0" text="URL" />
+                              <TableColumn fx:id="urlColumn" minWidth="200.0" prefWidth="350.0" text="URL" />
                            </columns>
                         </TableView>
                      </children>

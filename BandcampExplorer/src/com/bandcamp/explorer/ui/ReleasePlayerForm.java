@@ -1,7 +1,6 @@
 package com.bandcamp.explorer.ui;
 
 import java.net.URL;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -40,6 +39,7 @@ import javafx.stage.Window;
 import javafx.util.Duration;
 
 import com.bandcamp.explorer.data.Release;
+import com.bandcamp.explorer.data.Time;
 import com.bandcamp.explorer.data.Track;
 import com.bandcamp.explorer.ui.CellFactory.CellCustomizer;
 
@@ -66,7 +66,7 @@ public class ReleasePlayerForm extends SplitPane {
 	@FXML private TableColumn<Track, Number> trackNumberColumn;
 	@FXML private TableColumn<Track, String> artistColumn;
 	@FXML private TableColumn<Track, String> titleColumn;
-	@FXML private TableColumn<Track, Track.Time> timeColumn;
+	@FXML private TableColumn<Track, Time> timeColumn;
 
 	// Icons for player control buttons
 	private static final ImageView PLAY_ICON     = loadIcon("player_play.png");
@@ -378,8 +378,10 @@ public class ReleasePlayerForm extends SplitPane {
 		 * and resetting its state values to default.
 		 */
 		void quit() {
-			if (player != null)
+			if (player != null) {
 				player.dispose();
+				player = null;
+			}
 			if (timeSliderValueListener != null)
 				timeSlider.valueProperty().removeListener(timeSliderValueListener);
 			if (volumeSliderValueListener != null)
@@ -510,17 +512,15 @@ public class ReleasePlayerForm extends SplitPane {
 		 * @return duration as text
 		 */
 		private String formatTime(Duration duration) {
-			long seconds = Math.round(duration.toSeconds());
-			return LocalTime.ofSecondOfDay(seconds)
-					.format(seconds >= 3600 ? Track.Time.HH_mm_ss : Track.Time.mm_ss);
+			return Time.formatSeconds((int)Math.round(duration.toSeconds()));
 		}
 
 	}
 
-	
+
 	private ReleasePlayerForm() {}
 
-	
+
 	/**
 	 * Loads an icon for player control button.
 	 * 
@@ -532,7 +532,7 @@ public class ReleasePlayerForm extends SplitPane {
 		return url != null ? new ImageView(url.toString()) : null;
 	}
 
-	
+
 	/**
 	 * Loads a release player form component.
 	 */
@@ -541,7 +541,7 @@ public class ReleasePlayerForm extends SplitPane {
 				ReleasePlayerForm.class.getResource("ReleasePlayerForm.fxml"),
 				ReleasePlayerForm::new);
 	}
-	
+
 
 	/**
 	 * Sets the owner window for player's top stage.
@@ -555,6 +555,15 @@ public class ReleasePlayerForm extends SplitPane {
 	 */
 	public void setOwner(Window owner) {
 		stage.initOwner(owner);
+	}
+
+
+	/**
+	 * Shows and brings to front player window if it was hidden or iconified.
+	 */
+	public void show() {
+		stage.setIconified(false);
+		stage.show();
 	}
 
 
@@ -577,20 +586,17 @@ public class ReleasePlayerForm extends SplitPane {
 	 * @param release a release
 	 */
 	void setRelease(Release release) {
-		if (this.release == release) {
-			if (release != null) {
-				// For same release just bring window to front
-				stage.setIconified(false);
-				stage.show();
-			}
+		if (this.release != null && this.release.equals(release)) {
+			// For same release just bring window to front
+			show();
 			return;
 		}
-		else
+		else {
 			this.release = release;
+			audioPlayer.quit();
+		}
 
 		if (release != null) {
-			audioPlayer.quit();
-
 			// Loading artwork
 			String artworkLink = release.getArtworkThumbLink();
 			artworkView.setImage(artworkLink != null ? new Image(artworkLink, true) : null);
@@ -626,12 +632,10 @@ public class ReleasePlayerForm extends SplitPane {
 
 			// Show the window
 			stage.setTitle(release.getArtist() + " - " + release.getTitle());
-			stage.setIconified(false);
-			stage.show();
+			show();
 			playButton.requestFocus();
 		}
 		else {
-			audioPlayer.quit();
 			artworkView.setImage(null);
 			releaseLink.setText(null);
 			releaseInfo.clear();
