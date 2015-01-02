@@ -39,7 +39,7 @@ public final class BandcampExplorer extends Application {
 	@Override
 	public void start(Stage primaryStage) {
 		this.primaryStage = primaryStage;
-		this.primaryStage.setTitle("Bandcamp Explorer 0.3.0");
+		this.primaryStage.setTitle("Bandcamp Explorer 0.3.1");
 		this.primaryStage.setOnCloseRequest(event -> searchExecutor.shutdown());
 
 		try {

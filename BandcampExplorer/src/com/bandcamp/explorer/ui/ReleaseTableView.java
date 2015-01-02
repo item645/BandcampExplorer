@@ -239,7 +239,7 @@ class ReleaseTableView extends AnchorPane {
 	/**
 	 * Loads a release table view component.
 	 */
-	public static ReleaseTableView load() {
+	static ReleaseTableView load() {
 		FXML_STREAM.reset(); // for BAIS reset is always supported
 		return Utils.loadFXMLComponent(FXML_STREAM, ReleaseTableView::new);
 	}

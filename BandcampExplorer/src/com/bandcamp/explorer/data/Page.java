@@ -1,6 +1,7 @@
 package com.bandcamp.explorer.data;
 
 import java.io.IOException;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -14,6 +15,8 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.regex.Pattern;
 
+import com.bandcamp.explorer.util.ExceptionUnchecker;
+
 /**
  * This class is used to load an arbitrary page using specified URL string
  * and collect all Bandcamp releases, encountered on that page, in a form
@@ -24,33 +27,38 @@ class Page {
 	private static final Pattern RELEASE_LINK = Pattern.compile("(https?://[^/]+\\.[^/\\+\"]+)??/(album|track)/[^/\\+]+?(?=(\"|\\?|<))", Pattern.CASE_INSENSITIVE);
 
 	private final List<Callable<Release>> releaseLoaders = new ArrayList<>();
-	private final Set<String> links = new HashSet<>();
 	private final SearchTask parentTask;
 
 
 	/**
-	 * Constructs a page using specified URL string and loads it.
+	 * Constructs a page object using specified URL string and loads it.
 	 * 
 	 * @param url URL string
 	 * @param parentTask an instance of SearchTask that requests a page loading
 	 * @throws IOException if page cannot be loaded for some reason 
-	 *         or supplied URL string is not valid
-	 * @throws NullPointerException if parent task is null
+	 * @throws IllegalArgumentException if supplied URL string is not valid
+	 * @throws NullPointerException if URL string or parent task is null
 	 */
 	Page(String url, SearchTask parentTask) throws IOException {
 		this.parentTask = Objects.requireNonNull(parentTask);
-		load(new URL(url));
+
+		// Pushing URL string through multi-arg constructor and ASCII string 
+		// conversion of URI to properly encode it before passing as URL object
+		load(ExceptionUnchecker.uncheck(
+				() -> new URL(new URI(null, Objects.requireNonNull(url), null).toASCIIString()),
+				IllegalArgumentException::new));
 	}
 
 
 	/**
-	 * Loads a page using URL and creates a loader for every unique release 
+	 * Loads a page using supplied URI and creates a loader for every unique release 
 	 * link found on this page.
 	 */
 	private void load(URL url) throws IOException {
 		if (parentTask.isCancelled())
 			return;
 		try (Scanner input = new Scanner(url.openStream(), StandardCharsets.UTF_8.name())) {
+			Set<String> links = new HashSet<>();
 			String link = null;
 			while ((link = input.findWithinHorizon(RELEASE_LINK, 0)) != null) {
 				link = link.toLowerCase(Locale.ROOT);

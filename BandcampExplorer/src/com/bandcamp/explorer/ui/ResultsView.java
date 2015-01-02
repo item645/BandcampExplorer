@@ -348,11 +348,12 @@ public class ResultsView extends AnchorPane {
 	 * Does nothing if tabs are disabled.
 	 */
 	void switchTab() {
-		if (getSelectedTab().isDisabled())
+		Tab selected = getSelectedTab();
+		if (selected.isDisabled())
 			return;
 		
 		tabPane.requestFocus();
-		if (isLastTab(getSelectedTab()))
+		if (isLastTab(selected))
 			selectionModel.select(1);
 		else
 			selectionModel.selectNext();

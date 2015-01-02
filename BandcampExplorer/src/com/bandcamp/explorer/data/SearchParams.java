@@ -58,9 +58,10 @@ public class SearchParams {
 		 * 
 		 * @param value comparator that sets a sort order for results
 		 * @return this builder
+		 * @throws NullPointerException if supplied comparator is null
 		 */
 		public Builder sortOrder(Comparator<Release> value) {
-			this.sortOrder = value;
+			this.sortOrder = Objects.requireNonNull(value);
 			return this;
 		}
 

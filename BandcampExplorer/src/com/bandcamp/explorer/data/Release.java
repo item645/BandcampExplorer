@@ -98,7 +98,7 @@ public final class Release {
 	/**
 	 * Defines possible download types for release.
 	 */
-	public static enum DownloadType {
+	public enum DownloadType {
 
 		/**
 		 * Release is free for download.
@@ -253,12 +253,14 @@ public final class Release {
 					s = s.replace(special.getKey(), special.getValue());
 			return s;
 		}
-	}	
+	}
 
 
 	/**
 	 * Loads all the tracks from JSON data and returns them as unmodifiable
 	 * list of Track objects.
+	 * 
+	 * @param releaseArtist the artist of this release
 	 */
 	private List<Track> loadTracks(String releaseArtist) {
 		List<Track> result = new ArrayList<>();
@@ -269,24 +271,54 @@ public final class Release {
 			for (int i = 0; i < numTracks.intValue(); i++) {
 				String trackDataID = "trackinfo[" + i + "].";
 
-				String artist = null, title = null;
 				String artistTitle = property(trackDataID + "title", String.class);
-				if (artistTitle != null) {
-					// If there are multiple artists on this release, title property will
-					// contain both artist and title, separated by " - ", so we need
-					// to split them.
-					if (artistTitle.contains(" - ")) {
-						if (splitter == null)
-							splitter = Pattern.compile(" - ");
-						String[] vals = splitter.split(artistTitle, 2);
-						artist = vals[0];
-						title = vals[1];
-						// TODO find a workaround for situations where single-artist release contains tracks with " - "
-						// example: http://maxscordamaglia.bandcamp.com/album/eetudes-on-the-run
-					}
-					else {
-						artist = releaseArtist;
-						title = artistTitle;
+				String artist = releaseArtist;
+				String title = artistTitle;
+				if (artistTitle != null && artistTitle.contains(" - ")) {
+
+					// Here we are trying to figure out whether the title property contains not
+					// only the title of a track, but also its artist name, that is different
+					// from the release artist (this usually happens for various artists type
+					// compilations and splits).
+					// In that case artist and title are separated by " - ", however, additional
+					// check should be made to correctly handle situations where title property
+					// doesn't specify track artist and " - " is actually a part of track title.
+					// Since there is no JSON property that explicitly defines track artist,
+					// the only reliable way to do such check is to use title_link property from
+					// which the actual title (without artist) can be extracted, although in
+					// stripped (escaped) form. After we have both versions (taken from title and
+					// title_link), we can decide whether the title property value should be split
+					// (if it contains track artist) or left intact (if it contains only track title).
+					String titleLink = property(trackDataID + "title_link", String.class);
+					if (titleLink != null) {
+
+						// Get the first token (word) from title_link
+						String linkToken = titleLink.substring(titleLink.lastIndexOf('/') + 1);
+						int h1 = linkToken.indexOf('-');
+						if (h1 != -1) 
+							linkToken = linkToken.substring(0, h1);
+						linkToken = linkToken.toLowerCase(Locale.ENGLISH);
+
+						// Get the first token (word) from title 
+						int s = artistTitle.indexOf(' ');
+						int h2 = artistTitle.indexOf('-');
+						String titleToken = artistTitle.substring(0, Math.min(s, h2)).toLowerCase(Locale.ENGLISH);
+
+						// Compare the tokens. If they are different, it means that title property
+						// contains track artist and thus should be split.
+						// Still, this won't work in some corner cases. For example, when on
+						// some single-artist release some track has " - " in its title and
+						// the first word in that title contains some illegal chars which were dropped
+						// from it in title_link.
+						// However, such cases are expected to be quite rare and won't be a good reason
+						// to throw in additional checks and complicating the logic even more.
+						if (!linkToken.equals(titleToken)) {
+							if (splitter == null)
+								splitter = Pattern.compile(" - ");
+							String[] vals = splitter.split(artistTitle, 2);
+							artist = vals[0];
+							title = vals[1];
+						}
 					}
 				}
 
@@ -299,7 +331,13 @@ public final class Release {
 				if (property(trackDataID + "file", Object.class) != null)
 					fileLink = property(trackDataID + "file['mp3-128']", String.class);
 
-				result.add(new Track(i + 1, Objects.toString(artist), Objects.toString(title), durationValue, fileLink));
+				result.add(new Track(
+						i + 1,
+						Objects.toString(artist),
+						Objects.toString(title),
+						durationValue,
+						fileLink)
+				);
 			}
 		}
 
@@ -312,19 +350,34 @@ public final class Release {
 	 * Returns null if there's not artwork for this release.
 	 */
 	private String loadArtworkThumbLink() {
-		// We get an url to small 100x100 thumbnail and modify that url
+		// We get an URL to small 100x100 thumbnail and modify that URL
 		// so it will point to a bigger 350x350 image (a standard image used
-		// to display artwork on release html page). The url is changed by replacing 
-		// format specifier (after '_') from 3 to 2. Replacement is done at char 
-		// array level to avoid using slow regex-based methods of String.
+		// to display artwork on release page). The URL is changed by replacing 
+		// format specifier (after '_') from 3 to 2.
+		// Also, if URL's protocol is https, we must replace that with http, because
+		// as of present JavaFX is unable to load images from bcbits.com (Bandcamp's
+		// image storage) using https URLs due to a problem with SSL certificates.
+		// Replacement is done at char array level to avoid using slow regex-based methods of String.
 		String s = property("artThumbURL", String.class);
 		if (s != null) {
-			int i = s.lastIndexOf('_');
-			if (i != -1 && i < s.length() - 1 && s.charAt(i+1) == '3') {
-				char[] chars = s.toCharArray();
-				chars[i+1] = '2';
-				return String.valueOf(chars);
+			int u = s.lastIndexOf('_');
+			char[] chars;
+
+			if (s.startsWith("https")) {
+				chars = new char[s.length() - 1];
+				s.getChars(5, s.length(), chars, 4);
+				for (int i = 0; i < 4; i++)
+					chars[i] = s.charAt(i);
+				if (u != -1)
+					u--;
 			}
+			else
+				chars = s.toCharArray();
+
+			if (u != -1 && u < chars.length - 1 && chars[u+1] == '3')
+				chars[u+1] = '2';
+
+			s = String.valueOf(chars);
 		}
 		return s;
 	}
@@ -472,7 +525,7 @@ public final class Release {
 
 	/**
 	 * Returns a total time of this release. The returned instance of time represents
-	 * a total duration of all playable tracks on this release.
+	 * a total duration of all tracks on this release.
 	 */
 	public Time getTime() {
 		return time.get();

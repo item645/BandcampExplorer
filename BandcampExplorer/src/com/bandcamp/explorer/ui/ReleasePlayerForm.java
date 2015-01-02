@@ -1,6 +1,7 @@
 package com.bandcamp.explorer.ui;
 
 import java.net.URL;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -14,6 +15,9 @@ import javafx.beans.value.ChangeListener;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.SortedList;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
+import javafx.event.EventTarget;
 import javafx.fxml.FXML;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -211,7 +215,7 @@ public class ReleasePlayerForm extends SplitPane {
 	 */
 	private class AudioPlayer {
 
-		private final String LOADING_TRACK_MSG = "Loading track...";
+		private static final String LOADING_TRACK_MSG = "Loading track...";
 
 		private MediaPlayer player;
 		private Track track;
@@ -561,7 +565,7 @@ public class ReleasePlayerForm extends SplitPane {
 	/**
 	 * Shows and brings to front player window if it was hidden or iconified.
 	 */
-	public void show() {
+	void show() {
 		stage.setIconified(false);
 		stage.show();
 	}
@@ -605,13 +609,7 @@ public class ReleasePlayerForm extends SplitPane {
 			releaseLink.setText(release.getURI().toString());
 
 			// Setting release info
-			String tagsStr = release.getTagsString();
-			if (!tagsStr.isEmpty()) {
-				releaseInfo.setText(new StringBuilder("Tags: ").append(tagsStr).append('.')
-						.append('\n').append('\n').append(release.getInformation()).toString());
-			}
-			else
-				releaseInfo.setText(release.getInformation());
+			releaseInfo.setText(createReleaseInfo(release));
 
 			// Setting the tracklist
 			trackList.clear();
@@ -636,6 +634,7 @@ public class ReleasePlayerForm extends SplitPane {
 			playButton.requestFocus();
 		}
 		else {
+			loadReleaseButton.requestFocus();
 			artworkView.setImage(null);
 			releaseLink.setText(null);
 			releaseInfo.clear();
@@ -645,6 +644,26 @@ public class ReleasePlayerForm extends SplitPane {
 			stage.setTitle(null);
 			stage.hide();
 		}
+	}
+
+
+	/**
+	 * Creates a string with information about release to place into text area
+	 * on a player form.
+	 * 
+	 * @param release a release to create info for
+	 */
+	private static String createReleaseInfo(Release release) {
+		LocalDate releaseDate = release.getReleaseDate();
+		return new StringBuilder()
+		.append(release.getArtist()).append(" - ").append(release.getTitle()).append('\n').append('\n')
+		.append("PUBLISHED: ").append(release.getPublishDate()).append('\n')
+		.append("RELEASED: ").append(releaseDate.equals(LocalDate.MIN) ? "-" : releaseDate).append('\n')
+		.append("DOWNLOAD TYPE: ").append(release.getDownloadType()).append('\n')
+		.append("TIME: ").append(release.getTime()).append('\n')
+		.append("TAGS: ").append(release.getTagsString()).append('\n')
+		.append('\n').append(release.getInformation())
+		.toString();
 	}
 
 
@@ -715,6 +734,28 @@ public class ReleasePlayerForm extends SplitPane {
 				} 
 				catch (Exception e) {
 					Dialogs.messageBox("Error loading release: " + e, "Error", stage);
+				}
+			}
+		}
+	}
+
+
+	/**
+	 * Handles Enter key press event directed to button by invoking the action 
+	 * installed on that button.
+	 * If event's target is not a button or target button is disabled or does not
+	 * have action installed, then does nothing.
+	 */
+	@FXML
+	private void runButtonActionOnEnter(KeyEvent event) {
+		if (event.getCode() == KeyCode.ENTER) {
+			EventTarget target = event.getTarget();
+			if (target instanceof Button) {
+				Button button = (Button)target;
+				if (!button.isDisabled()) {
+					EventHandler<ActionEvent> handler = button.getOnAction();
+					if (handler != null)
+						handler.handle(new ActionEvent(button, button));
 				}
 			}
 		}

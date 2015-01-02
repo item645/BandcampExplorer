@@ -123,8 +123,6 @@ public final class SearchTask extends Task<SearchResult> {
 				releases.add(release);
 			updateProgress(i, numTasks);
 		}
-		if (isCancelled())
-			return new SearchResult(searchParams);
 
 		SearchResult result = new SearchResult(releases, searchParams);
 		result.sort(searchParams.sortOrder());
