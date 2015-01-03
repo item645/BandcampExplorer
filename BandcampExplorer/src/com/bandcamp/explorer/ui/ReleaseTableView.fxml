@@ -26,7 +26,7 @@
                                                 <Font name="Arial Bold Italic" size="14.0" />
                                              </font>
                                           </Label>
-                                          <TextField fx:id="artistFilter" layoutX="26.0" layoutY="18.0" onKeyPressed="#onFilterKeyPress" prefHeight="20.0" prefWidth="200.0" GridPane.rowIndex="1" />
+                                          <TextField fx:id="artistFilter" layoutX="26.0" layoutY="18.0" minWidth="100.0" onKeyPressed="#onFilterKeyPress" prefHeight="20.0" prefWidth="175.0" GridPane.rowIndex="1" />
                                        </children>
                                        <padding>
                                           <Insets left="10.0" right="10.0" />
@@ -39,7 +39,7 @@
                                                 <Font name="Arial Bold Italic" size="14.0" />
                                              </font>
                                           </Label>
-                                          <TextField fx:id="titleFilter" layoutX="249.0" layoutY="18.0" onKeyPressed="#onFilterKeyPress" prefHeight="20.0" prefWidth="200.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                                          <TextField fx:id="titleFilter" layoutX="249.0" layoutY="18.0" minWidth="100.0" onKeyPressed="#onFilterKeyPress" prefHeight="20.0" prefWidth="175.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
                                        </children>
                                        <padding>
                                           <Insets left="10.0" right="10.0" />
@@ -52,7 +52,7 @@
                                                 <Font name="Arial Bold Italic" size="14.0" />
                                              </font>
                                           </Label>
-                                          <TextField fx:id="tagsFilter" onKeyPressed="#onFilterKeyPress" prefHeight="20.0" prefWidth="200.0" />
+                                          <TextField fx:id="tagsFilter" minWidth="100.0" onKeyPressed="#onFilterKeyPress" prefHeight="20.0" prefWidth="175.0" />
                                        </children>
                                        <padding>
                                           <Insets left="10.0" right="10.0" />
@@ -65,7 +65,7 @@
                                                 <Font name="Arial Bold Italic" size="14.0" />
                                              </font>
                                           </Label>
-                                          <TextField fx:id="urlFilter" onKeyPressed="#onFilterKeyPress" prefHeight="20.0" prefWidth="200.0" />
+                                          <TextField fx:id="urlFilter" minWidth="100.0" onKeyPressed="#onFilterKeyPress" prefHeight="20.0" prefWidth="175.0" />
                                        </children>
                                        <padding>
                                           <Insets left="10.0" right="10.0" />
@@ -80,24 +80,24 @@
                                           </Label>
                                           <HBox alignment="CENTER_LEFT" spacing="5.0">
                                              <children>
-                                                <CheckBox fx:id="dlTypeFree" mnemonicParsing="false" selected="true" text="Free">
+                                                <CheckBox fx:id="dlTypeFree" minWidth="52.0" mnemonicParsing="false" selected="true" text="Free">
                                                    <font>
-                                                      <Font name="Arial Italic" size="14.0" />
+                                                      <Font name="Arial Italic" size="13.0" />
                                                    </font>
                                                 </CheckBox>
-                                                <CheckBox fx:id="dlTypeNameYourPrice" layoutX="10.0" layoutY="10.0" mnemonicParsing="false" selected="true" text="Name Your Price">
+                                                <CheckBox fx:id="dlTypeNameYourPrice" layoutX="10.0" layoutY="10.0" minWidth="124.0" mnemonicParsing="false" selected="true" text="Name Your Price">
                                                    <font>
-                                                      <Font name="Arial Italic" size="14.0" />
+                                                      <Font name="Arial Italic" size="13.0" />
                                                    </font>
                                                 </CheckBox>
-                                                <CheckBox fx:id="dlTypePaid" layoutX="63.0" layoutY="10.0" mnemonicParsing="false" selected="true" text="Paid">
+                                                <CheckBox fx:id="dlTypePaid" layoutX="63.0" layoutY="10.0" minWidth="52.0" mnemonicParsing="false" selected="true" text="Paid">
                                                    <font>
-                                                      <Font name="Arial Italic" size="14.0" />
+                                                      <Font name="Arial Italic" size="13.0" />
                                                    </font>
                                                 </CheckBox>
-                                                <CheckBox fx:id="dlTypeUnavailable" layoutX="169.0" layoutY="10.0" mnemonicParsing="false" selected="true" text="Unavailable">
+                                                <CheckBox fx:id="dlTypeUnavailable" layoutX="169.0" layoutY="10.0" minWidth="93.0" mnemonicParsing="false" selected="true" text="Unavailable">
                                                    <font>
-                                                      <Font name="Arial Italic" size="14.0" />
+                                                      <Font name="Arial Italic" size="13.0" />
                                                    </font>
                                                 </CheckBox>
                                              </children>
@@ -123,18 +123,18 @@
                                           </Label>
                                           <HBox alignment="CENTER_LEFT" spacing="5.0">
                                              <children>
-                                                <Label layoutX="20.0" layoutY="85.0" text="from">
+                                                <Label layoutX="20.0" layoutY="85.0" minWidth="28.0" text="from">
                                                    <font>
                                                       <Font name="Arial Italic" size="14.0" />
                                                    </font>
                                                 </Label>
-                                                <DatePicker fx:id="publishDateFilterFrom" prefWidth="150.0" />
-                                                <Label layoutX="20.0" layoutY="10.0" text="to">
+                                                <DatePicker fx:id="publishDateFilterFrom" prefWidth="125.0" />
+                                                <Label layoutX="20.0" layoutY="10.0" minWidth="12.0" text="to">
                                                    <font>
                                                       <Font name="Arial Italic" size="14.0" />
                                                    </font>
                                                 </Label>
-                                                <DatePicker fx:id="publishDateFilterTo" layoutX="20.0" layoutY="27.0" prefWidth="150.0" />
+                                                <DatePicker fx:id="publishDateFilterTo" layoutX="20.0" layoutY="27.0" prefWidth="125.0" />
                                              </children>
                                           </HBox>
                                        </children>
@@ -154,18 +154,18 @@
                                           </Label>
                                           <HBox alignment="CENTER_LEFT" spacing="5.0">
                                              <children>
-                                                <Label layoutX="20.0" layoutY="85.0" text="from">
+                                                <Label layoutX="20.0" layoutY="85.0" minWidth="28.0" text="from">
                                                    <font>
                                                       <Font name="Arial Italic" size="14.0" />
                                                    </font>
                                                 </Label>
-                                                <DatePicker fx:id="releaseDateFilterFrom" prefWidth="150.0" />
-                                                <Label layoutX="20.0" layoutY="10.0" text="to">
+                                                <DatePicker fx:id="releaseDateFilterFrom" prefWidth="125.0" />
+                                                <Label layoutX="20.0" layoutY="10.0" minWidth="12.0" text="to">
                                                    <font>
                                                       <Font name="Arial Italic" size="14.0" />
                                                    </font>
                                                 </Label>
-                                                <DatePicker fx:id="releaseDateFilterTo" layoutX="20.0" layoutY="27.0" prefWidth="150.0" />
+                                                <DatePicker fx:id="releaseDateFilterTo" layoutX="20.0" layoutY="27.0" prefWidth="125.0" />
                                              </children>
                                           </HBox>
                                        </children>
@@ -180,15 +180,24 @@
                                                 <Font name="Arial" size="14.0" />
                                              </font>
                                           </Label>
-                                          <HBox spacing="5.0">
+                                          <HBox spacing="10.0">
                                              <children>
-                                                <Button fx:id="applyFilter" mnemonicParsing="false" onAction="#applyFilter" prefHeight="20.0" prefWidth="110.0" text="Apply Filter">
+                                                <Button fx:id="applyFilter" mnemonicParsing="false" onAction="#applyFilter" prefHeight="20.0" prefWidth="100.0" text="Apply Filter">
                                                    <VBox.margin>
                                                       <Insets left="20.0" />
                                                    </VBox.margin>
+                                                   <font>
+                                                      <Font size="12.0" />
+                                                   </font>
                                                 </Button>
-                                                <Button fx:id="resetFilter" layoutX="40.0" layoutY="27.0" mnemonicParsing="false" onAction="#resetFilter" prefHeight="20.0" prefWidth="110.0" text="Reset Filter" />
-                                                <Button fx:id="showPlayer" layoutX="125.0" layoutY="10.0" mnemonicParsing="false" onAction="#showPlayer" prefHeight="20.0" prefWidth="110.0" text="Show Player" />
+                                                <Button fx:id="resetFilter" layoutX="40.0" layoutY="27.0" mnemonicParsing="false" onAction="#resetFilter" prefHeight="20.0" prefWidth="100.0" text="Reset Filter">
+                                                   <font>
+                                                      <Font size="12.0" />
+                                                   </font></Button>
+                                                <Button fx:id="showPlayer" layoutX="125.0" layoutY="10.0" mnemonicParsing="false" onAction="#showPlayer" prefHeight="20.0" prefWidth="100.0" text="Show Player">
+                                                   <font>
+                                                      <Font size="12.0" />
+                                                   </font></Button>
                                              </children>
                                           </HBox>
                                        </children>
