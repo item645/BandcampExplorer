@@ -16,7 +16,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import javafx.stage.StageStyle;
 import javafx.stage.Window;
 
 /**
@@ -156,7 +155,6 @@ class Dialogs {
 
 		Stage dialog = new Stage();
 		dialog.initOwner(owner);
-		dialog.initStyle(StageStyle.UTILITY);
 		dialog.initModality(Modality.APPLICATION_MODAL);
 		dialog.setResizable(false);
 		dialog.setTitle(title);

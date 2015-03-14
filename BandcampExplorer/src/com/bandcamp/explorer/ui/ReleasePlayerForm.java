@@ -10,17 +10,18 @@ import java.util.Objects;
 import java.util.Optional;
 
 import javafx.beans.binding.Bindings;
+import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.SortedList;
-import javafx.event.ActionEvent;
-import javafx.event.EventHandler;
 import javafx.event.EventTarget;
 import javafx.fxml.FXML;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
@@ -37,7 +38,6 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaException;
 import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaPlayer.Status;
-import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.util.Duration;
@@ -54,6 +54,7 @@ public class ReleasePlayerForm extends SplitPane {
 
 	private Stage stage;
 	@FXML private Button loadReleaseButton;
+	@FXML private Button unloadReleaseButton;
 	@FXML private Button previousButton;
 	@FXML private Button nextButton;
 	@FXML private Button playButton;
@@ -72,22 +73,21 @@ public class ReleasePlayerForm extends SplitPane {
 	@FXML private TableColumn<Track, String> titleColumn;
 	@FXML private TableColumn<Track, Time> timeColumn;
 
+	private static final String NO_RELEASE_TITLE = "[No Release]";
+
 	// Icons for player control buttons
-	private static final ImageView PLAY_ICON     = loadIcon("player_play.png");
-	private static final ImageView PAUSE_ICON    = loadIcon("player_pause.png");
-	private static final ImageView STOP_ICON     = loadIcon("player_stop.png");
-	private static final ImageView PREVIOUS_ICON = loadIcon("player_previous.png");
-	private static final ImageView NEXT_ICON     = loadIcon("player_next.png");
-
-	// For play buttons in a track list view we use text instead
-	private static final String PLAY_TEXT = "\u25BA";
-	private static final String PAUSE_TEXT = "||";
-
+	private static final Image PLAY_ICON_IMAGE   = loadIcon("player_play.png");
+	private static final Image PAUSE_ICON_IMAGE  = loadIcon("player_pause.png");
+	private static final ImageView PLAY_ICON     = new ImageView(PLAY_ICON_IMAGE);
+	private static final ImageView PAUSE_ICON    = new ImageView(PAUSE_ICON_IMAGE);
+	private static final ImageView STOP_ICON     = new ImageView(loadIcon("player_stop.png"));
+	private static final ImageView PREVIOUS_ICON = new ImageView(loadIcon("player_previous.png"));
+	private static final ImageView NEXT_ICON     = new ImageView(loadIcon("player_next.png"));
 
 	private final AudioPlayer audioPlayer = new AudioPlayer();
 	private final TrackList trackList = new TrackList();
 	private TrackListView trackListView;
-	private Release release;
+	private final ObjectProperty<Release> release = new SimpleObjectProperty<>(null);
 
 
 	/**
@@ -100,7 +100,7 @@ public class ReleasePlayerForm extends SplitPane {
 		private final TableView<Track> tableView;
 		private final ObservableList<Track> observableTracks = FXCollections.observableArrayList();
 		private final SortedList<Track> sortedTracks = new SortedList<>(observableTracks);
-		private final List<Button> playButtons = new ArrayList<>();
+		private final List<TrackListButton> playButtons = new ArrayList<>();
 
 
 		/**
@@ -137,7 +137,7 @@ public class ReleasePlayerForm extends SplitPane {
 		/**
 		 * Returns a list of play buttons from table's first column.
 		 */
-		List<Button> getPlayPuttons() {
+		List<TrackListButton> getPlayPuttons() {
 			return playButtons;
 		}
 
@@ -207,6 +207,50 @@ public class ReleasePlayerForm extends SplitPane {
 
 
 	/**
+	 * Class for control buttons in a track list view, allowing for playing/pausing
+	 * individual tracks.
+	 */
+	private static class TrackListButton extends Button {
+
+		private final ImageView playIcon;
+		private final ImageView pauseIcon;
+
+		{
+			// New image view object is instantiated for each button because
+			// it is not allowed to reuse the same node within a scene graph
+			playIcon = new ImageView(PLAY_ICON_IMAGE);
+			playIcon.setFitWidth(12);
+			playIcon.setFitHeight(12);
+			pauseIcon = new ImageView(PAUSE_ICON_IMAGE);
+			pauseIcon.setFitWidth(12);
+			pauseIcon.setFitHeight(12);
+
+			setMinSize(20, 20);
+			setMaxSize(20, 20);
+			setPrefSize(20, 20);
+			setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+		}
+
+
+		/**
+		 * Sets a play icon for this button.
+		 */
+		void setPlayIcon() {
+			setGraphic(playIcon);
+		}
+
+
+		/**
+		 * Sets a pause icon for this button.
+		 */
+		void setPauseIcon() {
+			setGraphic(pauseIcon);
+		}
+
+	}
+
+
+	/**
 	 * AudioPlayer is used to actually play audio tracks on release.
 	 * This class employs JavaFX MediaPlayer to play audio and works with associated
 	 * controls in enclosing class to provide abilities for full-fledged playback,
@@ -220,8 +264,8 @@ public class ReleasePlayerForm extends SplitPane {
 		private MediaPlayer player;
 		private Track track;
 		private Duration duration;
-		private ChangeListener<? super Number> timeSliderValueListener;
-		private ChangeListener<? super Number> volumeSliderValueListener;
+		private ChangeListener<Number> timeSliderValueListener;
+		private ChangeListener<Number> volumeSliderValueListener;
 		private long currentSecond = -1;
 		private boolean preventTimeSliderSeek;
 
@@ -315,8 +359,10 @@ public class ReleasePlayerForm extends SplitPane {
 			});
 			player.setOnError(() -> {
 				MediaException e = player.getError();
-				if (e != null)
+				if (e != null) {
 					e.printStackTrace();
+					Dialogs.messageBox(e.toString(), "Audio Player Error", stage);
+				}
 				quit();
 			});
 		}
@@ -336,7 +382,7 @@ public class ReleasePlayerForm extends SplitPane {
 		 * @param track a track to check for playback
 		 */
 		boolean isPlayingTrack(Track track) {
-			return isPlaying() && this.track == track;
+			return this.track == track && isPlaying();
 		}
 
 
@@ -439,23 +485,23 @@ public class ReleasePlayerForm extends SplitPane {
 		 */
 		private void updateTrackListButtons() {
 			int thisTrackIndex = track.getNumber() - 1;
-			List<Button> buttons = trackListView.getPlayPuttons();
+			List<TrackListButton> buttons = trackListView.getPlayPuttons();
 			for (int i = 0; i < buttons.size(); i++) {
-				Button button = buttons.get(i);
+				TrackListButton button = buttons.get(i);
 				if (button != null) {
 					if (i == thisTrackIndex) {
 						// button corresponding to current track
 						if (isPlaying()) {
-							button.setText(PAUSE_TEXT);
+							button.setPauseIcon();
 							button.setOnAction(event -> pause());
 						}
 						else {
-							button.setText(PLAY_TEXT);
+							button.setPlayIcon();
 							button.setOnAction(event -> play());
 						}
 					}
 					else {
-						button.setText(PLAY_TEXT);
+						button.setPlayIcon();
 						int otherTrackIndex = i;
 						button.setOnAction(event -> {
 							// no need for isPlayable() check here because buttons are 
@@ -526,14 +572,14 @@ public class ReleasePlayerForm extends SplitPane {
 
 
 	/**
-	 * Loads an icon for player control button.
+	 * Loads an icon image for player control button.
 	 * 
 	 * @param name icon name
-	 * @return icon image view; null, if icon with such name is not found
+	 * @return icon image; null, if icon with such name is not found
 	 */
-	private static ImageView loadIcon(String name) {
+	private static Image loadIcon(String name) {
 		URL url = ReleasePlayerForm.class.getResource(name);
-		return url != null ? new ImageView(url.toString()) : null;
+		return url != null ? new Image(url.toString()) : null;
 	}
 
 
@@ -563,10 +609,9 @@ public class ReleasePlayerForm extends SplitPane {
 
 
 	/**
-	 * Shows and brings to front player window if it was hidden or iconified.
+	 * Shows and brings to front player window if it was hidden.
 	 */
 	void show() {
-		stage.setIconified(false);
 		stage.show();
 	}
 
@@ -590,13 +635,13 @@ public class ReleasePlayerForm extends SplitPane {
 	 * @param release a release
 	 */
 	void setRelease(Release release) {
-		if (this.release != null && this.release.equals(release)) {
+		if (this.release.get() != null && this.release.get().equals(release)) {
 			// For same release just bring window to front
 			show();
 			return;
 		}
 		else {
-			this.release = release;
+			this.release.set(release);
 			audioPlayer.quit();
 		}
 
@@ -619,7 +664,7 @@ public class ReleasePlayerForm extends SplitPane {
 			// Grow list of play buttons to match number of tracks on release so references
 			// to new buttons can later be added via trackListView.getPlayPuttons().set
 			// on cells construction
-			List<Button> playButtons = trackListView.getPlayPuttons();
+			List<TrackListButton> playButtons = trackListView.getPlayPuttons();
 			playButtons.clear();
 			trackList.forEach(track -> playButtons.add(null));
 
@@ -641,8 +686,7 @@ public class ReleasePlayerForm extends SplitPane {
 			trackList.clear();
 			trackListView.getPlayPuttons().clear();
 			trackListView.clear();
-			stage.setTitle(null);
-			stage.hide();
+			stage.setTitle(NO_RELEASE_TITLE);
 		}
 	}
 
@@ -672,9 +716,9 @@ public class ReleasePlayerForm extends SplitPane {
 	 */
 	private void initStage() {
 		stage = new Stage();
+		stage.setTitle(NO_RELEASE_TITLE);
 		stage.setResizable(false);
 		stage.setOnCloseRequest(event -> {
-			setRelease(null);
 			stage.hide();
 			event.consume();
 		});
@@ -707,7 +751,7 @@ public class ReleasePlayerForm extends SplitPane {
 
 	/**
 	 * Handler for mouse click on a table view.
-	 * If double-clicked , plays selected track.
+	 * If double-clicked, plays selected track.
 	 */
 	@FXML
 	private void onTracksTableMouseClick(MouseEvent event) {
@@ -730,6 +774,8 @@ public class ReleasePlayerForm extends SplitPane {
 			String u = url.get().trim();
 			if (!u.isEmpty()) {
 				try {
+					if (!u.startsWith("http://") && !u.startsWith("https://"))
+						u = "http://" + u;
 					setRelease(new Release(u));
 				} 
 				catch (Exception e) {
@@ -737,6 +783,15 @@ public class ReleasePlayerForm extends SplitPane {
 				}
 			}
 		}
+	}
+
+
+	/**
+	 * Unloads currently loaded release from the player.
+	 */
+	@FXML
+	private void unloadRelease() {
+		setRelease(null);
 	}
 
 
@@ -750,14 +805,8 @@ public class ReleasePlayerForm extends SplitPane {
 	private void runButtonActionOnEnter(KeyEvent event) {
 		if (event.getCode() == KeyCode.ENTER) {
 			EventTarget target = event.getTarget();
-			if (target instanceof Button) {
-				Button button = (Button)target;
-				if (!button.isDisabled()) {
-					EventHandler<ActionEvent> handler = button.getOnAction();
-					if (handler != null)
-						handler.handle(new ActionEvent(button, button));
-				}
-			}
+			if (target instanceof Button)
+				((Button)target).fire();
 		}
 	}
 
@@ -767,8 +816,9 @@ public class ReleasePlayerForm extends SplitPane {
 	 */
 	@FXML
 	private void openReleasePage() {
-		if (release != null)
-			Utils.browse(release.getURI());
+		Release rls = release.get();
+		if (rls != null)
+			Utils.browse(rls.getURI());
 	}
 
 
@@ -790,15 +840,18 @@ public class ReleasePlayerForm extends SplitPane {
 				// Since this factory will be invoked not only during table initial
 				// fill but also on any column sort actions, we need to adjust our
 				// newly created buttons to conform with player's current state
-				Button button = new Button(audioPlayer.isPlayingTrack(track) ? PAUSE_TEXT : PLAY_TEXT);
-				button.setFont(new Font(10));
+				TrackListButton button = new TrackListButton();
+				if (audioPlayer.isPlayingTrack(track))
+					button.setPauseIcon();
+				else
+					button.setPlayIcon();
 				button.setOnAction(event -> {
 					if (audioPlayer.isPlayingTrack(track)) {
-						button.setText(PAUSE_TEXT);
+						button.setPauseIcon();
 						audioPlayer.pause();
 					}
 					else {
-						button.setText(PLAY_TEXT);
+						button.setPlayIcon();
 						audioPlayer.setTrack(track);
 						audioPlayer.play();
 					}
@@ -828,6 +881,8 @@ public class ReleasePlayerForm extends SplitPane {
 
 		timeColumn.setCellValueFactory(cellData -> cellData.getValue().timeProperty());
 
+		unloadReleaseButton.disableProperty().bind(Bindings.isNull(release));
+		
 		playButton.setGraphic(PLAY_ICON);
 		stopButton.setGraphic(STOP_ICON);
 		previousButton.setGraphic(PREVIOUS_ICON);
@@ -853,6 +908,7 @@ public class ReleasePlayerForm extends SplitPane {
 		assert artworkView != null : "fx:id=\"artworkView\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert playButton != null : "fx:id=\"playButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert loadReleaseButton != null : "fx:id=\"loadReleaseButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert unloadReleaseButton != null : "fx:id=\"unloadReleaseButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert nextButton != null : "fx:id=\"nextButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert timeColumn != null : "fx:id=\"timeColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert releaseLink != null : "fx:id=\"releaseLink\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
