@@ -247,6 +247,15 @@ public class ResultsView extends AnchorPane {
 
 
 	/**
+	 * Shows and brings to front player window if it was hidden.
+	 */
+	void showPlayer() {
+		if (releasePlayer != null)
+			releasePlayer.show();
+	}
+
+
+	/**
 	 * Adds a new tab to this results view and creates new release table view
 	 * as its content to display search result.
 	 */

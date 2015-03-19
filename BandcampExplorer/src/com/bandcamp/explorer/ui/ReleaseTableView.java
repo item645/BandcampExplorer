@@ -88,7 +88,7 @@ class ReleaseTableView extends AnchorPane {
 	private static final ByteArrayInputStream FXML_STREAM = ExceptionUnchecker.uncheck(() -> {
 		try (InputStream in = new BufferedInputStream(
 				ReleaseTableView.class.getResourceAsStream("ReleaseTableView.fxml"))) {
-			ByteArrayOutputStream out = new ByteArrayOutputStream(16384);
+			ByteArrayOutputStream out = new ByteArrayOutputStream(20480);
 			int b;
 			while ((b = in.read()) != -1)
 				out.write(b);
@@ -286,15 +286,15 @@ class ReleaseTableView extends AnchorPane {
 	private Predicate<Release> prepareFilter() {
 		List<Predicate<Release>> filters = new ArrayList<>();
 
-		String artist = artistFilter.getCharacters().toString().trim();
+		String artist = artistFilter.getText().trim();
 		if (!artist.isEmpty())
 			filters.add(ReleaseFilters.artistContains(artist));
 
-		String title = titleFilter.getCharacters().toString().trim();
+		String title = titleFilter.getText().trim();
 		if (!title.isEmpty())
 			filters.add(ReleaseFilters.titleContains(title));
 
-		String tags = tagsFilter.getCharacters().toString().trim();
+		String tags = tagsFilter.getText().trim();
 		if (!tags.isEmpty())
 			filters.add(ReleaseFilters.byTags(
 					Arrays.stream(tags.split(","))
@@ -302,7 +302,7 @@ class ReleaseTableView extends AnchorPane {
 					.collect(Collectors.toSet()),
 					null));
 
-		String url = urlFilter.getCharacters().toString().trim();
+		String url = urlFilter.getText().trim();
 		if (!url.isEmpty())
 			filters.add(ReleaseFilters.urlContains(url));
 
@@ -485,14 +485,22 @@ class ReleaseTableView extends AnchorPane {
 		tagsColumn.setCellFactory(tooltip);
 		tagsColumn.setCellValueFactory(cellData -> cellData.getValue().tagsStringProperty());
 
-		// For release URL column we create a hyperlink which can be used to open
-		// a release page on Bandcamp using the default browser.
-		urlColumn.setCellFactory(new CellFactory<Release, URI>(uri -> {
-			Hyperlink link = new Hyperlink(uri.toString());
-			link.setOnAction(event -> Utils.browse(uri));
-			link.setStyle("-fx-text-fill: blue;");
-			return link;
-		}, cellContextMenu.customizer()));
+		// For each cell in a release URL column we create a hyperlink which can 
+		// be used to open a release page on Bandcamp using the default browser.
+		urlColumn.setCellFactory(new CellFactory<>(
+				CellCustomizer.cellNode(uri -> {
+					if (uri != null) {
+						Hyperlink link = new Hyperlink(uri.toString());
+						link.setOnAction(event -> Utils.browse(uri));
+						link.setStyle("-fx-text-fill: blue;");
+						return link;
+					}
+					else
+						return null;
+				}),
+				cellContextMenu.customizer()
+			)
+		);
 		urlColumn.setCellValueFactory(cellData -> cellData.getValue().uriProperty());
 
 		// Setting a callback to display an information about selected
@@ -503,6 +511,8 @@ class ReleaseTableView extends AnchorPane {
 				StringBuilder sb = new StringBuilder();
 				if (!newRelease.getInformation().isEmpty())
 					sb.append(newRelease.getInformation()).append('\n').append('\n');
+				if (!newRelease.getCredits().isEmpty())
+					sb.append(newRelease.getCredits()).append('\n').append('\n');
 				if (!newRelease.getTracks().isEmpty()) {
 					sb.append("Tracklist:\n");
 					newRelease.getTracks().forEach(track -> sb.append(track).append('\n'));

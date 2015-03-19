@@ -24,7 +24,6 @@ import javafx.util.Callback;
  */
 class CellFactory<S,T> implements Callback<TableColumn<S,T>, TableCell<S,T>> {
 
-	private final Function<T, Node> cellNodeProvider;
 	private final List<CellCustomizer<S,T>> cellCustomizers = new ArrayList<>();
 
 
@@ -93,12 +92,33 @@ class CellFactory<S,T> implements Callback<TableColumn<S,T>, TableCell<S,T>> {
 			};
 		}
 
+
+		/**
+		 * Creates a customizer that replaces cell textual content with a Node object
+		 * derived from the data item contained by cell.
+		 * Node object is created using supplied conversion function that takes cell
+		 * item as its argument and returns node to display within a cell.
+		 * 
+		 * @param cellNodeProvider conversion function; must not be null and also
+		 *        must take into account that cell item, passed to it, can be null
+		 * @throws NullPointerException if conversion function is null
+		 */
+		static <S,T> CellCustomizer<S,T> cellNode(Function<T, Node> cellNodeProvider) {
+			Objects.requireNonNull(cellNodeProvider);
+			return (cell, newItem, empty) -> {
+				cell.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+				cell.setGraphic(cellNodeProvider.apply(newItem));
+			};
+		}
+
 	}
 
 
 	/**
-	 * Constructs a new cell factory that renders cells in a default manner,
-	 * displaying cell's item value converted to text via item.toString().
+	 * Constructs a new cell factory that allows for cells customization
+	 * using supplied customizers. If no customizers were supplied, then this
+	 * factory renders cells in a default manner displaying cell's item value
+	 * converted to text via item.toString().
 	 * 
 	 * @param cellCustomizers An array of CellCustomizer callbacks to be invoked
 	 *        every time cell item is updated, to customize a cell. If passed array
@@ -108,29 +128,6 @@ class CellFactory<S,T> implements Callback<TableColumn<S,T>, TableCell<S,T>> {
 	 */
 	@SafeVarargs
 	CellFactory(CellCustomizer<S,T>... cellCustomizers) {
-		this(null, cellCustomizers);
-	}
-
-
-	/**
-	 * Constructs a new cell factory that allows to replace cells content with an
-	 * arbitrary Node objects.
-	 * 
-	 * @param cellNodeProvider A callback function to return Node objects
-	 *        for displaying them as cells content. If non-null, this function
-	 *        will be invoked to convert cell item into a Node object for
-	 *        displaying it in a cell instead of text. If null, then cell will be
-	 *        rendered in a usual manner, displaying cell's item value converted to
-	 *        text via item.toString().
-	 * @param cellCustomizers An array of CellCustomizer callbacks to be invoked
-	 *        every time cell item is updated, to customize a cell. If passed array
-	 *        is empty (or zero arguments were passed in case of varargs), then
-	 *        this factory won't make any additional customizations for cells it creates.
-	 * @throws NullPointerException if cell customizers array or any of its elements is null
-	 */
-	@SafeVarargs
-	CellFactory(Function<T, Node> cellNodeProvider, CellCustomizer<S,T>... cellCustomizers) {
-		this.cellNodeProvider = cellNodeProvider;
 		for (CellCustomizer<S,T> customizer : cellCustomizers)
 			this.cellCustomizers.add(Objects.requireNonNull(customizer));
 	}
@@ -147,23 +144,18 @@ class CellFactory<S,T> implements Callback<TableColumn<S,T>, TableCell<S,T>> {
 		return new TableCell<S,T>() {
 			@Override
 			protected void updateItem(T item, boolean empty) {
-				if (item == getItem())
-					return;
-				super.updateItem(item, empty);
-				if (item == null || empty) {
-					super.setText(null);
-					super.setGraphic(null);
-				}
-				else {
-					super.setText(item.toString());
-					if (cellNodeProvider != null) {
-						super.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-						super.setGraphic(cellNodeProvider.apply(item));
+				if (item != getItem()) {
+					super.updateItem(item, empty);
+
+					if (item == null || empty) {
+						setText(null);
+						setGraphic(null);
 					}
 					else
-						super.setGraphic(null);
+						setText(item.toString());
+
+					cellCustomizers.forEach(customizer -> customizer.apply(this, item, empty));
 				}
-				cellCustomizers.forEach(customizer -> customizer.apply(this, item, empty));
 			}
 		};
 	}

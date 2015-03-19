@@ -64,13 +64,18 @@ public class BandcampExplorerMainForm extends BorderPane {
 	 * Creates an instance of main form.
 	 */
 	private BandcampExplorerMainForm() {
+		KeyCombination CTRL_P   = new KeyCodeCombination(KeyCode.P, KeyCombination.SHORTCUT_DOWN);
 		KeyCombination CTRL_T   = new KeyCodeCombination(KeyCode.T, KeyCombination.SHORTCUT_DOWN);
 		KeyCombination CTRL_W   = new KeyCodeCombination(KeyCode.W, KeyCombination.SHORTCUT_DOWN);
 		KeyCombination CTRL_TAB = new KeyCodeCombination(KeyCode.TAB, KeyCombination.SHORTCUT_DOWN);
 
 		// top level filter for hotkeys
 		addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-			if (CTRL_T.match(event)) {
+			if (CTRL_P.match(event)) {
+				resultsView.showPlayer();
+				event.consume();
+			}
+			else if (CTRL_T.match(event)) {
 				resultsView.addTab();
 				searchQuery.requestFocus();
 				event.consume();
@@ -255,6 +260,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 		cancelSearch.setDisable(!disable);
 		clearSelected.setDisable(disable);
 		clearAll.setDisable(disable);
+		showCombinedResults.setDisable(disable);
 
 		resultsView.disableTabs(disable);
 	}

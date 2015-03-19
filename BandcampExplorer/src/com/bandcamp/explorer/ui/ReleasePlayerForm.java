@@ -19,6 +19,7 @@ import javafx.collections.ObservableList;
 import javafx.collections.transformation.SortedList;
 import javafx.event.EventTarget;
 import javafx.fxml.FXML;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
@@ -26,7 +27,9 @@ import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.image.Image;
@@ -84,23 +87,26 @@ public class ReleasePlayerForm extends SplitPane {
 	private static final ImageView PREVIOUS_ICON = new ImageView(loadIcon("player_previous.png"));
 	private static final ImageView NEXT_ICON     = new ImageView(loadIcon("player_next.png"));
 
-	private final AudioPlayer audioPlayer = new AudioPlayer();
-	private final TrackList trackList = new TrackList();
 	private TrackListView trackListView;
+	private final AudioPlayer audioPlayer = new AudioPlayer();
 	private final ObjectProperty<Release> release = new SimpleObjectProperty<>(null);
 
 
 	/**
 	 * Thin wrapper around tracks table view also encapsulating and providing access
 	 * to some associated stuff, like observable items list and list of play buttons 
-	 * from first column.
+	 * from the first column.
 	 */
 	private static class TrackListView {
 
 		private final TableView<Track> tableView;
 		private final ObservableList<Track> observableTracks = FXCollections.observableArrayList();
 		private final SortedList<Track> sortedTracks = new SortedList<>(observableTracks);
-		private final List<TrackListButton> playButtons = new ArrayList<>();
+
+		/**
+		 * Holds a list of play buttons from table's first column
+		 */
+		final List<TrackListButton> playButtons = new ArrayList<>();
 
 
 		/**
@@ -117,49 +123,24 @@ public class ReleasePlayerForm extends SplitPane {
 
 
 		/**
-		 * Removes all items from this track list view.
-		 */
-		void clear() {
-			observableTracks.clear();
-		}
-
-
-		/**
-		 * Adds a collection of tracks as items to this track list view.
+		 * Returns a track at the specified position in a track list view.
 		 * 
-		 * @param tracks a collection of tracks
+		 * @param index zero-based index of the position
+		 * @return a track
+		 * @throws IndexOutOfBoundsException if index is out of range
 		 */
-		void addAll(Collection<Track> tracks) {
-			observableTracks.addAll(tracks);
+		Track getTrack(int index) {
+			return observableTracks.get(index);
 		}
 
 
 		/**
-		 * Returns a list of play buttons from table's first column.
-		 */
-		List<TrackListButton> getPlayPuttons() {
-			return playButtons;
-		}
-
-	}
-
-
-	/**
-	 * A subclass of ArrayList representing a list of tracks and providing
-	 * additional methods for playable tracks lookup.
-	 */
-	private static class TrackList extends ArrayList<Track> {
-
-		private static final long serialVersionUID = 2980118610902127703L;
-
-
-		/**
-		 * Finds a first playable track in this list.
+		 * Finds the first playable track in this list.
 		 * 
 		 * @return first playable track; null, if no such track found
 		 */
 		Track getFirstPlayableTrack() {
-			for (Track t : this)
+			for (Track t : observableTracks)
 				if (t.isPlayable())
 					return t;
 			return null;
@@ -175,7 +156,7 @@ public class ReleasePlayerForm extends SplitPane {
 		 * @throws NullPointerException if track is null
 		 */
 		Track getPreviousPlayableTrack(Track track) {
-			ListIterator<Track> itr = listIterator(track.getNumber() - 1);
+			ListIterator<Track> itr = observableTracks.listIterator(track.getNumber() - 1);
 			while (itr.hasPrevious()) {
 				Track t = itr.previous();
 				if (t != track && t.isPlayable())
@@ -194,13 +175,33 @@ public class ReleasePlayerForm extends SplitPane {
 		 * @throws NullPointerException if track is null
 		 */
 		Track getNextPlayableTrack(Track track) {
-			ListIterator<Track> itr = listIterator(track.getNumber() - 1);
+			ListIterator<Track> itr = observableTracks.listIterator(track.getNumber() - 1);
 			while (itr.hasNext()) {
 				Track t = itr.next();
 				if (t != track && t.isPlayable())
 					return t;
 			}
 			return null;
+		}
+
+
+		/**
+		 * Removes all items from this track list view.
+		 */
+		void clear() {
+			observableTracks.clear();
+			playButtons.clear();
+		}
+
+
+		/**
+		 * Adds a collection of tracks as items to this track list view.
+		 * 
+		 * @param tracks a collection of tracks
+		 * @throws NullPointerException if the specified collection is null
+		 */
+		void addAll(Collection<Track> tracks) {
+			observableTracks.addAll(tracks);
 		}
 
 	}
@@ -290,6 +291,8 @@ public class ReleasePlayerForm extends SplitPane {
 			player = new MediaPlayer(new Media(track.getFileLink()));
 			this.track = track;
 
+			highlightCurrentTrack();
+
 			player.setVolume(volumeSlider.getValue() / volumeSlider.getMax());
 			player.currentTimeProperty().addListener(observable -> updateTrackProgress());
 			nowPlayingInfo.setText(LOADING_TRACK_MSG);
@@ -311,10 +314,20 @@ public class ReleasePlayerForm extends SplitPane {
 			disablePlayerButtons(false);
 			playButton.setOnAction(event -> play());
 			stopButton.setOnAction(event -> stop());
-			prepareSwitchButton(previousButton, trackList.getPreviousPlayableTrack(track));
-			prepareSwitchButton(nextButton, trackList.getNextPlayableTrack(track));
+			prepareSwitchButton(previousButton, trackListView.getPreviousPlayableTrack(track));
+			prepareSwitchButton(nextButton, trackListView.getNextPlayableTrack(track));
 
 			currentSecond = -1;
+		}
+
+
+		/**
+		 * Returns a track loaded for playback in this audio player.
+		 * 
+		 * @return a track; null, if there's no track in player
+		 */
+		Track getTrack() {
+			return track;
 		}
 
 
@@ -346,7 +359,7 @@ public class ReleasePlayerForm extends SplitPane {
 				nowPlayingInfo.setText(LOADING_TRACK_MSG);
 			});
 			player.setOnEndOfMedia(() -> {
-				Track next = trackList.getNextPlayableTrack(track);
+				Track next = trackListView.getNextPlayableTrack(track);
 				if (next != null) {
 					updateTrackProgress();
 					setTrack(next);
@@ -448,7 +461,7 @@ public class ReleasePlayerForm extends SplitPane {
 
 
 		/**
-		 * Disables/enable player's control buttons
+		 * Disables/enables player's control buttons
 		 */
 		private void disablePlayerButtons(boolean disable) {
 			playButton.setDisable(disable);
@@ -480,17 +493,33 @@ public class ReleasePlayerForm extends SplitPane {
 
 
 		/**
-		 * Updates play buttons in a tracklist view so that they conform to
+		 * Highlights the currently loaded track by setting bold font
+		 * style for corresponding table row in a track list view.
+		 */
+		private void highlightCurrentTrack() {
+			trackListView.playButtons.forEach(button -> {
+				if (button != null) {
+					Parent parent = button.getParent();
+					if (parent instanceof TableCell) {
+						TableRow<?> row = ((TableCell<?,?>)parent).getTableRow();
+						highlightTableRow(row, row.getItem() == track);
+					}
+				}
+			});
+		}
+
+
+		/**
+		 * Updates play buttons in a track list view so that they conform to
 		 * audio player current state.
 		 */
 		private void updateTrackListButtons() {
 			int thisTrackIndex = track.getNumber() - 1;
-			List<TrackListButton> buttons = trackListView.getPlayPuttons();
-			for (int i = 0; i < buttons.size(); i++) {
-				TrackListButton button = buttons.get(i);
+			for (int i = 0; i < trackListView.playButtons.size(); i++) {
+				TrackListButton button = trackListView.playButtons.get(i);
 				if (button != null) {
 					if (i == thisTrackIndex) {
-						// button corresponding to current track
+						// index corresponding to current track
 						if (isPlaying()) {
 							button.setPauseIcon();
 							button.setOnAction(event -> pause());
@@ -506,7 +535,7 @@ public class ReleasePlayerForm extends SplitPane {
 						button.setOnAction(event -> {
 							// no need for isPlayable() check here because buttons are 
 							// created only for playable tracks 
-							setTrack(trackList.get(otherTrackIndex));
+							setTrack(trackListView.getTrack(otherTrackIndex));
 							play();
 						});
 					}
@@ -657,19 +686,16 @@ public class ReleasePlayerForm extends SplitPane {
 			releaseInfo.setText(createReleaseInfo(release));
 
 			// Setting the tracklist
-			trackList.clear();
-			trackList.addAll(release.getTracks());
+			List<Track> tracks = release.getTracks();
 			trackListView.clear();
-			trackListView.addAll(trackList);
+			trackListView.addAll(tracks);
 			// Grow list of play buttons to match number of tracks on release so references
 			// to new buttons can later be added via trackListView.getPlayPuttons().set
 			// on cells construction
-			List<TrackListButton> playButtons = trackListView.getPlayPuttons();
-			playButtons.clear();
-			trackList.forEach(track -> playButtons.add(null));
-
+			tracks.forEach(track -> trackListView.playButtons.add(null));
+			
 			// Prepare the first playable track to play
-			Track first = trackList.getFirstPlayableTrack();
+			Track first = trackListView.getFirstPlayableTrack();
 			if (first != null)
 				audioPlayer.setTrack(first);
 
@@ -683,8 +709,6 @@ public class ReleasePlayerForm extends SplitPane {
 			artworkView.setImage(null);
 			releaseLink.setText(null);
 			releaseInfo.clear();
-			trackList.clear();
-			trackListView.getPlayPuttons().clear();
 			trackListView.clear();
 			stage.setTitle(NO_RELEASE_TITLE);
 		}
@@ -706,7 +730,8 @@ public class ReleasePlayerForm extends SplitPane {
 		.append("DOWNLOAD TYPE: ").append(release.getDownloadType()).append('\n')
 		.append("TIME: ").append(release.getTime()).append('\n')
 		.append("TAGS: ").append(release.getTagsString()).append('\n')
-		.append('\n').append(release.getInformation())
+		.append('\n').append(release.getInformation()).append('\n')
+		.append('\n').append(release.getCredits())
 		.toString();
 	}
 
@@ -833,37 +858,48 @@ public class ReleasePlayerForm extends SplitPane {
 
 		trackListView = new TrackListView(tracksTableView);
 
-		// Setting a custom cell factory to display a play/pause button 
-		// for each playable track
-		playButtonColumn.setCellFactory(new CellFactory<Track, Track>(track -> {
-			if (track.isPlayable()) {
-				// Since this factory will be invoked not only during table initial
-				// fill but also on any column sort actions, we need to adjust our
-				// newly created buttons to conform with player's current state
-				TrackListButton button = new TrackListButton();
-				if (audioPlayer.isPlayingTrack(track))
-					button.setPauseIcon();
-				else
-					button.setPlayIcon();
-				button.setOnAction(event -> {
-					if (audioPlayer.isPlayingTrack(track)) {
-						button.setPauseIcon();
-						audioPlayer.pause();
+		// Setting a custom cell factory that creates play/pause button 
+		// for each playable track, saves references to these buttons for
+		// later access from audio player and also highlights the track
+		// that is loaded in audio player
+		playButtonColumn.setCellFactory(new CellFactory<>(
+				CellCustomizer.cellNode(track -> {
+					if (track != null && track.isPlayable()) {
+						// Since this factory will be invoked not only during table initial
+						// fill but also on any column sort actions, we need to adjust our
+						// newly created buttons to conform with player's current state
+						TrackListButton button = new TrackListButton();
+						if (audioPlayer.isPlayingTrack(track))
+							button.setPauseIcon();
+						else
+							button.setPlayIcon();
+						button.setOnAction(event -> {
+							if (audioPlayer.isPlayingTrack(track)) {
+								button.setPauseIcon();
+								audioPlayer.pause();
+							}
+							else {
+								button.setPlayIcon();
+								audioPlayer.setTrack(track);
+								audioPlayer.play();
+							}
+						});
+						// Saving button references so they could be later accessed from audio player's
+						// state transition handlers
+						trackListView.playButtons.set(track.getNumber() - 1, button);
+						return button;
 					}
-					else {
-						button.setPlayIcon();
-						audioPlayer.setTrack(track);
-						audioPlayer.play();
-					}
-				});
-				// Saving button references so they could be later accessed from audio player's
-				// state transition handlers
-				trackListView.getPlayPuttons().set(track.getNumber() - 1, button);
-				return button;
-			}
-			else
-				return null; // don't create buttons for unplayable tracks
-		}));
+					else
+						return null; // don't create buttons for null or unplayable tracks
+				}),
+				// Special-purpose customizer that highlights cell's parent table row if it
+				// corresponds to currently loaded track
+				(cell, track, empty) -> {
+					if (track != null)
+						highlightTableRow(cell.getTableRow(), track == audioPlayer.getTrack());
+				}
+			)
+		);
 		playButtonColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue()));
 		playButtonColumn.setSortable(false);
 
@@ -882,7 +918,7 @@ public class ReleasePlayerForm extends SplitPane {
 		timeColumn.setCellValueFactory(cellData -> cellData.getValue().timeProperty());
 
 		unloadReleaseButton.disableProperty().bind(Bindings.isNull(release));
-		
+
 		playButton.setGraphic(PLAY_ICON);
 		stopButton.setGraphic(STOP_ICON);
 		previousButton.setGraphic(PREVIOUS_ICON);
@@ -892,6 +928,17 @@ public class ReleasePlayerForm extends SplitPane {
 		volumeLevel.textProperty().bind(
 				Bindings.createStringBinding(
 						() -> Math.round(volumeSlider.getValue()) + "%", volumeSlider.valueProperty()));
+	}
+
+
+	/**
+	 * Highlights the specified table row by applying a bold font style for its contents.
+	 * 
+	 * @param row a row to highlight
+	 * @param highlight if true, row gets highlighted, otherwise sets style back to normal
+	 */
+	private static void highlightTableRow(TableRow<?> row, boolean highlight) {
+		row.setStyle(highlight ? "-fx-font-weight: bold" : "-fx-font-weight: normal");
 	}
 
 

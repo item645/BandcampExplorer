@@ -93,6 +93,7 @@ public final class Release {
 	private final String artworkThumbLink;
 	private final List<Track> tracks;
 	private final String information;
+	private final String credits;
 
 
 	/**
@@ -161,6 +162,7 @@ public final class Release {
 			tracks = loadTracks(artist_);
 			artworkThumbLink = loadArtworkThumbLink();
 			information = Objects.toString(property("current.about", String.class), "");
+			credits = Objects.toString(property("current.credits", String.class), "");
 			int time_ = tracks.stream().collect(Collectors.summingInt(track -> track.getTime().getSeconds()));
 
 			// Wrapping all necessary stuff in JFX-compliant properties
@@ -601,7 +603,7 @@ public final class Release {
 
 
 	/**
-	 * Returns a set of tags describing this release.
+	 * Returns an unmodifiable set of tags describing this release.
 	 */
 	public Set<String> getTags() {
 		return tags.get();
@@ -659,6 +661,15 @@ public final class Release {
 	 */
 	public String getInformation() {
 		return information;
+	}
+
+
+	/**
+	 * Returns the credits for this release.
+	 * If there are no credits provided, returns empty string.
+	 */
+	public String getCredits() {
+		return credits;
 	}
 
 }
