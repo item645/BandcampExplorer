@@ -5,6 +5,10 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+
 
 import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
@@ -22,6 +26,8 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.text.Text;
 
+
+
 import com.bandcamp.explorer.data.SearchParams;
 import com.bandcamp.explorer.data.SearchResult;
 import com.bandcamp.explorer.data.SearchTask;
@@ -32,6 +38,16 @@ import com.bandcamp.explorer.util.ExceptionUnchecker;
  * Controller class for application's main form.
  */
 public class BandcampExplorerMainForm extends BorderPane {
+
+	private static final Logger LOGGER = Logger.getLogger(BandcampExplorerMainForm.class.getName());
+
+	/**
+	 * Single instance of main form component
+	 */
+	private static final BandcampExplorerMainForm INSTANCE = Utils.loadFXMLComponent(
+			BandcampExplorerMainForm.class.getResource("BandcampExplorerMainForm.fxml"),
+			BandcampExplorerMainForm::new);
+
 
 	@FXML private ComboBox<SearchType> searchType;
 	@FXML private ComboBox<Integer> page;
@@ -64,6 +80,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 	 * Creates an instance of main form.
 	 */
 	private BandcampExplorerMainForm() {
+		KeyCombination CTRL_E   = new KeyCodeCombination(KeyCode.E, KeyCombination.SHORTCUT_DOWN);
 		KeyCombination CTRL_P   = new KeyCodeCombination(KeyCode.P, KeyCombination.SHORTCUT_DOWN);
 		KeyCombination CTRL_T   = new KeyCodeCombination(KeyCode.T, KeyCombination.SHORTCUT_DOWN);
 		KeyCombination CTRL_W   = new KeyCodeCombination(KeyCode.W, KeyCombination.SHORTCUT_DOWN);
@@ -71,8 +88,12 @@ public class BandcampExplorerMainForm extends BorderPane {
 
 		// top level filter for hotkeys
 		addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+			if (CTRL_E.match(event)) {
+				EventLog.getInstance().show();
+				event.consume();
+			}
 			if (CTRL_P.match(event)) {
-				resultsView.showPlayer();
+				ReleasePlayerForm.getInstance().show();
 				event.consume();
 			}
 			else if (CTRL_T.match(event)) {
@@ -93,23 +114,10 @@ public class BandcampExplorerMainForm extends BorderPane {
 
 
 	/**
-	 * Loads a main form component.
+	 * Returns a reference to a main form component.
 	 */
-	public static BandcampExplorerMainForm load() {
-		return Utils.loadFXMLComponent(
-				BandcampExplorerMainForm.class.getResource("BandcampExplorerMainForm.fxml"),
-				BandcampExplorerMainForm::new);
-	}
-
-
-	/**
-	 * Sets a ResultsView component to use with this form.
-	 * 
-	 * @param resultsView a results view
-	 * @throws NullPointerException if resultsView is null
-	 */
-	public void setResultsView(ResultsView resultsView) {
-		setCenter(this.resultsView = Objects.requireNonNull(resultsView));
+	public static BandcampExplorerMainForm getInstance() {
+		return INSTANCE;
 	}
 
 
@@ -143,7 +151,6 @@ public class BandcampExplorerMainForm extends BorderPane {
 
 		searchQuery.setText(Objects.requireNonNull(query));
 		searchType.setValue(Objects.requireNonNull(type));
-
 		if (newResultTab)
 			resultsView.addTab();
 
@@ -161,13 +168,13 @@ public class BandcampExplorerMainForm extends BorderPane {
 	private void searchReleases() {
 		checkForRunningTask();
 
-		String query = searchQuery.getCharacters().toString().trim();
+		String query = searchQuery.getText().trim();
 		if (query.isEmpty())
 			return;
 
-		SearchTask task = new SearchTask(
-				new SearchParams.Builder(query, searchType.getValue()).pages(page.getValue()).build(),
-				searchExecutor);
+		SearchParams params = new SearchParams.Builder(
+				query, searchType.getValue()).pages(page.getValue()).build();
+		SearchTask task = new SearchTask(params, searchExecutor);
 
 		statusText.textProperty().bind(task.messageProperty());
 		task.setRequestingDataMessage("Requesting data...");
@@ -177,29 +184,36 @@ public class BandcampExplorerMainForm extends BorderPane {
 			runningTask = task;
 			disableControlsOnSearch(true);
 			initProgressBar(task.progressProperty());
-		});
 
+			LOGGER.info(String.format("Starting search: %1$s: \"%2$s\" (%3$d pages)",
+					params.searchType(),
+					params.searchQuery(),
+					params.pages()));
+		});
 		task.setOnSucceeded(event -> {
 			runningTask = null;
 
 			SearchResult result = ExceptionUnchecker.uncheck(() -> task.get());
 			resultsView.setSearchResult(result);
 
-			writeStatusBar(new StringBuilder(Integer.toString(result.size()))
-			.append(" releases found during last search. Search time: ")
-			.append(Duration.between(task.getStartTime(), Instant.now()).getSeconds())
-			.append('s').toString());
+			String report = String.format("Search finished: %1$d releases found. Search time: %2$ds.",
+					result.size(),
+					Duration.between(task.getStartTime(), Instant.now()).getSeconds());
+			writeStatusBar(report);
+			LOGGER.info(report);
 
 			disableControlsOnSearch(false);
 		});
-
 		task.setOnCancelled(event -> {
 			runningTask = null;
-			writeStatusBar("Search cancelled");
+
+			String msg = "Search cancelled";
+			writeStatusBar(msg);
+			LOGGER.info(msg);
+
 			disableControlsOnSearch(false);
 			resetProgressBar();
 		});
-
 		task.setOnFailed(event -> {
 			runningTask = null;
 
@@ -207,11 +221,11 @@ public class BandcampExplorerMainForm extends BorderPane {
 			if (ex instanceof ExecutionException)
 				ex = ex.getCause();
 			if (ex != null) {
-				writeStatusBar("Error: " + ex);
-				ex.printStackTrace();
+				writeStatusBar("Search failed: " + ex);
+				LOGGER.log(Level.SEVERE, "Search failed: " + ex.getMessage(), ex);
 			}
 			else
-				writeStatusBar("Unknown error");
+				writeStatusBar("Search failed: Unknown error");
 
 			disableControlsOnSearch(false);
 			resetProgressBar();
@@ -283,14 +297,14 @@ public class BandcampExplorerMainForm extends BorderPane {
 	 * 
 	 * @param observable observable that progress bar should be bound to
 	 */
-	private void initProgressBar(ObservableValue<? extends Number> observable) {
+	private void initProgressBar(ObservableValue<Number> observable) {
 		resetProgressBar();
 		progressBar.progressProperty().bind(observable);
 	}
 
 
 	/**
-	 * Resets progress bar unbinding its progress property and setting
+	 * Resets progress bar, unbinding its progress property and setting
 	 * progress value to 0.
 	 */
 	private void resetProgressBar() {
@@ -350,6 +364,8 @@ public class BandcampExplorerMainForm extends BorderPane {
 	@FXML
 	private void initialize() {  	
 		checkComponents();
+
+		setCenter(resultsView = ResultsView.getInstance());
 
 		searchType.setItems(FXCollections.observableArrayList(SearchType.values()));
 		searchType.setValue(SearchType.SEARCH);

@@ -21,10 +21,10 @@ import javafx.stage.Window;
 /**
  * "Quick and dirty" implementation of some necessary message dialogs due to the
  * lack of this functionality in JavaFX (and deprecation of ControlsFX Dialogs).
- * This must be replaced with standard JavaFX implementation which will be available 
- * in JDK version 8u40 (scheduled for March 2015).
+ * Someday this should be replaced with standard JavaFX implementation which is available 
+ * since JDK version 8u40 (released March 2015).
  */
-class Dialogs {
+public class Dialogs {
 
 	private Dialogs() {}
 
@@ -41,7 +41,7 @@ class Dialogs {
 	 *         button was pressed or input box is closed, then returned optional is empty.
 	 * @throws NullPointerException if prompt text, title or owner is null
 	 */
-	static Optional<String> inputBox(String promptText, String title, Window owner) {
+	public static Optional<String> inputBox(String promptText, String title, Window owner) {
 		Objects.requireNonNull(promptText);
 
 		Stage dialog = createDialog(title, owner);
@@ -106,7 +106,7 @@ class Dialogs {
 	 * @param owner the owner of message box window
 	 * @throws NullPointerException if message text, title or owner is null
 	 */
-	static void messageBox(String message, String title, Window owner) {
+	public static void messageBox(String message, String title, Window owner) {
 		Objects.requireNonNull(message);
 
 		Stage dialog = createDialog(title, owner);

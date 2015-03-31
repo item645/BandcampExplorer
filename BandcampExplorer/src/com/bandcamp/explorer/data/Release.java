@@ -16,6 +16,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -36,6 +38,8 @@ import javax.script.ScriptException;
  * album or single track.
  */
 public final class Release {
+
+	private static final Logger LOGGER = Logger.getLogger(Release.class.getName());
 
 	/**
 	 * Pattern to locate a release data within HTML page. The data is defined in JSON format
@@ -89,7 +93,6 @@ public final class Release {
 	private final ReadOnlySetProperty<String> tags;
 	private final ReadOnlyStringProperty tagsString;
 	private final ReadOnlyObjectProperty<URI> uri;
-	private final String link;
 	private final String artworkThumbLink;
 	private final List<Track> tracks;
 	private final String information;
@@ -127,19 +130,49 @@ public final class Release {
 	}
 
 
-	/** 
-	 * Loads the release using specified URL string.
-	 * 
-	 * @param url URL string
-	 * @throws IOException if release web page cannot be loaded for some reason 
-	 * @throws IllegalArgumentException if release web page does not contain valid data
-	 *         or supplied URL string is not valid
-	 * @throws NullPointerException if url is null
-	 */
-	public Release(String url) throws IOException {
-		URI uri_ = URI.create(url);
 
-		try (Scanner input = new Scanner(uri_.toURL().openStream(), StandardCharsets.UTF_8.name())) {
+	/**
+	 * Returns the release corresponding to the specified Bandcamp URL string.
+	 * If release object for this URL string is available in cache,
+	 * then cached version is returned. Otherwise, new release object is
+	 * created, using data loaded from the URL, added to cache and then returned.
+	 * 
+	 * @param url URL string representing a location to load release from
+	 * @throws IOException if there was an IO error while loading release web page
+	 *         or if release page does not contain valid data
+	 * @throws NullPointerException if url is null
+	 * @throws IllegalArgumentException if supplied URL string is not valid
+	 */
+	public static Release forURL(String url) throws IOException {
+		URI uri = URI.create(url);
+		return ReleaseCache.INSTANCE.getRelease(createID(uri), () -> {
+			LOGGER.info("Loading release: " + uri);
+			return new Release(uri);
+		});
+	}
+
+
+	/**
+	 * Creates unique identifier for release, derived from the URI in a way
+	 * that such ID represents a release location at Bandcamp website.
+	 * 
+	 * @param uri a URI
+	 * @return unique ID
+	 */
+	private static String createID(URI uri) {
+		return (uri.getHost() + uri.getPath()).toLowerCase(Locale.ROOT);
+	}
+
+
+	/** 
+	 * Loads the release using specified URI.
+	 * 
+	 * @param uri a URI to load release from
+	 * @throws IOException if there was an IO error while loading release web page
+	 *         or if release page does not contain valid data
+	 */
+	private Release(URI uri) throws IOException {
+		try (Scanner input = new Scanner(uri.toURL().openStream(), StandardCharsets.UTF_8.name())) {
 			String artist_, title_;
 			DownloadType downloadType_;
 			LocalDate releaseDate_, publishDate_;
@@ -150,7 +183,7 @@ public final class Release {
 				JS.eval(input.findWithinHorizon(RELEASE_DATA, 0));
 			}
 			catch (Exception e) {
-				throw new IllegalArgumentException("Release data is not valid or cannot be located", e);
+				throw new IOException("Release data is not valid or cannot be located", e);
 			}
 
 			artist_ = Objects.toString(property("artist", String.class));
@@ -166,6 +199,7 @@ public final class Release {
 			int time_ = tracks.stream().collect(Collectors.summingInt(track -> track.getTime().getSeconds()));
 
 			// Wrapping all necessary stuff in JFX-compliant properties
+			this.uri = new ReadOnlyObjectWrapper<>(uri).getReadOnlyProperty();
 			artist = new ReadOnlyStringWrapper(artist_).getReadOnlyProperty();
 			title = new ReadOnlyStringWrapper(title_).getReadOnlyProperty();
 			downloadType = new ReadOnlyObjectWrapper<>(downloadType_).getReadOnlyProperty();
@@ -174,10 +208,6 @@ public final class Release {
 			publishDate = new ReadOnlyObjectWrapper<>(publishDate_).getReadOnlyProperty();
 			tags = new ReadOnlySetWrapper<>(FXCollections.unmodifiableObservableSet(FXCollections.observableSet(tags_)));
 			tagsString = new ReadOnlyStringWrapper(tags_.stream().collect(Collectors.joining(", "))).getReadOnlyProperty();
-			uri = new ReadOnlyObjectWrapper<>(uri_).getReadOnlyProperty();
-
-			// This serves as sort of unique identifier for release and is used for equals/hashcode
-			link = (uri_.getHost() + uri_.getPath()).toLowerCase(Locale.ROOT);
 		}
 	}
 
@@ -405,7 +435,8 @@ public final class Release {
 
 
 	/**
-	 * Helper method for extracting the value of named JSON property in typesafe manner. 
+	 * Helper method for extracting the value of named JSON property in typesafe manner.
+	 * 
 	 * @param name property name
 	 * @param type a target type to convert property value to
 	 */
@@ -424,7 +455,7 @@ public final class Release {
 	 * To log errors encountered when reading individual properties from JSON.
 	 */
 	private void logError(Exception e) {
-		System.err.println("Error processing release data: " + uri.get() + " (" + e + ")");
+		LOGGER.log(Level.SEVERE, "Error processing release data: " + uri.get() + " (" + e.getMessage() + ")", e);
 	}
 
 
@@ -433,7 +464,7 @@ public final class Release {
 	 */
 	@Override
 	public int hashCode() {
-		return link.hashCode();
+		return super.hashCode();
 	}
 
 
@@ -451,8 +482,9 @@ public final class Release {
 	 */
 	@Override
 	public boolean equals(Object other) {
-		if (this == other) return true;
-		return other instanceof Release ? Objects.equals(this.link, ((Release)other).link) : false;
+		// Release caching ensures that there exists at most one instance of Release
+		// with a given ID at a time, thus identity comparison is enough (same goes for hash code)
+		return super.equals(other);
 	}
 
 

@@ -13,6 +13,8 @@ import java.util.Objects;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 import com.bandcamp.explorer.util.ExceptionUnchecker;
@@ -24,6 +26,7 @@ import com.bandcamp.explorer.util.ExceptionUnchecker;
  */
 class Page {
 
+	private static final Logger LOGGER = Logger.getLogger(Page.class.getName());
 	private static final Pattern RELEASE_LINK = Pattern.compile("(https?://[^/]+\\.[^/\\+\"]+)??/(album|track)/[^/\\+]+?(?=(\"|\\?|<))", Pattern.CASE_INSENSITIVE);
 
 	private final List<Callable<Release>> releaseLoaders = new ArrayList<>();
@@ -51,7 +54,7 @@ class Page {
 
 
 	/**
-	 * Loads a page using supplied URI and creates a loader for every unique release 
+	 * Loads a page using supplied URL and creates a loader for every unique release 
 	 * link found on this page.
 	 */
 	private void load(URL url) throws IOException {
@@ -74,16 +77,16 @@ class Page {
 	/**
 	 * Creates a loader for the specified release link.
 	 * 
-	 * @param link a link (http URL string, pointing to a release)
+	 * @param url URL string representing a location to load release from
 	 * @return a Callable object, containing code to load the release
 	 */
-	private Callable<Release> createReleaseLoader(String link) {	
+	private Callable<Release> createReleaseLoader(String url) {	
 		return () -> {
 			try {
-				return !parentTask.isCancelled() ? new Release(link) : null;
+				return !parentTask.isCancelled() ? Release.forURL(url) : null;
 			} 
 			catch (Exception e) {
-				System.err.println("Error loading link: " + link + " (" + e + ")");
+				LOGGER.log(Level.SEVERE, "Error loading release: " + url + " (" + e.getMessage() + ")", e);
 				return null;
 			}
 		};
@@ -91,7 +94,7 @@ class Page {
 
 
 	/**
-	 * Returns an unmidofiable list of loaders, each corresponding to every unique
+	 * Returns an unmodifiable list of loaders, each corresponding to every unique
 	 * release link found on this page. Loader is an instance of Callable which, 
 	 * when invoked, loads and returns the Release object. If parent search task
 	 * was cancelled or error occured on release loading, the loader returns null.

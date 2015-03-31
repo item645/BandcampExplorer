@@ -30,7 +30,13 @@ import com.bandcamp.explorer.data.SearchResult;
 /**
  * Controller class for results view component.
  */
-public class ResultsView extends AnchorPane {
+class ResultsView extends AnchorPane {
+
+	/**
+	 * Single instance of results view component.
+	 */
+	private static final ResultsView INSTANCE = new ResultsView();
+
 
 	private final TabPane tabPane = new TabPane();
 	private final ObservableList<Tab> tabs = tabPane.getTabs();
@@ -39,8 +45,6 @@ public class ResultsView extends AnchorPane {
 	private final IntegerProperty numOfUnclosableTabs = new SimpleIntegerProperty();
 	private int tabIndex;
 
-	private BandcampExplorerMainForm mainForm;
-	private ReleasePlayerForm releasePlayer;
 
 
 	/**
@@ -81,6 +85,7 @@ public class ResultsView extends AnchorPane {
 						// at least one such tab in a tab pane)
 						selectionModel.select(2);
 						tabs.remove(1);
+						combinedReleases.clear();
 					}
 				}
 			});
@@ -156,27 +161,6 @@ public class ResultsView extends AnchorPane {
 			combinedReleases.addAll(list);
 		}
 
-
-		/**
-		 * Sets a reference to app's main form component for release
-		 * table view on this tab.
-		 * 
-		 * @param mainForm a main form
-		 */
-		void setMainForm(BandcampExplorerMainForm mainForm) {
-			releaseTable.setMainForm(mainForm);
-		}
-
-
-		/**
-		 * Sets the release player for release table view on this tab.
-		 * 
-		 * @param releasePlayer the release player
-		 */
-		void setReleasePlayer(ReleasePlayerForm releasePlayer) {
-			releaseTable.setReleasePlayer(releasePlayer);
-		}
-
 	}
 
 
@@ -190,20 +174,6 @@ public class ResultsView extends AnchorPane {
 		AnchorPane.setLeftAnchor(tabPane, 0.0);
 		AnchorPane.setRightAnchor(tabPane, 0.0);
 		getChildren().add(tabPane);
-
-		// This listener sets a main form's reference for this results view and pushes
-		// it to all child release tables when results view is added to main form.
-		parentProperty().addListener((observable, oldValue, newValue) -> {
-			if (mainForm == null) {
-				if (newValue instanceof BandcampExplorerMainForm) {
-					mainForm = (BandcampExplorerMainForm)newValue;
-					combinedResultsTab.setMainForm(mainForm);
-					doForEachTab(tab -> getReleaseTableOnTab(tab).setMainForm(mainForm));
-				}
-				else
-					throw new IllegalArgumentException("Invalid container for ResultsView component: " + newValue);
-			}
-		});
 
 		// This is a fake tab which serves as a "button" to add new tabs
 		Tab addBtn = new Tab("+");
@@ -227,31 +197,10 @@ public class ResultsView extends AnchorPane {
 
 
 	/**
-	 * Loads a results view component.
+	 * Returns a reference to a results view component.
 	 */
-	public static ResultsView load() {
-		return new ResultsView();
-	}
-
-
-	/**
-	 * Sets the release player for playing selected releases.
-	 * 
-	 * @param releasePlayer the release player
-	 */
-	public void setReleasePlayer(ReleasePlayerForm releasePlayer) {
-		this.releasePlayer = releasePlayer;
-		combinedResultsTab.setReleasePlayer(releasePlayer);
-		doForEachTab(tab -> getReleaseTableOnTab(tab).setReleasePlayer(releasePlayer));
-	}
-
-
-	/**
-	 * Shows and brings to front player window if it was hidden.
-	 */
-	void showPlayer() {
-		if (releasePlayer != null)
-			releasePlayer.show();
+	public static ResultsView getInstance() {
+		return INSTANCE;
 	}
 
 
@@ -270,11 +219,7 @@ public class ResultsView extends AnchorPane {
 		tab.setOnClosed(event -> combinedResultsTab.updateReleases());
 		// Don't allow to close tabs if there's only one "normal" tab left
 		tab.closableProperty().bind(Bindings.size(tabs).greaterThan(numOfUnclosableTabs));
-
-		ReleaseTableView releaseTable = ReleaseTableView.load();
-		releaseTable.setMainForm(mainForm);
-		releaseTable.setReleasePlayer(releasePlayer);
-		tab.setContent(releaseTable);
+		tab.setContent(ReleaseTableView.load());
 
 		tabs.add(tab);
 		selectionModel.select(tab);
@@ -309,7 +254,10 @@ public class ResultsView extends AnchorPane {
 		.append(": ").append(params.searchQuery()).append(" (").append(params.pages())
 		.append(params.pages() > 1 ? " pages" : " page").append(", ").append(result.size())
 		.append(" releases found)");
-		selected.setTooltip(new Tooltip(tooltipText.toString()));
+		Tooltip tooltip = selected.getTooltip();
+		if (tooltip == null)
+			selected.setTooltip(tooltip = new Tooltip());
+		tooltip.setText(tooltipText.toString());
 	}
 
 
@@ -411,8 +359,12 @@ public class ResultsView extends AnchorPane {
 	private void clearTab(Tab tab) {
 		getReleasesOnTab(tab).clear();
 		Tooltip tooltip = tab.getTooltip();
-		if (tooltip != null)
-			tooltip.setText("(DELETED) " + tooltip.getText());
+		if (tooltip != null) {
+			String text = tooltip.getText();
+			String del = "(DELETED) ";
+			if (!text.startsWith(del))
+				tooltip.setText(del + text);
+		}
 	}
 
 

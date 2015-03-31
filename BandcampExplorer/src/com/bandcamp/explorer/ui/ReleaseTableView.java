@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.collections.ModifiableObservableListBase;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.collections.transformation.SortedList;
@@ -89,8 +90,7 @@ class ReleaseTableView extends AnchorPane {
 		try (InputStream in = new BufferedInputStream(
 				ReleaseTableView.class.getResourceAsStream("ReleaseTableView.fxml"))) {
 			ByteArrayOutputStream out = new ByteArrayOutputStream(20480);
-			int b;
-			while ((b = in.read()) != -1)
+			for (int b; (b = in.read()) != -1; )
 				out.write(b);
 			return new ByteArrayInputStream(out.toByteArray());
 		}
@@ -100,12 +100,41 @@ class ReleaseTableView extends AnchorPane {
 
 	private final ObservableList<Release> items = FXCollections.observableArrayList();
 	private final FilteredList<Release> filteredItems = new FilteredList<>(items);
-	private final SortedList<Release> sortedItems = new SortedList<>(filteredItems);
+	private SortedList<Release> sortedItems = new SortedList<>(filteredItems);
+
+	/**
+	 * Special-purpose forwarding wrapper for items list that features modified clear()
+	 * method to deal with the problem of stale Release references in a SortedList.
+	 * Reference to this wrapper is handed to class clients so they can transparently
+	 * call modified version of clear().
+	 */
+	private final ObservableList<Release> itemsForwarder = new ModifiableObservableListBase<Release>() {
+
+		/** 
+		 * {@inheritDoc}
+		 * This modified implementation additionally instantiates and installs new instance
+		 * of SortedList following each call to clear() on backing items list.
+		 * This guarantees that all stale Release references contained by SortedList's internal
+		 * array of sorted elements become unreachable as soon as old instance of SortedList
+		 * gets discarded, which is essential to release cache to work as it is supposed to.
+		 */
+		@Override
+		public void clear() {
+			items.clear();
+			sortedItems.comparatorProperty().unbind();
+			releaseTableView.setItems(sortedItems = new SortedList<>(filteredItems));
+			sortedItems.comparatorProperty().bind(releaseTableView.comparatorProperty());
+		}
+
+		// Other implemented methods simply delegate to the items list
+		@Override public Release get(int index)                       {return items.get(index);}
+		@Override public int size()                                   {return items.size();}
+		@Override protected void doAdd(int index, Release element)    {items.add(index, element);}
+		@Override protected Release doSet(int index, Release element) {return items.set(index, element);}
+		@Override protected Release doRemove(int index)               {return items.remove(index);}
+	};
 
 	private final CellContextMenu cellContextMenu = new CellContextMenu();
-
-	private BandcampExplorerMainForm mainForm;
-	private ReleasePlayerForm releasePlayer;
 	private TableViewResizeHelper resizeHelper;
 
 
@@ -158,20 +187,18 @@ class ReleaseTableView extends AnchorPane {
 		private void createItems() {
 			MenuItem searchArtist = new MenuItem("Search this Artist");
 			searchArtist.setOnAction(event -> {
-				if (mainForm != null) {
-					Release release = getSelectedRelease();
-					if (release != null)
-						mainForm.searchReleases(release.getArtist(), SearchType.SEARCH, true);
-				}
+				Release release = getSelectedRelease();
+				if (release != null)
+					BandcampExplorerMainForm.getInstance().searchReleases(
+							release.getArtist(), SearchType.SEARCH, true);
 			});
 
 			MenuItem moreFromDomain = new MenuItem("More Releases from this Domain");
 			moreFromDomain.setOnAction(event -> {
-				if (mainForm != null) {
-					Release release = getSelectedRelease();
-					if (release != null)
-						mainForm.searchReleases(release.getDiscographyURI().toString(), SearchType.DIRECT, true);
-				}
+				Release release = getSelectedRelease();
+				if (release != null)
+					BandcampExplorerMainForm.getInstance().searchReleases(
+							release.getDiscographyURI().toString(), SearchType.DIRECT, true);
 			});
 
 			MenuItem viewOnBandcamp = new MenuItem("View on Bandcamp");
@@ -246,34 +273,10 @@ class ReleaseTableView extends AnchorPane {
 
 
 	/**
-	 * Sets a reference to app's main form component.
-	 * Does nothing if reference is already set or reference is null.
-	 * 
-	 * @param mainForm a main form
-	 */
-	void setMainForm(BandcampExplorerMainForm mainForm) {
-		if (this.mainForm == null && mainForm != null)
-			this.mainForm = mainForm;
-	}
-
-
-	/**
-	 * Sets the release player for playing selected releases.
-	 * Does nothing if release player has been already set.
-	 * 
-	 * @param releasePlayer the release player
-	 */
-	void setReleasePlayer(ReleasePlayerForm releasePlayer) {
-		if (this.releasePlayer == null)
-			this.releasePlayer = releasePlayer;
-	}
-
-
-	/**
 	 * Returns an observable list of releases in this table view. 
 	 */
 	ObservableList<Release> getReleases() {
-		return items;
+		return itemsForwarder;
 	}
 
 
@@ -385,11 +388,9 @@ class ReleaseTableView extends AnchorPane {
 	 * Opens a player window to play currently selected release.
 	 */
 	private void playSelectedRelease() {
-		if (releasePlayer != null) {
-			Release release = getSelectedRelease();
-			if (release != null)
-				Platform.runLater(() -> releasePlayer.setRelease(release));
-		}
+		Release release = getSelectedRelease();
+		if (release != null)
+			Platform.runLater(() -> ReleasePlayerForm.getInstance().setRelease(release));
 	}
 
 
@@ -407,8 +408,7 @@ class ReleaseTableView extends AnchorPane {
 	 */
 	@FXML
 	private void showPlayer() {
-		if (releasePlayer != null)
-			releasePlayer.show();
+		ReleasePlayerForm.getInstance().show();
 	}
 
 

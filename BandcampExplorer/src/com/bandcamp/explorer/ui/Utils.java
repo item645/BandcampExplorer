@@ -6,6 +6,8 @@ import java.net.URI;
 import java.net.URL;
 import java.util.Objects;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.bandcamp.explorer.util.ExceptionUnchecker;
 
@@ -18,6 +20,9 @@ import javafx.scene.layout.Region;
  * Contains some general utility stuff for UI.
  */
 class Utils {
+
+	private static final Logger LOGGER = Logger.getLogger(Utils.class.getName());
+
 
 	private Utils() {}
 
@@ -96,12 +101,12 @@ class Utils {
 				Desktop.getDesktop().browse(uri);
 			}
 			catch (Exception e) {
-				e.printStackTrace();
+				LOGGER.log(Level.SEVERE, "URL browse error: " + e.getMessage(), e);
 			}
 		}
 	}
-	
-	
+
+
 	/**
 	 * Converts specified object to its string representation and
 	 * puts result string into a system clipboard.

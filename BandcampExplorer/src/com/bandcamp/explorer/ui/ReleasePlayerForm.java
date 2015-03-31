@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
@@ -55,6 +57,27 @@ import com.bandcamp.explorer.ui.CellFactory.CellCustomizer;
  */
 public class ReleasePlayerForm extends SplitPane {
 
+	private static final Logger LOGGER = Logger.getLogger(ReleasePlayerForm.class.getName());
+
+	private static final String NO_RELEASE_TITLE = "[No Release]";
+
+	// Icons for player control buttons
+	private static final Image PLAY_ICON_IMAGE   = loadIcon("player_play.png");
+	private static final Image PAUSE_ICON_IMAGE  = loadIcon("player_pause.png");
+	private static final ImageView PLAY_ICON     = new ImageView(PLAY_ICON_IMAGE);
+	private static final ImageView PAUSE_ICON    = new ImageView(PAUSE_ICON_IMAGE);
+	private static final ImageView STOP_ICON     = new ImageView(loadIcon("player_stop.png"));
+	private static final ImageView PREVIOUS_ICON = new ImageView(loadIcon("player_previous.png"));
+	private static final ImageView NEXT_ICON     = new ImageView(loadIcon("player_next.png"));
+
+	/**
+	 * Single instance of release player form component
+	 */
+	private static final ReleasePlayerForm INSTANCE = Utils.loadFXMLComponent(
+			ReleasePlayerForm.class.getResource("ReleasePlayerForm.fxml"),
+			ReleasePlayerForm::new);
+
+	
 	private Stage stage;
 	@FXML private Button loadReleaseButton;
 	@FXML private Button unloadReleaseButton;
@@ -75,17 +98,6 @@ public class ReleasePlayerForm extends SplitPane {
 	@FXML private TableColumn<Track, String> artistColumn;
 	@FXML private TableColumn<Track, String> titleColumn;
 	@FXML private TableColumn<Track, Time> timeColumn;
-
-	private static final String NO_RELEASE_TITLE = "[No Release]";
-
-	// Icons for player control buttons
-	private static final Image PLAY_ICON_IMAGE   = loadIcon("player_play.png");
-	private static final Image PAUSE_ICON_IMAGE  = loadIcon("player_pause.png");
-	private static final ImageView PLAY_ICON     = new ImageView(PLAY_ICON_IMAGE);
-	private static final ImageView PAUSE_ICON    = new ImageView(PAUSE_ICON_IMAGE);
-	private static final ImageView STOP_ICON     = new ImageView(loadIcon("player_stop.png"));
-	private static final ImageView PREVIOUS_ICON = new ImageView(loadIcon("player_previous.png"));
-	private static final ImageView NEXT_ICON     = new ImageView(loadIcon("player_next.png"));
 
 	private TrackListView trackListView;
 	private final AudioPlayer audioPlayer = new AudioPlayer();
@@ -373,8 +385,8 @@ public class ReleasePlayerForm extends SplitPane {
 			player.setOnError(() -> {
 				MediaException e = player.getError();
 				if (e != null) {
-					e.printStackTrace();
-					Dialogs.messageBox(e.toString(), "Audio Player Error", stage);
+					LOGGER.log(Level.SEVERE, "Audio Player Error: " + e.getMessage(), e);
+					Dialogs.messageBox(e.getMessage(), "Audio Player Error", stage);
 				}
 				quit();
 			});
@@ -613,12 +625,10 @@ public class ReleasePlayerForm extends SplitPane {
 
 
 	/**
-	 * Loads a release player form component.
+	 * Returns a reference to a release player form component.
 	 */
-	public static ReleasePlayerForm load() {
-		return Utils.loadFXMLComponent(
-				ReleasePlayerForm.class.getResource("ReleasePlayerForm.fxml"),
-				ReleasePlayerForm::new);
+	public static ReleasePlayerForm getInstance() {
+		return INSTANCE;
 	}
 
 
@@ -747,6 +757,10 @@ public class ReleasePlayerForm extends SplitPane {
 			stage.hide();
 			event.consume();
 		});
+		stage.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+			if (event.getCode() == KeyCode.ESCAPE)
+				stage.hide();
+		});
 		stage.setScene(new Scene(this));
 	}
 
@@ -801,10 +815,12 @@ public class ReleasePlayerForm extends SplitPane {
 				try {
 					if (!u.startsWith("http://") && !u.startsWith("https://"))
 						u = "http://" + u;
-					setRelease(new Release(u));
+					setRelease(Release.forURL(u));
 				} 
 				catch (Exception e) {
-					Dialogs.messageBox("Error loading release: " + e, "Error", stage);
+					String errMsg = "Error loading release: " + e;
+					LOGGER.log(Level.SEVERE, errMsg, e);
+					Dialogs.messageBox(errMsg, "Error", stage);
 				}
 			}
 		}
