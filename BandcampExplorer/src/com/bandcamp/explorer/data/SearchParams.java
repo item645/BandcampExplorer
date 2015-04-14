@@ -17,7 +17,7 @@ public class SearchParams {
 	/**
 	 * A builder to supply search parameters in convenient way.
 	 */
-	public static class Builder {
+	public static final class Builder {
 		private final String searchQuery;
 		private final SearchType searchType;
 		private int pages = 1;
@@ -25,7 +25,7 @@ public class SearchParams {
 
 
 		/**
-		 * Constructs a builer with mandatory parameters.
+		 * Constructs a builder with mandatory parameters.
 		 * 
 		 * @param searchQuery a string representing search query; the actual meaning of
 		 *        search query depends on specified search type

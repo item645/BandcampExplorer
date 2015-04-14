@@ -86,7 +86,7 @@ class Page {
 				return !parentTask.isCancelled() ? Release.forURL(url) : null;
 			} 
 			catch (Exception e) {
-				LOGGER.log(Level.SEVERE, "Error loading release: " + url + " (" + e.getMessage() + ")", e);
+				LOGGER.log(Level.WARNING, "Error loading release: " + url + " (" + e.getMessage() + ")", e);
 				return null;
 			}
 		};

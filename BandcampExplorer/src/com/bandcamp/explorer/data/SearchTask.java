@@ -10,14 +10,15 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.function.BiFunction;
 
 import javafx.concurrent.Task;
 
 /**
  * An implementation of JavaFX Task used to execute a search for releases
  * on Bandcamp using specified search parameters.
- * The get() method of this task returns a SearchResult object, containing all the
- * releases found during this search session.
+ * The get() and getValue() methods of this task return a SearchResult object,
+ * containing all the releases found during this search session.
  * The sort order of releases in a returned SearchResult is determined by
  * sortOrder option specified by search parameters.
  */
@@ -25,9 +26,9 @@ public final class SearchTask extends Task<SearchResult> {
 
 	private final ExecutorService executor;
 	private final SearchParams searchParams;
+	private final String requestingDataMsg;
+	private final BiFunction<Integer, Integer, String> loadingReleasesMsg;
 	private Instant startTime;
-	private String requestingDataMsg;
-	private String loadingReleasesMsg;
 
 
 	/**
@@ -35,40 +36,27 @@ public final class SearchTask extends Task<SearchResult> {
 	 * 
 	 * @param params search parameters
 	 * @param executor an instance of executor service that will be employed
-	 *        to execute all page loading operations 
+	 *        to execute all page and release loading operations 
+	 * @param requestingDataMsg a text for updating message property when data
+	 *        requesting stage is performed (if null, message is not updated)
+	 * @param loadingReleasesMsg a callback function that accepts two int arguments (number of
+	 *        processed releases and total number of releases to process) and returns a string
+	 *        for updating message property when release loading stage is performed (if null,
+	 *        message is not updated)
 	 * @throws NullPointerException if params or executor is null 
 	 */
-	public SearchTask(SearchParams params, ExecutorService executor) {
+	public SearchTask(SearchParams params, ExecutorService executor,
+			String requestingDataMsg, BiFunction<Integer, Integer, String> loadingReleasesMsg) {
 		this.searchParams = Objects.requireNonNull(params);
 		this.executor = Objects.requireNonNull(executor);
-	}
-
-
-	/**
-	 * Sets a string to update a message property with when data requesting
-	 * stage is performed.
-	 * 
-	 * @param msg a string; if null, then message property won't be updated
-	 */
-	public void setRequestingDataMessage(String msg) {
-		requestingDataMsg = msg;
-	}
-
-
-	/**
-	 * Sets a string to update a message property with when release loading
-	 * stage is performed.
-	 * 
-	 * @param msg a string; if null, then message property won't be updated
-	 */
-	public void setLoadingReleasesMessage(String msg) {
-		loadingReleasesMsg = msg;
+		this.requestingDataMsg = requestingDataMsg;
+		this.loadingReleasesMsg = loadingReleasesMsg;
 	}
 
 
 	/**
 	 * Returns an instant of time when this task started executing (that is,
-	 * when its call() method has been invoked).
+	 * when task has transitioned to the RUNNING state).
 	 * 
 	 * @return an instant of time; null, if task is not started yet
 	 */
@@ -77,12 +65,21 @@ public final class SearchTask extends Task<SearchResult> {
 	}
 
 
+	/**
+	 * {@inheritDoc}
+	 * This implementation sets a start time of this task.
+	 */
+	@Override
+	protected void running() {
+		startTime = Instant.now();
+	}
+
+
 	/** 
 	 * Implements the actual logic of search.
 	 */
 	@Override
 	protected SearchResult call() throws Exception {
-		startTime = Instant.now();
 		if (requestingDataMsg != null)
 			updateMessage(requestingDataMsg);
 
@@ -106,7 +103,7 @@ public final class SearchTask extends Task<SearchResult> {
 		int numTasks = releaseLoaders.size();
 		updateProgress(0, numTasks);
 		if (loadingReleasesMsg != null)
-			updateMessage(loadingReleasesMsg);
+			updateMessage(loadingReleasesMsg.apply(0, numTasks));
 
 		// Submitting loaders to completion service so that results can be
 		// processed upon completion
@@ -121,6 +118,8 @@ public final class SearchTask extends Task<SearchResult> {
 			Release release = completionService.take().get();
 			if (release != null)
 				releases.add(release);
+			if (loadingReleasesMsg != null)
+				updateMessage(loadingReleasesMsg.apply(i, numTasks));
 			updateProgress(i, numTasks);
 		}
 

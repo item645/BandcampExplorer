@@ -90,7 +90,7 @@ class ReleaseCache {
 							try {
 								if (valueTask.get() == staleValue) {
 									cache.remove(staleValue.id, valueTask);
-									LOGGER.info("Purged from cache: " + staleValue.id);
+									LOGGER.finer("Purged from cache: " + staleValue.id);
 								}
 							}
 							catch (ExecutionException ignored) {}

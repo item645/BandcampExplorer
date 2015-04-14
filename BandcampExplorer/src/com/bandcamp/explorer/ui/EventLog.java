@@ -5,6 +5,7 @@ import java.io.StringWriter;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.logging.Formatter;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
@@ -24,34 +25,34 @@ import javafx.stage.Window;
  */
 public class EventLog extends AnchorPane {
 
-	/**
-	 * Single instance of event log component
-	 */
-	private static final EventLog EVENT_LOG = Utils.loadFXMLComponent(
-			EventLog.class.getResource("EventLog.fxml"),
-			EventLog::new);
-
+	private static EventLog EVENT_LOG;
 
 	private static final DateTimeFormatter HH_mm_ss = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.ENGLISH);
-	private static final String LINE_SEPARATOR = System.getProperty("line.separator");
+	private static final String LINE_SEPARATOR = System.lineSeparator();
 
 	/**
 	 * A handler that transfers messages and exceptions from logger to an
 	 * appropriate text area of EventLog
 	 */
-	private final Handler logHandler;
-	{
-		logHandler = new Handler() {
+	private final Handler logHandler = createHandler();
+
+
+	/**
+	 * Instantiates and sets up the log handler.
+	 */
+	private static Handler createHandler() {
+		Handler handler = new Handler() {
 			@Override
 			public void publish(LogRecord record) {
-				// Since this code will be invoked concurrently from search threads,
+				// Since this code will be invoked concurrently from different threads,
 				// all updates to UI components must be submitted for sequential
 				// execution in JavaFX thread
+				String messageText = getFormatter().format(record);
+				String exceptionText = exceptionToText(record.getThrown());
 				Platform.runLater(() -> {
-					EVENT_LOG.logMessage(getFormatter().format(record));
-					Throwable exception = record.getThrown();
-					if (exception != null)
-						EVENT_LOG.logException(exception);
+					EVENT_LOG.logMessage(messageText);
+					if (exceptionText != null)
+						EVENT_LOG.logException(exceptionText);
 				});
 			}
 			@Override public void flush() {}
@@ -59,29 +60,81 @@ public class EventLog extends AnchorPane {
 		};
 
 		// Installing the formatter that adds time stamp and line break to each log message
-		logHandler.setFormatter(new Formatter() {
+		handler.setFormatter(new Formatter() {
 			@Override
 			public String format(LogRecord record) {
 				return new StringBuilder(HH_mm_ss.format(LocalDateTime.now()))
 				.append("   ").append(formatMessage(record)).append(LINE_SEPARATOR).toString();
 			}
 		});
+
+		return handler;
 	}
 
 
-	private Stage stage;
+	/**
+	 * Converts the specified exception into a text, composed of current time stamp,
+	 * exception stack trace and separator.
+	 * 
+	 * @param exception an exception to convert
+	 * @return exception text; null, if passed exception object is null
+	 */
+	private static String exceptionToText(Throwable exception) {
+		if (exception != null) {
+			StringWriter output = new StringWriter();
+			output.write(HH_mm_ss.format(LocalDateTime.now()) + "   ");
+			exception.printStackTrace(new PrintWriter(output, true));
+			output.write("--------------------------------" + LINE_SEPARATOR);
+			return output.toString();
+		}
+		else
+			return null;
+	}
+
+
+	private final Stage stage;
 	@FXML private TextArea eventsTextArea;
 	@FXML private TextArea exceptionsTextArea;	
 
 
-	private EventLog() {}
+	/**
+	 * Creates an instance of event log.
+	 */
+	private EventLog(Window owner) {
+		stage = new Stage();
+		stage.initOwner(owner);
+		stage.setTitle("Event Log");
+		stage.setResizable(false);
+		stage.setOnCloseRequest(event -> {
+			stage.hide();
+			event.consume();
+		});
+		stage.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+			if (event.getCode() == KeyCode.ESCAPE)
+				stage.hide();
+		});
+		stage.setScene(new Scene(this));
+
+	}
 
 
 	/**
-	 * Returns a reference to an event log component.
+	 * Creates an instance of the event log component.
+	 * 
+	 * @param owner the owner of event log window
+	 * @throws NullPointerException if owner is null
+	 * @throws IllegalStateException if this method has been called more than once
 	 */
-	public static EventLog getInstance() {
-		return EVENT_LOG;
+	public static EventLog create(Window owner) {
+		if (!Platform.isFxApplicationThread())
+			throw new IllegalStateException("This component can be created only from Java FX Application Thread");
+		if (EVENT_LOG != null)
+			throw new IllegalStateException("This component can't be instantiated more than once");
+		Objects.requireNonNull(owner);
+		
+		return (EVENT_LOG = Utils.loadFXMLComponent(
+				EventLog.class.getResource("EventLog.fxml"),
+				() -> new EventLog(owner)));
 	}
 
 
@@ -103,21 +156,6 @@ public class EventLog extends AnchorPane {
 
 
 	/**
-	 * Sets the owner window for event log's top stage.
-	 * This method is used to set the primary stage as an owner to ensure
-	 * that when primary window is closing, event log's window will be automatically
-	 * closed as well.
-	 * 
-	 * @param owner an owner window
-	 * @throws NullPointerException if event log's top stage is not yet initialized
-	 * @throws IllegalStateException if top stage has already been made visible
-	 */
-	public void setOwner(Window owner) {
-		stage.initOwner(owner);
-	}
-
-
-	/**
 	 * Writes the message into the events text area. 
 	 * 
 	 * @param message a message to log
@@ -128,48 +166,22 @@ public class EventLog extends AnchorPane {
 
 
 	/**
-	 * Writes stack trace of the specified exception into exceptions
-	 * text area, also adding time stamp and separator to the resulting text.
+	 * Writes exception text into the exceptions text area.
 	 * 
-	 * @param exception an exception to log
+	 * @param exceptionText exception text to log
 	 */
-	private void logException(Throwable exception) {
-		StringWriter writer = new StringWriter();
-		writer.write(HH_mm_ss.format(LocalDateTime.now()) + "   ");
-		exception.printStackTrace(new PrintWriter(writer, true));
-		writer.write("--------------------------------\n");
-		exceptionsTextArea.appendText(writer.toString());
+	private void logException(String exceptionText) {
+		exceptionsTextArea.appendText(exceptionText);
 	}
 
 
 	/**
-	 * Loads a top level stage for event log.
-	 */
-	private void initStage() {
-		stage = new Stage();
-		stage.setTitle("Event Log");
-		stage.setResizable(false);
-		stage.setOnCloseRequest(event -> {
-			stage.hide();
-			event.consume();
-		});
-		stage.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-			if (event.getCode() == KeyCode.ESCAPE)
-				stage.hide();
-		});
-		stage.setScene(new Scene(this));
-	}
-
-
-	/**
-	 * Initialization method invoked by FXML loader, provides initial setup for components.
+	 * Initialization method invoked by FXML loader.
 	 */
 	@FXML
 	private void initialize() {
 		assert eventsTextArea != null : "fx:id=\"eventsTextArea\" was not injected: check your FXML file 'EventLog.fxml'.";
 		assert exceptionsTextArea != null : "fx:id=\"exceptionsTextArea\" was not injected: check your FXML file 'EventLog.fxml'.";
-
-		initStage();
 	}
 
 }

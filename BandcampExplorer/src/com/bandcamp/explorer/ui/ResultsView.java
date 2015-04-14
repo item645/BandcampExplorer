@@ -32,17 +32,13 @@ import com.bandcamp.explorer.data.SearchResult;
  */
 class ResultsView extends AnchorPane {
 
-	/**
-	 * Single instance of results view component.
-	 */
-	private static final ResultsView INSTANCE = new ResultsView();
-
-
+	private final BandcampExplorerMainForm mainForm;
+	private final ReleasePlayerForm releasePlayer;
 	private final TabPane tabPane = new TabPane();
 	private final ObservableList<Tab> tabs = tabPane.getTabs();
 	private final SingleSelectionModel<Tab> selectionModel = tabPane.getSelectionModel();
-	private final CombinedResultsTab combinedResultsTab = new CombinedResultsTab();
 	private final IntegerProperty numOfUnclosableTabs = new SimpleIntegerProperty();
+	private final CombinedResultsTab combinedResultsTab;
 	private int tabIndex;
 
 
@@ -53,7 +49,7 @@ class ResultsView extends AnchorPane {
 	 */
 	private class CombinedResultsTab extends Tab {
 
-		private final ReleaseTableView releaseTable = ReleaseTableView.load();
+		private final ReleaseTableView releaseTable = ReleaseTableView.create(mainForm, releasePlayer);
 		private final ObservableList<Release> combinedReleases = releaseTable.getReleases();
 		private final BooleanProperty visible = new SimpleBooleanProperty(false);
 
@@ -105,25 +101,6 @@ class ResultsView extends AnchorPane {
 
 
 		/**
-		 * Adds new set of releases to combined results.
-		 * Each individual release is added only if it's not present 
-		 * in combined results yet.
-		 * The addition is not performed if combined results tab is not visible
-		 * at the moment.
-		 * 
-		 * @param releases releases to add
-		 * @throws NullPointerException if releases is null
-		 */
-		void addReleases(Iterable<Release> releases) {
-			if (visible.get()) {
-				Set<Release> unique = new HashSet<>(combinedReleases);
-				releases.forEach(unique::add);
-				updateCombinedReleases(unique);
-			}
-		}
-
-
-		/**
 		 * Updates the combined results table by fetching and combining
 		 * results from all opened tabs.
 		 * Does nothing if combined results tab is not visible at the moment.
@@ -168,7 +145,11 @@ class ResultsView extends AnchorPane {
 	/**
 	 * Creates a results view component and provides its initial setup.
 	 */
-	private ResultsView() {
+	private ResultsView(BandcampExplorerMainForm mainForm, ReleasePlayerForm releasePlayer) {
+		this.mainForm = mainForm;
+		this.releasePlayer = releasePlayer;
+		this.combinedResultsTab = new CombinedResultsTab();
+		
 		AnchorPane.setTopAnchor(tabPane, 0.0);
 		AnchorPane.setBottomAnchor(tabPane, 0.0);
 		AnchorPane.setLeftAnchor(tabPane, 0.0);
@@ -197,18 +178,27 @@ class ResultsView extends AnchorPane {
 
 
 	/**
-	 * Returns a reference to a results view component.
+	 * Creates an instance of results view component.
+	 * 
+	 * @param mainForm reference to app's main form
+	 * @param releasePlayer reference to a release player
 	 */
-	public static ResultsView getInstance() {
-		return INSTANCE;
+	static ResultsView create(BandcampExplorerMainForm mainForm, ReleasePlayerForm releasePlayer) {
+		assert mainForm != null;
+		assert releasePlayer != null;
+		return new ResultsView(mainForm, releasePlayer);
 	}
 
 
 	/**
 	 * Adds a new tab to this results view and creates new release table view
 	 * as its content to display search result.
+	 * Does nothing if tabs are disabled.
 	 */
 	void addTab() {
+		if (tabPane.isDisabled())
+			return;
+		
 		Tab tab = new Tab("New search (" + ++tabIndex + ")");
 		tab.setOnCloseRequest(event -> {
 			if (isLastTab(tab))
@@ -219,7 +209,7 @@ class ResultsView extends AnchorPane {
 		tab.setOnClosed(event -> combinedResultsTab.updateReleases());
 		// Don't allow to close tabs if there's only one "normal" tab left
 		tab.closableProperty().bind(Bindings.size(tabs).greaterThan(numOfUnclosableTabs));
-		tab.setContent(ReleaseTableView.load());
+		tab.setContent(ReleaseTableView.create(mainForm, releasePlayer));
 
 		tabs.add(tab);
 		selectionModel.select(tab);
@@ -233,8 +223,12 @@ class ResultsView extends AnchorPane {
 	 * 
 	 * @param result a search result to display
 	 * @throws NullPointerException if result is null
+	 * @throws IllegalStateException if tabs are disabled
 	 */
 	void setSearchResult(SearchResult result) {
+		if (tabPane.isDisabled())
+			throw new IllegalStateException("Tabs must be enabled before setting a search result");
+
 		Tab selected = getSelectedTab();
 		if (selected == combinedResultsTab) {
 			addTab();
@@ -245,7 +239,7 @@ class ResultsView extends AnchorPane {
 		ObservableList<Release> releases = getReleasesOnTab(selected);
 		releases.clear();
 		result.forEach(releases::add);
-		combinedResultsTab.addReleases(result);
+		combinedResultsTab.updateReleases();
 
 		// Update tab's header and tooltip accordingly
 		SearchParams params = result.getSearchParams();
@@ -274,9 +268,11 @@ class ResultsView extends AnchorPane {
 	/**
 	 * Closes currently selected tab.
 	 * Does nothing if selected tab is a combined results tab or selected tab
-	 * is the only "normal" tab left in a tab pane.
+	 * is the only "normal" tab left in a tab pane or if tabs are disabled.
 	 */
 	void closeSelectedTab() {
+		if (tabPane.isDisabled())
+			return;
 		Tab tab = getSelectedTab();
 		if (!tab.isClosable())
 			return;
@@ -305,12 +301,11 @@ class ResultsView extends AnchorPane {
 	 * Does nothing if tabs are disabled.
 	 */
 	void switchTab() {
-		Tab selected = getSelectedTab();
-		if (selected.isDisabled())
+		if (tabPane.isDisabled())
 			return;
 		
 		tabPane.requestFocus();
-		if (isLastTab(selected))
+		if (isLastTab(getSelectedTab()))
 			selectionModel.select(1);
 		else
 			selectionModel.selectNext();
@@ -320,8 +315,13 @@ class ResultsView extends AnchorPane {
 	/**
 	 * Clears search result from currently selected tab in this results view.
 	 * Does nothing if selected tab is a combined results tab.
+	 * 
+	 * @throws IllegalStateException if tabs are disabled
 	 */
 	void clearSelectedResult() {
+		if (tabPane.isDisabled())
+			throw new IllegalStateException("Cannot clear disabled tabs");
+		
 		Tab selected = getSelectedTab();
 		if (selected != combinedResultsTab) {
 			clearTab(selected);
@@ -332,8 +332,13 @@ class ResultsView extends AnchorPane {
 
 	/**
 	 * Clears all search results from this results view.
+	 * 
+	 * @throws IllegalStateException if tabs are disabled
 	 */
 	void clearAllResults() {
+		if (tabPane.isDisabled())
+			throw new IllegalStateException("Cannot clear disabled tabs");
+
 		doForEachTab(this::clearTab);
 		combinedResultsTab.removeReleases();
 	}
@@ -345,8 +350,7 @@ class ResultsView extends AnchorPane {
 	 * @param disable if true, tabs will be disabled
 	 */
 	void disableTabs(boolean disable) {
-		combinedResultsTab.setDisable(disable);
-		doForEachTab(tab -> tab.setDisable(disable));
+		tabPane.setDisable(disable);
 	}
 
 

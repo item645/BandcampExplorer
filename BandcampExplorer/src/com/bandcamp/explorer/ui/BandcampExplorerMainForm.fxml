@@ -53,10 +53,6 @@
                            <font>
                               <Font size="12.0" />
                            </font></Button>
-                        <Button fx:id="cancelSearch" disable="true" layoutX="826.0" layoutY="18.0" minWidth="100.0" mnemonicParsing="false" onAction="#cancelSearch" prefHeight="20.0" prefWidth="100.0" text="Cancel">
-                           <font>
-                              <Font size="12.0" />
-                           </font></Button>
                         <Button fx:id="clearSelected" layoutX="981.0" layoutY="22.0" minWidth="110.0" mnemonicParsing="false" onAction="#clearSelectedResult" prefHeight="20.0" prefWidth="120.0" text="Clear Selected">
                            <font>
                               <Font size="12.0" />
@@ -85,7 +81,6 @@
    <bottom>
       <VBox BorderPane.alignment="CENTER">
          <children>
-            <ProgressBar fx:id="progressBar" maxWidth="1.7976931348623157E308" progress="0.0" />
             <Text fx:id="statusText" strokeType="OUTSIDE" strokeWidth="0.0">
                <HBox.margin>
                   <Insets bottom="5.0" left="10.0" top="5.0" />
@@ -98,6 +93,9 @@
                </VBox.margin>
             </Text>
          </children>
+         <padding>
+            <Insets bottom="5.0" top="5.0" />
+         </padding>
       </VBox>
    </bottom>
 </fx:root>

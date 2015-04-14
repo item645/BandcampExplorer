@@ -77,7 +77,7 @@ public enum SearchType {
 	/**
 	 * Indicates whether search type supports using multiple pages.
 	 */
-	boolean isMultiPage;
+	final boolean isMultiPage;
 
 
 	private SearchType(boolean isMultiPage) {

@@ -212,6 +212,14 @@
                               <Insets bottom="10.0" left="5.0" right="5.0" top="5.0" />
                            </padding>
                         </VBox>
+                        <HBox>
+                           <padding>
+                              <Insets bottom="5.0" left="10.0" />
+                           </padding>
+                           <children>
+                              <Label fx:id="filteredStatusLabel" />
+                           </children>
+                        </HBox>
                         <TableView fx:id="releaseTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" onKeyPressed="#onReleaseTableKeyPress" onMouseClicked="#onReleaseTableMouseClick" prefHeight="700.0" prefWidth="1650.0" tableMenuButtonVisible="true" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" SplitPane.resizableWithParent="false" VBox.vgrow="ALWAYS">
                            <columns>
                               <TableColumn fx:id="artistColumn" prefWidth="300.0" text="Artist" />

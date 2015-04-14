@@ -2,6 +2,7 @@ package com.bandcamp.explorer;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -34,7 +35,7 @@ public final class BandcampExplorer extends Application {
 	/**
 	 * App title with current version number
 	 */
-	private static final String APP_TITLE = "Bandcamp Explorer 0.3.2";
+	private static final String APP_TITLE = "Bandcamp Explorer 0.3.3";
 
 	/**
 	 * A reference to app's top level stage.
@@ -42,10 +43,9 @@ public final class BandcampExplorer extends Application {
 	private Stage primaryStage;
 
 	/**
-	 * Executor service employed for performing asynchronous loading
-	 * operations during search tasks execution.
+	 * Executor service employed for performing various asynchronous operations
 	 */
-	private final ExecutorService searchExecutor = Executors.newFixedThreadPool(6);
+	private final ExecutorService executorService = Executors.newFixedThreadPool(6);
 
 
 
@@ -53,7 +53,7 @@ public final class BandcampExplorer extends Application {
 	public void start(Stage primaryStage) {
 		this.primaryStage = primaryStage;
 		this.primaryStage.setTitle(APP_TITLE);
-		this.primaryStage.setOnCloseRequest(event -> searchExecutor.shutdown());
+		this.primaryStage.setOnCloseRequest(event -> executorService.shutdown());
 
 		try {
 			initUI();
@@ -69,11 +69,11 @@ public final class BandcampExplorer extends Application {
 	 */
 	private void initUI() {
 		// Loading and configuring components
-		configureLogging();
-		BandcampExplorerMainForm mainForm = BandcampExplorerMainForm.getInstance();
-		mainForm.setSearchExecutor(searchExecutor);
-		ReleasePlayerForm.getInstance().setOwner(primaryStage);
-		EventLog.getInstance().setOwner(primaryStage);
+		EventLog eventLog = EventLog.create(primaryStage);
+		configureLogging(eventLog.getLogHandler());
+		ReleasePlayerForm releasePlayer = ReleasePlayerForm.create(primaryStage);
+		BandcampExplorerMainForm mainForm = BandcampExplorerMainForm.create(primaryStage, releasePlayer, eventLog);
+		mainForm.setExecutorService(executorService);
 
 		// When everything's prepared, show app's window
 		primaryStage.setScene(new Scene(mainForm));
@@ -87,13 +87,13 @@ public final class BandcampExplorer extends Application {
 	/**
 	 * Sets up application-wide logging.
 	 */
-	private void configureLogging() {
+	private void configureLogging(Handler eventLogHandler) {
 		LOGGER.setUseParentHandlers(false);
 		LOGGER.setLevel(Level.ALL);
-		LOGGER.addHandler(EventLog.getInstance().getLogHandler());
+		LOGGER.addHandler(eventLogHandler);
 
 		// Make sure to log any uncaught exceptions in JavaFX thread
-		Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> {
+		Thread.currentThread().setUncaughtExceptionHandler((thread, exception) -> {
 			LOGGER.log(Level.SEVERE, "Unexpected error occured in thread \"" + thread.getName() + "\"", exception);
 			Dialogs.messageBox("Unexpected Error: " + exception.getMessage() + 
 					"\n\nSee Event Log for details (Ctrl+E)", "Error", primaryStage);

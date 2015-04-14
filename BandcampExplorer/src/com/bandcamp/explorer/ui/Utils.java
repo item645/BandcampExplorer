@@ -9,12 +9,12 @@ import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.bandcamp.explorer.util.ExceptionUnchecker;
-
 import javafx.fxml.FXMLLoader;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.Region;
+
+import com.bandcamp.explorer.util.ExceptionUnchecker;
 
 /**
  * Contains some general utility stuff for UI.
@@ -91,7 +91,8 @@ class Utils {
 
 	/**
 	 * Launches the default browser and navigates to specified URI.
-	 * If java.awt.Desktop is not supported, does nothing.
+	 * If java.awt.Desktop is not supported, does nothing except logging
+	 * a message about that.
 	 * 
 	 * @param uri URI to open in a browser
 	 */
@@ -104,6 +105,8 @@ class Utils {
 				LOGGER.log(Level.SEVERE, "URL browse error: " + e.getMessage(), e);
 			}
 		}
+		else
+			LOGGER.warning("java.awt.Desktop is not supported");
 	}
 
 

@@ -2,13 +2,12 @@ package com.bandcamp.explorer.ui;
 
 import java.util.Objects;
 
+import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
 import javafx.beans.Observable;
 import javafx.beans.binding.ListBinding;
-import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ListProperty;
-import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleListProperty;
 import javafx.beans.value.ChangeListener;
@@ -48,10 +47,8 @@ class TableViewResizeHelper {
 	private final ChangeListener<Boolean> onTableVBarVisible = this::onTableVBarVisible;
 	private final TableView<?> tableView;
 	private final ObservableList<? extends TableColumn<?,?>> visibleColumns;
-	private final DoubleProperty tableWidth;
 	private final ListProperty<DoubleProperty> columnWidths;
 	private ScrollBar tableVBar;
-	private BooleanProperty tableVBarVisible;
 	private boolean preventUpdate;
 	private boolean enabled;
 
@@ -66,7 +63,6 @@ class TableViewResizeHelper {
 		this.tableView = Objects.requireNonNull(tableView);
 		visibleColumns = tableView.getVisibleLeafColumns();
 
-		tableWidth = new SimpleDoubleProperty(tableView.getWidth());
 		columnWidths = new SimpleListProperty<>();
 	}
 
@@ -79,8 +75,7 @@ class TableViewResizeHelper {
 			return;
 
 		// Adding a listener to track table view width change
-		tableWidth.bind(tableView.widthProperty());
-		tableWidth.addListener(onChangeWidth);
+		tableView.widthProperty().addListener(onChangeWidth);
 
 		// Create a binding between a list of visible columns and list property
 		// that tracks a width of each visible column.
@@ -119,17 +114,19 @@ class TableViewResizeHelper {
 	 * resize policy to resize columns.
 	 */
 	void disable() {
-		tableWidth.unbind();
-		tableWidth.removeListener(onChangeWidth);
+		if (!enabled)
+			return;
+
+		tableView.widthProperty().removeListener(onChangeWidth);
 
 		columnWidths.unbind();
 		columnWidths.get().forEach(width -> width.removeListener(onChangeWidth));
 		columnWidths.removeListener(onChangeWidth);
 
-		tableVBarVisible.unbind();
-		tableVBarVisible.removeListener(onTableVBarVisible);
-		tableVBarVisible = null;
-		tableVBar = null;
+		if (tableVBar != null) {
+			tableVBar.visibleProperty().removeListener(onTableVBarVisible);
+			tableVBar = null;
+		}
 
 		enabled = false;
 	}
@@ -149,11 +146,8 @@ class TableViewResizeHelper {
 				}
 			}
 		}
-		if (tableVBar != null) {
-			tableVBarVisible = new SimpleBooleanProperty(tableVBar.isVisible());
-			tableVBarVisible.bind(tableVBar.visibleProperty());
-			tableVBarVisible.addListener(onTableVBarVisible);
-		}
+		if (tableVBar != null)
+			tableVBar.visibleProperty().addListener(onTableVBarVisible);
 	}
 
 
@@ -166,7 +160,8 @@ class TableViewResizeHelper {
 	 * accordingly (if scrollbar is visible then padding value must be larger).
 	 */
 	private void onTableVBarVisible(Observable observable, Boolean oldValue, Boolean newValue) {
-		updateLastColumnWidth(newValue ? tableVBar.getWidth() + 2 : 2);
+		// for some reason this works properly only with delayed update
+		Platform.runLater(() -> updateLastColumnWidth(newValue ? tableVBar.getWidth() : 2));
 	}
 
 
@@ -178,7 +173,7 @@ class TableViewResizeHelper {
 	private void onChangeWidth(Observable o) {
 		if (tableVBar == null)
 			initTableVBar();
-		updateLastColumnWidth(tableVBar != null && tableVBar.isVisible() ? tableVBar.getWidth() + 2 : 2);
+		updateLastColumnWidth(tableVBar != null && tableVBar.isVisible() ? tableVBar.getWidth() : 2);
 	}
 
 
@@ -199,9 +194,9 @@ class TableViewResizeHelper {
 		for (int i = 0; i < columnWidths.size(); i++)
 			columnWidthTotal += columnWidths.get(i).get();
 		TableColumn<?,?> lastColumn = visibleColumns.get(visibleColumns.size() - 1);
-		lastColumn.setPrefWidth(lastColumn.getWidth() + (tableWidth.get() - columnWidthTotal) - padding);
+		lastColumn.setPrefWidth(lastColumn.getWidth() + (tableView.getWidth() - columnWidthTotal) - padding);
 
 		preventUpdate = false;
 	}
-	
+
 }

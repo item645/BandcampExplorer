@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
@@ -70,15 +71,9 @@ public class ReleasePlayerForm extends SplitPane {
 	private static final ImageView PREVIOUS_ICON = new ImageView(loadIcon("player_previous.png"));
 	private static final ImageView NEXT_ICON     = new ImageView(loadIcon("player_next.png"));
 
-	/**
-	 * Single instance of release player form component
-	 */
-	private static final ReleasePlayerForm INSTANCE = Utils.loadFXMLComponent(
-			ReleasePlayerForm.class.getResource("ReleasePlayerForm.fxml"),
-			ReleasePlayerForm::new);
+	private static ReleasePlayerForm INSTANCE;
 
-	
-	private Stage stage;
+	private final Stage stage;
 	@FXML private Button loadReleaseButton;
 	@FXML private Button unloadReleaseButton;
 	@FXML private Button previousButton;
@@ -303,13 +298,13 @@ public class ReleasePlayerForm extends SplitPane {
 			player = new MediaPlayer(new Media(track.getFileLink()));
 			this.track = track;
 
+			setStateTransitionHandlers();
+			
 			highlightCurrentTrack();
 
 			player.setVolume(volumeSlider.getValue() / volumeSlider.getMax());
 			player.currentTimeProperty().addListener(observable -> updateTrackProgress());
 			nowPlayingInfo.setText(LOADING_TRACK_MSG);
-
-			setStateTransitionHandlers();
 
 			timeSlider.setDisable(false);
 			timeSlider.valueProperty().addListener(
@@ -563,11 +558,19 @@ public class ReleasePlayerForm extends SplitPane {
 		 * elapsed/total track time.
 		 */
 		private void updateTrackProgress() {
+			if (player == null)
+				// This can happen if quit() was called right before media player
+				// has completed its internal event processing (as a result, the update
+				// to a registered listener has been placed _after_ the call to quit() on
+				// JavaFX event queue)
+				return;
+
 			Duration currentTime = player.getCurrentTime();
 			long second = currentTime.equals(player.getStopTime()) 
 					? Math.round(currentTime.toSeconds()) : (long)currentTime.toSeconds();
 			if (second == currentSecond)
-				return; // prevents updating more than once in a second
+				// prevents updating more than once in a second
+				return;
 			else
 				currentSecond = second;
 
@@ -609,7 +612,24 @@ public class ReleasePlayerForm extends SplitPane {
 	}
 
 
-	private ReleasePlayerForm() {}
+	/**
+	 * Creates an instance of release player form.
+	 */
+	private ReleasePlayerForm(Window owner) {
+		stage = new Stage();
+		stage.initOwner(owner);
+		stage.setTitle(NO_RELEASE_TITLE);
+		stage.setResizable(false);
+		stage.setOnCloseRequest(event -> {
+			stage.hide();
+			event.consume();
+		});
+		stage.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+			if (event.getCode() == KeyCode.ESCAPE)
+				stage.hide();
+		});
+		stage.setScene(new Scene(this));
+	}
 
 
 	/**
@@ -625,25 +645,22 @@ public class ReleasePlayerForm extends SplitPane {
 
 
 	/**
-	 * Returns a reference to a release player form component.
-	 */
-	public static ReleasePlayerForm getInstance() {
-		return INSTANCE;
-	}
-
-
-	/**
-	 * Sets the owner window for player's top stage.
-	 * This method is used to set the primary stage as an owner to ensure
-	 * that when primary window is closing, player window will be automatically
-	 * closed as well.
+	 * Creates an instance of release player form component.
 	 * 
-	 * @param owner an owner window
-	 * @throws NullPointerException if player's top stage is not yet initialized
-	 * @throws IllegalStateException if top stage has already been made visible
+	 * @param owner the owner of player form window
+	 * @throws NullPointerException if owner is null
+	 * @throws IllegalStateException if this method has been called more than once
 	 */
-	public void setOwner(Window owner) {
-		stage.initOwner(owner);
+	public static ReleasePlayerForm create(Window owner) {
+		if (!Platform.isFxApplicationThread())
+			throw new IllegalStateException("This component can be created only from Java FX Application Thread");
+		if (INSTANCE != null)
+			throw new IllegalStateException("This component can't be instantiated more than once");
+		Objects.requireNonNull(owner);
+		
+		return (INSTANCE = Utils.loadFXMLComponent(
+				ReleasePlayerForm.class.getResource("ReleasePlayerForm.fxml"),
+				() -> new ReleasePlayerForm(owner)));
 	}
 
 
@@ -700,7 +717,7 @@ public class ReleasePlayerForm extends SplitPane {
 			trackListView.clear();
 			trackListView.addAll(tracks);
 			// Grow list of play buttons to match number of tracks on release so references
-			// to new buttons can later be added via trackListView.getPlayPuttons().set
+			// to new buttons can later be added via trackListView.playPuttons.set()
 			// on cells construction
 			tracks.forEach(track -> trackListView.playButtons.add(null));
 			
@@ -712,6 +729,7 @@ public class ReleasePlayerForm extends SplitPane {
 			// Show the window
 			stage.setTitle(release.getArtist() + " - " + release.getTitle());
 			show();
+			stage.requestFocus();
 			playButton.requestFocus();
 		}
 		else {
@@ -743,25 +761,6 @@ public class ReleasePlayerForm extends SplitPane {
 		.append('\n').append(release.getInformation()).append('\n')
 		.append('\n').append(release.getCredits())
 		.toString();
-	}
-
-
-	/**
-	 * Loads a top level stage for this player.
-	 */
-	private void initStage() {
-		stage = new Stage();
-		stage.setTitle(NO_RELEASE_TITLE);
-		stage.setResizable(false);
-		stage.setOnCloseRequest(event -> {
-			stage.hide();
-			event.consume();
-		});
-		stage.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-			if (event.getCode() == KeyCode.ESCAPE)
-				stage.hide();
-		});
-		stage.setScene(new Scene(this));
 	}
 
 
@@ -819,7 +818,7 @@ public class ReleasePlayerForm extends SplitPane {
 				} 
 				catch (Exception e) {
 					String errMsg = "Error loading release: " + e;
-					LOGGER.log(Level.SEVERE, errMsg, e);
+					LOGGER.log(Level.WARNING, errMsg, e);
 					Dialogs.messageBox(errMsg, "Error", stage);
 				}
 			}
@@ -869,8 +868,6 @@ public class ReleasePlayerForm extends SplitPane {
 	@FXML
 	private void initialize() {
 		checkComponents();
-
-		initStage();
 
 		trackListView = new TrackListView(tracksTableView);
 

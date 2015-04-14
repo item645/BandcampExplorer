@@ -17,6 +17,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.collections.FXCollections;
 import javafx.collections.ModifiableObservableListBase;
 import javafx.collections.ObservableList;
@@ -70,6 +71,7 @@ class ReleaseTableView extends AnchorPane {
 	@FXML private Button applyFilter;
 	@FXML private Button resetFilter;
 	@FXML private Button showPlayer;
+	@FXML private Label filteredStatusLabel;
 	@FXML private TableView<Release> releaseTableView;
 	@FXML private TableColumn<Release, String> artistColumn;
 	@FXML private TableColumn<Release, String> titleColumn;
@@ -95,6 +97,9 @@ class ReleaseTableView extends AnchorPane {
 			return new ByteArrayInputStream(out.toByteArray());
 		}
 	});
+
+	private final BandcampExplorerMainForm mainForm;
+	private final ReleasePlayerForm releasePlayer;
 
 	private final EnumSet<Release.DownloadType> selectedDownloadTypes = EnumSet.allOf(Release.DownloadType.class);
 
@@ -189,16 +194,14 @@ class ReleaseTableView extends AnchorPane {
 			searchArtist.setOnAction(event -> {
 				Release release = getSelectedRelease();
 				if (release != null)
-					BandcampExplorerMainForm.getInstance().searchReleases(
-							release.getArtist(), SearchType.SEARCH, true);
+					mainForm.searchReleases(release.getArtist(), SearchType.SEARCH, true);
 			});
 
 			MenuItem moreFromDomain = new MenuItem("More Releases from this Domain");
 			moreFromDomain.setOnAction(event -> {
 				Release release = getSelectedRelease();
 				if (release != null)
-					BandcampExplorerMainForm.getInstance().searchReleases(
-							release.getDiscographyURI().toString(), SearchType.DIRECT, true);
+					mainForm.searchReleases(release.getDiscographyURI().toString(), SearchType.DIRECT, true);
 			});
 
 			MenuItem viewOnBandcamp = new MenuItem("View on Bandcamp");
@@ -260,15 +263,29 @@ class ReleaseTableView extends AnchorPane {
 	}
 
 
-	private ReleaseTableView() {}
+	/**
+	 * Creates an instance of release table view component.
+	 * 
+	 * @param mainForm reference to app's main form
+	 * @param releasePlayer reference to a release player
+	 */
+	private ReleaseTableView(BandcampExplorerMainForm mainForm, ReleasePlayerForm releasePlayer) {
+		this.mainForm = mainForm;
+		this.releasePlayer = releasePlayer;
+	}
 
 
 	/**
-	 * Loads a release table view component.
+	 * Creates an instance of release table view component.
+	 * 
+	 * @param mainForm reference to app's main form
+	 * @param releasePlayer reference to a release player
 	 */
-	static ReleaseTableView load() {
+	static ReleaseTableView create(BandcampExplorerMainForm mainForm, ReleasePlayerForm releasePlayer) {
+		assert mainForm != null;
+		assert releasePlayer != null;
 		FXML_STREAM.reset(); // for BAIS reset is always supported
-		return Utils.loadFXMLComponent(FXML_STREAM, ReleaseTableView::new);
+		return Utils.loadFXMLComponent(FXML_STREAM, () -> new ReleaseTableView(mainForm, releasePlayer));
 	}
 
 
@@ -390,7 +407,7 @@ class ReleaseTableView extends AnchorPane {
 	private void playSelectedRelease() {
 		Release release = getSelectedRelease();
 		if (release != null)
-			Platform.runLater(() -> ReleasePlayerForm.getInstance().setRelease(release));
+			Platform.runLater(() -> releasePlayer.setRelease(release));
 	}
 
 
@@ -408,7 +425,7 @@ class ReleaseTableView extends AnchorPane {
 	 */
 	@FXML
 	private void showPlayer() {
-		ReleasePlayerForm.getInstance().show();
+		releasePlayer.show();
 	}
 
 
@@ -447,6 +464,11 @@ class ReleaseTableView extends AnchorPane {
 		publishDateFilterTo.addEventFilter(KeyEvent.KEY_PRESSED, this::onFilterKeyPress);
 		releaseDateFilterTo.addEventFilter(KeyEvent.KEY_PRESSED, this::onFilterKeyPress);
 
+		filteredStatusLabel.textProperty().bind(
+				Bindings.createStringBinding(
+						() -> String.format(
+								"Displaying: %1$s of %2$s", filteredItems.size(), items.size()), filteredItems));
+		
 		releaseTableView.setItems(sortedItems);
 		sortedItems.comparatorProperty().bind(releaseTableView.comparatorProperty());
 
@@ -538,6 +560,7 @@ class ReleaseTableView extends AnchorPane {
 		// copy-pasted from SceneBuilder's "sample controller skeleton" window
 		assert publishDateFilterFrom != null : "fx:id=\"publishDateFilterFrom\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert resetFilter != null : "fx:id=\"resetFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
+		assert filteredStatusLabel != null : "fx:id=\"filterStatusText\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert publishDateFilterTo != null : "fx:id=\"publishDateFilterTo\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert tagsColumn != null : "fx:id=\"tagsColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert dlTypeColumn != null : "fx:id=\"dlTypeColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";

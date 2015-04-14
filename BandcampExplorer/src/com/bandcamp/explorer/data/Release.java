@@ -186,6 +186,7 @@ public final class Release {
 				throw new IOException("Release data is not valid or cannot be located", e);
 			}
 
+			this.uri = new ReadOnlyObjectWrapper<>(uri).getReadOnlyProperty();
 			artist_ = Objects.toString(property("artist", String.class));
 			title_ = Objects.toString(property("current.title", String.class));
 			releaseDate_ = propertyDate("album_release_date");
@@ -199,7 +200,6 @@ public final class Release {
 			int time_ = tracks.stream().collect(Collectors.summingInt(track -> track.getTime().getSeconds()));
 
 			// Wrapping all necessary stuff in JFX-compliant properties
-			this.uri = new ReadOnlyObjectWrapper<>(uri).getReadOnlyProperty();
 			artist = new ReadOnlyStringWrapper(artist_).getReadOnlyProperty();
 			title = new ReadOnlyStringWrapper(title_).getReadOnlyProperty();
 			downloadType = new ReadOnlyObjectWrapper<>(downloadType_).getReadOnlyProperty();
@@ -455,7 +455,7 @@ public final class Release {
 	 * To log errors encountered when reading individual properties from JSON.
 	 */
 	private void logError(Exception e) {
-		LOGGER.log(Level.SEVERE, "Error processing release data: " + uri.get() + " (" + e.getMessage() + ")", e);
+		LOGGER.log(Level.WARNING, "Error processing release data: " + uri.get() + " (" + e.getMessage() + ")", e);
 	}
 
 
