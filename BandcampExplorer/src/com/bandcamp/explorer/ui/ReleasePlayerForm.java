@@ -1,5 +1,6 @@
 package com.bandcamp.explorer.ui;
 
+import java.net.URI;
 import java.net.URL;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -276,6 +277,7 @@ public class ReleasePlayerForm extends SplitPane {
 		private ChangeListener<Number> volumeSliderValueListener;
 		private long currentSecond = -1;
 		private boolean preventTimeSliderSeek;
+		private boolean quit = true;
 
 
 		/**
@@ -297,6 +299,7 @@ public class ReleasePlayerForm extends SplitPane {
 				quit();
 			player = new MediaPlayer(new Media(track.getFileLink()));
 			this.track = track;
+			quit = false;
 
 			setStateTransitionHandlers();
 			
@@ -309,13 +312,14 @@ public class ReleasePlayerForm extends SplitPane {
 			timeSlider.setDisable(false);
 			timeSlider.valueProperty().addListener(
 				timeSliderValueListener = (observable, oldValue, newValue) -> {
-					if (!preventTimeSliderSeek)
+					if (!quit && !preventTimeSliderSeek)
 						player.seek(duration.multiply(newValue.doubleValue() / timeSlider.getMax()));
 			});
 			volumeSlider.setDisable(false);
 			volumeSlider.valueProperty().addListener(
 				volumeSliderValueListener = (observable, oldValue, newValue) -> {
-					player.setVolume(newValue.doubleValue() / volumeSlider.getMax());
+					if (!quit)
+						player.setVolume(newValue.doubleValue() / volumeSlider.getMax());
 			});
 
 			disablePlayerButtons(false);
@@ -343,8 +347,10 @@ public class ReleasePlayerForm extends SplitPane {
 		 */
 		private void setStateTransitionHandlers() {
 			player.setOnReady(() -> {
-				duration = player.getMedia().getDuration();
-				updateTrackProgress();
+				if (!quit) {
+					duration = player.getMedia().getDuration();
+					updateTrackProgress();
+				}
 			});
 			player.setOnPlaying(() -> {
 				playButton.setGraphic(PAUSE_ICON);
@@ -366,24 +372,28 @@ public class ReleasePlayerForm extends SplitPane {
 				nowPlayingInfo.setText(LOADING_TRACK_MSG);
 			});
 			player.setOnEndOfMedia(() -> {
-				Track next = trackListView.getNextPlayableTrack(track);
-				if (next != null) {
-					updateTrackProgress();
-					setTrack(next);
-					play();
-				}
-				else {
-					stop();
-					updateTrackProgress();
+				if (!quit) {
+					Track next = trackListView.getNextPlayableTrack(track);
+					if (next != null) {
+						updateTrackProgress();
+						setTrack(next);
+						play();
+					}
+					else {
+						stop();
+						updateTrackProgress();
+					}
 				}
 			});
 			player.setOnError(() -> {
-				MediaException e = player.getError();
-				if (e != null) {
-					LOGGER.log(Level.SEVERE, "Audio Player Error: " + e.getMessage(), e);
-					Dialogs.messageBox(e.getMessage(), "Audio Player Error", stage);
+				if (!quit) {
+					MediaException e = player.getError();
+					if (e != null) {
+						LOGGER.log(Level.SEVERE, "Audio Player Error: " + e.getMessage(), e);
+						Dialogs.messageBox(e.getMessage(), "Audio Player Error", stage);
+					}
+					quit();
 				}
-				quit();
 			});
 		}
 
@@ -448,6 +458,7 @@ public class ReleasePlayerForm extends SplitPane {
 		 * and resetting its state values to default.
 		 */
 		void quit() {
+			quit = true;
 			if (player != null) {
 				player.dispose();
 				player = null;
@@ -521,6 +532,9 @@ public class ReleasePlayerForm extends SplitPane {
 		 * audio player current state.
 		 */
 		private void updateTrackListButtons() {
+			if (quit)
+				return;
+
 			int thisTrackIndex = track.getNumber() - 1;
 			for (int i = 0; i < trackListView.playButtons.size(); i++) {
 				TrackListButton button = trackListView.playButtons.get(i);
@@ -558,11 +572,7 @@ public class ReleasePlayerForm extends SplitPane {
 		 * elapsed/total track time.
 		 */
 		private void updateTrackProgress() {
-			if (player == null)
-				// This can happen if quit() was called right before media player
-				// has completed its internal event processing (as a result, the update
-				// to a registered listener has been placed _after_ the call to quit() on
-				// JavaFX event queue)
+			if (quit)
 				return;
 
 			Duration currentTime = player.getCurrentTime();
@@ -814,7 +824,7 @@ public class ReleasePlayerForm extends SplitPane {
 				try {
 					if (!u.startsWith("http://") && !u.startsWith("https://"))
 						u = "http://" + u;
-					setRelease(Release.forURL(u));
+					setRelease(Release.forURI(URI.create(u)));
 				} 
 				catch (Exception e) {
 					String errMsg = "Error loading release: " + e;

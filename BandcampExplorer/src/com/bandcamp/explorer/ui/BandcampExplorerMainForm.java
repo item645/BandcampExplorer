@@ -53,7 +53,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 	private final ResultsView resultsView;
 	private final ReleasePlayerForm releasePlayer;
 	private final EventLog eventLog;
-	private final StatusProgressBar progressBar;
+	private final ProgressBarDialog progressBar;
 	private ExecutorService executorService;
 
 	/**
@@ -68,7 +68,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 	private BandcampExplorerMainForm(Stage primaryStage, ReleasePlayerForm releasePlayer, EventLog eventLog) {
 		this.releasePlayer = releasePlayer;
 		this.eventLog = eventLog;
-		this.progressBar = StatusProgressBar.create(primaryStage);
+		this.progressBar = ProgressBarDialog.create(primaryStage);
 
 		setCenter(this.resultsView = ResultsView.create(this, releasePlayer));
 
@@ -212,7 +212,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 			progressBar.initProgress(task.progressProperty());
 			progressBar.show();
 
-			String report = String.format(" search: %1$s: \"%2$s\" (%3$d %4$s)",
+			String report = String.format(" search: %1$s: %2$s (%3$d %4$s)",
 					params.searchType(),
 					params.searchQuery(),
 					params.pages(),

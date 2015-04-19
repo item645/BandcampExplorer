@@ -1,7 +1,10 @@
 package com.bandcamp.explorer.data;
 
 import java.io.IOException;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
 import java.net.URI;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -16,6 +19,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -33,6 +42,7 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
+
 /**
  * Represents a release on Bandcamp website which can be either
  * album or single track.
@@ -40,6 +50,11 @@ import javax.script.ScriptException;
 public final class Release {
 
 	private static final Logger LOGGER = Logger.getLogger(Release.class.getName());
+
+	/**
+	 * Thread-safe cache for storing and reusing instantiated Release objects.
+	 */
+	private static final ReleaseCache RELEASE_CACHE = new ReleaseCache();
 
 	/**
 	 * Pattern to locate a release data within HTML page. The data is defined in JSON format
@@ -99,6 +114,7 @@ public final class Release {
 	private final String credits;
 
 
+
 	/**
 	 * Defines possible download types for release.
 	 */
@@ -132,20 +148,173 @@ public final class Release {
 
 
 	/**
-	 * Returns the release corresponding to the specified Bandcamp URL string.
-	 * If release object for this URL string is available in cache,
+	 * Implements a thread-safe caching mechanism for storing and reusing
+	 * instantiated Release objects.
+	 */
+	private static class ReleaseCache {
+		/*
+		 * The implementation is loosely based on "Memoizer" example from
+		 * "Java Concurrency in Practice" book (Section 5.6.) with added support
+		 * for weak reference values and automatic cleanup of stale entries.
+		 */
+
+		/**
+		 * An instance of concurrent hash map used for actual storage
+		 */
+		private final ConcurrentMap<String, FutureTask<CacheValue>> cache = new ConcurrentHashMap<>(500, 0.75f, 7);
+
+		/**
+		 * Reference queue used for tracking down GC'ed releases
+		 */
+		private final ReferenceQueue<Release> refQueue = new ReferenceQueue<>();
+
+
+		/**
+		 * Instantiates a release cache.
+		 */
+		ReleaseCache() {
+			// Dedicated thread to perform automatic removal of
+			// stale entries from the cache
+			Thread cleanupThread = new Thread(() -> {
+				while (true) {
+					try {
+						while (true) {
+							// Once release is marked by GC and its reference appended to
+							// queue, we need to remove corresponding cache entry.
+							// Before removal we must check that reference obtained from
+							// the queue is actually the same as the one stored in cache
+							// at the moment. Thus we ensure that, in case some other
+							// thread has concurrently updated the entry to a new value,
+							// we won't remove the updated value, but only stale one.
+							CacheValue staleValue = (CacheValue)refQueue.remove();
+							FutureTask<CacheValue> valueTask = cache.get(staleValue.id);
+							if (valueTask.isDone()) {
+								try {
+									if (valueTask.get() == staleValue) {
+										cache.remove(staleValue.id, valueTask);
+										LOGGER.finer("Purged from cache: " + staleValue.id);
+									}
+								}
+								catch (ExecutionException ignored) {}
+							}
+						}
+					}
+					catch (InterruptedException whoCares) {
+						// We don't need to restore interruption status here because
+						// there is no code higher up on the call stack that would be
+						// dealing with it.
+						// The only thing we want to do in case of possible interruption
+						// is to continue our work until program's exit.
+					}
+				}
+			}, "Release Cache Cleanup");
+			cleanupThread.setDaemon(true);
+			cleanupThread.start();
+		}
+
+
+		/**
+		 * Returns the release with the specified identifier.
+		 * If Release object with such ID is available in cache, it is returned.
+		 * Otherwise, instantiator function is used to instantiate the release.
+		 * Newly created object is stored in cache and returned as a result.
+		 * 
+		 * @param id release identifier
+		 * @param instantiator a callback function used to load the release if
+		 *        it is not in cache yet; the function must not return null when invoked
+		 *        and must not involve direct or indirect call to {@link ReleaseCache#getRelease}
+		 * @return a release
+		 * @throws IOException if there was an IO error while loading release web page
+		 *         or if release page does not contain valid data
+		 * @throws RuntimeException wraps any other exception (checked or unchecked)
+		 *         that might occur during release instantiation or internal operations
+		 *         within a cache
+		 */
+		Release getRelease(String id, Callable<Release> instantiator) throws IOException {
+			assert id != null;
+			assert instantiator != null;
+
+			while (true) {
+				FutureTask<CacheValue> task = cache.get(id);
+				if (task == null) {
+					FutureTask<CacheValue> task1 = new FutureTask<>(
+							() -> new CacheValue(id, instantiator.call(), refQueue));
+					task = cache.putIfAbsent(id, task1); // make sure that second "check-then-act" sequence is atomic
+					if (task == null)
+						(task = task1).run();
+				}
+				try {
+					Release release = task.get().get();
+					if (release == null)
+						// Result being null means that weak reference, previously available in cache,
+						// has been cleared by GC and we obtained cleared value before cleanup thread had
+						// a chance to remove stale entry.
+						// In this case we need to remove the entry (only if it still holds the same completed
+						// future task with cleared result) and fall through to the beginning of the loop to
+						// repeat the whole sequence once again.
+						cache.remove(id, task);
+					else
+						return release;
+				}
+				catch (CancellationException | InterruptedException | ExecutionException e) {
+					cache.remove(id, task);
+					if (e instanceof InterruptedException)
+						Thread.currentThread().interrupt();
+					else if (e instanceof ExecutionException) {
+						Throwable cause = e.getCause();
+						if (cause instanceof IOException)
+							throw (IOException)cause;
+					}
+					throw new RuntimeException(e);
+				}
+			}
+		}
+
+	}
+
+
+
+	/**
+	 * Weak reference wrapper for Release object together with its identifier,
+	 * representing a cache value.
+	 */
+	private static class CacheValue extends WeakReference<Release> {
+		/**
+		 * Release ID
+		 */
+		final String id;
+
+		/**
+		 * Constructs new cache value.
+		 * 
+		 * @param id release ID
+		 * @param release release object
+		 * @param refQueue reference queue
+		 * @throws NullPointerException if release object is null
+		 */
+		CacheValue(String id, Release release, ReferenceQueue<Release> refQueue) {
+			super(Objects.requireNonNull(release), refQueue);
+			this.id = id;
+		}
+
+	}
+
+
+
+	/**
+	 * Returns the release corresponding to the specified Bandcamp URI.
+	 * If release object for this URI is available in cache,
 	 * then cached version is returned. Otherwise, new release object is
-	 * created, using data loaded from the URL, added to cache and then returned.
+	 * created, using data loaded from the URI, added to cache and then returned.
 	 * 
-	 * @param url URL string representing a location to load release from
+	 * @param uri a URI representing a location to load release from
+	 * @return a release object
 	 * @throws IOException if there was an IO error while loading release web page
 	 *         or if release page does not contain valid data
-	 * @throws NullPointerException if url is null
-	 * @throws IllegalArgumentException if supplied URL string is not valid
+	 * @throws NullPointerException if uri is null
 	 */
-	public static Release forURL(String url) throws IOException {
-		URI uri = URI.create(url);
-		return ReleaseCache.INSTANCE.getRelease(createID(uri), () -> {
+	public static Release forURI(URI uri) throws IOException {
+		return RELEASE_CACHE.getRelease(createID(uri), () -> {
 			LOGGER.info("Loading release: " + uri);
 			return new Release(uri);
 		});
@@ -153,13 +322,15 @@ public final class Release {
 
 
 	/**
-	 * Creates unique identifier for release, derived from the URI in a way
-	 * that such ID represents a release location at Bandcamp website.
+	 * Creates unique identifier for release, derived from its URI in a way
+	 * that such ID represents release location at Bandcamp website. The resulting ID
+	 * includes host and path to a release and omits any other insignificant information,
+	 * such as protocol, port, any possible query and fragment part, and character case.
 	 * 
 	 * @param uri a URI
 	 * @return unique ID
 	 */
-	private static String createID(URI uri) {
+	static String createID(URI uri) {
 		return (uri.getHost() + uri.getPath()).toLowerCase(Locale.ROOT);
 	}
 
@@ -172,7 +343,12 @@ public final class Release {
 	 *         or if release page does not contain valid data
 	 */
 	private Release(URI uri) throws IOException {
-		try (Scanner input = new Scanner(uri.toURL().openStream(), StandardCharsets.UTF_8.name())) {
+		URLConnection connection = uri.toURL().openConnection();
+		// 60 seconds timeout for both connect and read
+		connection.setConnectTimeout(60000);
+		connection.setReadTimeout(60000);
+
+		try (Scanner input = new Scanner(connection.getInputStream(), StandardCharsets.UTF_8.name())) {
 			String artist_, title_;
 			DownloadType downloadType_;
 			LocalDate releaseDate_, publishDate_;
@@ -241,9 +417,9 @@ public final class Release {
 
 
 	/**
-	 * Loads a set of tags for this release.
+	 * Loads a set of tags for this release, fetching them from the input source.
 	 */
-	private Set<String> loadTags(Scanner input) {
+	private static Set<String> loadTags(Scanner input) {
 		// Tags are not included in JSON data so we need to fetch them from raw HTML.
 		// Resetting to 0 position is not required here because tags are located
 		// after TralbumData in HTML source.
@@ -473,8 +649,8 @@ public final class Release {
 	 * 
 	 * Two releases are deemed equal if they were loaded from the same location
 	 * at Bandcamp website. Strictly speaking, they are equal if their originating
-	 * URLs contain same host and path (ignoring protocols, ports, any possible query
-	 * and fragments parts, and character case).
+	 * URIs contain same host and path (ignoring protocols, ports, any possible query
+	 * and fragment parts, and character case).
 	 * 
 	 * Sometimes the same actual release can reside on more than one Bandcamp page
 	 * (for example, one on artist page and another on label page).

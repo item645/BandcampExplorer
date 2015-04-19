@@ -80,4 +80,16 @@ public final class SearchResult implements Iterable<Release> {
 		return Collections.unmodifiableCollection(result).iterator();
 	}
 
+
+	/** 
+	 * Converts this search result to its string representation.
+	 */
+	@Override
+	public String toString() {
+		return new StringBuilder(searchParams.searchType().toString())
+		.append(": ").append(searchParams.searchQuery()).append(" (").append(searchParams.pages())
+		.append(searchParams.pages() > 1 ? " pages" : " page").append(", ").append(result.size())
+		.append(" releases found)").toString();
+	}
+
 }

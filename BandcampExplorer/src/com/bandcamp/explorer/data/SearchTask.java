@@ -6,7 +6,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -92,8 +91,11 @@ public final class SearchTask extends Task<SearchResult> {
 					() -> searchParams.searchType().loadPage(searchParams.searchQuery(), pageNum, this)));
 		}
 
-		// Collecting loaders for all releases found during search
-		List<Callable<Release>> releaseLoaders = new ArrayList<>();
+		// Collecting loaders for all release URLs found during search.
+		// We use a hash set here to make sure that we won't have more than one
+		// loader for each unique release URL string, because Bandcamp search and tag
+		// pages with different numbers can duplicate same releases.
+		Set<ReleaseLoader> releaseLoaders = new HashSet<>();
 		for (Future<Page> page : pages)
 			releaseLoaders.addAll(page.get().getReleaseLoaders());
 
@@ -111,7 +113,7 @@ public final class SearchTask extends Task<SearchResult> {
 		releaseLoaders.forEach(completionService::submit);
 
 		// Gathering loaded Release objects
-		Set<Release> releases = new HashSet<>();
+		List<Release> releases = new ArrayList<>();
 		for (int i = 1; i <= numTasks; i++) {
 			if (isCancelled())
 				return new SearchResult(searchParams);

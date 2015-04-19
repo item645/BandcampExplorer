@@ -21,7 +21,8 @@ public class SearchParams {
 		private final String searchQuery;
 		private final SearchType searchType;
 		private int pages = 1;
-		private Comparator<Release> sortOrder = ReleaseSortOrder.PUBLISH_DATE_DESC;
+		private Comparator<Release> sortOrder = 
+				ReleaseSortOrder.PUBLISH_DATE_DESC.thenComparing(ReleaseSortOrder.ARTIST_AND_TITLE);
 
 
 		/**

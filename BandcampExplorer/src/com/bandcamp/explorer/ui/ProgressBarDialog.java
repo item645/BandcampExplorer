@@ -16,13 +16,13 @@ import javafx.stage.StageStyle;
 import javafx.stage.Window;
 
 /**
- * Controller class for StatusProgressBar component.
- * StatusProgressBar is a progress bar window that is capable of displaying a
+ * Controller class for ProgressBarDialog component.
+ * ProgressBarDialog is a progress bar window that is capable of displaying a
  * status text corresponding to the current state of operation,
  * optionally allowing to cancel the operation using Cancel button or by
- * closing progress bar window.
+ * closing the window.
  */
-class StatusProgressBar extends AnchorPane {
+class ProgressBarDialog extends AnchorPane {
 
 	@FXML private ProgressBar progressBar;
 	@FXML private Text statusText;
@@ -36,7 +36,7 @@ class StatusProgressBar extends AnchorPane {
 	/**
 	 * Creates an instance of progress bar.
 	 */
-	private StatusProgressBar(Window owner) {
+	private ProgressBarDialog(Window owner) {
 		stage = new Stage();
 		stage.initOwner(owner);
 		stage.initStyle(StageStyle.UTILITY);
@@ -53,11 +53,11 @@ class StatusProgressBar extends AnchorPane {
 	 * 
 	 * @param owner the owner of progress bar window
 	 */
-	static StatusProgressBar create(Window owner) {
+	static ProgressBarDialog create(Window owner) {
 		assert owner != null;
 		return Utils.loadFXMLComponent(
-				StatusProgressBar.class.getResource("StatusProgressBar.fxml"),
-				() -> new StatusProgressBar(owner));
+				ProgressBarDialog.class.getResource("ProgressBarDialog.fxml"),
+				() -> new ProgressBarDialog(owner));
 	}
 
 
@@ -192,9 +192,9 @@ class StatusProgressBar extends AnchorPane {
 	 */
 	@FXML
 	private void initialize() {
-		assert cancelButton != null : "fx:id=\"cancelButton\" was not injected: check your FXML file 'StatusProgressBar.fxml'.";
-		assert statusText != null : "fx:id=\"statusText\" was not injected: check your FXML file 'StatusProgressBar.fxml'.";
-		assert progressBar != null : "fx:id=\"progressBar\" was not injected: check your FXML file 'StatusProgressBar.fxml'.";
+		assert cancelButton != null : "fx:id=\"cancelButton\" was not injected: check your FXML file 'ProgressBarDialog.fxml'.";
+		assert statusText != null : "fx:id=\"statusText\" was not injected: check your FXML file 'ProgressBarDialog.fxml'.";
+		assert progressBar != null : "fx:id=\"progressBar\" was not injected: check your FXML file 'ProgressBarDialog.fxml'.";
 
 		cancelButton.setOnKeyPressed(event -> {
 			if (event.getCode() == KeyCode.ENTER)

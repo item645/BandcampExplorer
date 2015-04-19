@@ -94,7 +94,7 @@ public final class BandcampExplorer extends Application {
 
 		// Make sure to log any uncaught exceptions in JavaFX thread
 		Thread.currentThread().setUncaughtExceptionHandler((thread, exception) -> {
-			LOGGER.log(Level.SEVERE, "Unexpected error occured in thread \"" + thread.getName() + "\"", exception);
+			LOGGER.log(Level.SEVERE, "Unexpected error occurred in thread \"" + thread.getName() + "\"", exception);
 			Dialogs.messageBox("Unexpected Error: " + exception.getMessage() + 
 					"\n\nSee Event Log for details (Ctrl+E)", "Error", primaryStage);
 		});

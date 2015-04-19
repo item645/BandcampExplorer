@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.logging.Logger;
 
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.BooleanProperty;
@@ -24,13 +25,14 @@ import javafx.scene.layout.AnchorPane;
 
 import com.bandcamp.explorer.data.Release;
 import com.bandcamp.explorer.data.ReleaseSortOrder;
-import com.bandcamp.explorer.data.SearchParams;
 import com.bandcamp.explorer.data.SearchResult;
 
 /**
  * Controller class for results view component.
  */
 class ResultsView extends AnchorPane {
+
+	private static final Logger LOGGER = Logger.getLogger(ResultsView.class.getName());
 
 	private final BandcampExplorerMainForm mainForm;
 	private final ReleasePlayerForm releasePlayer;
@@ -133,7 +135,7 @@ class ResultsView extends AnchorPane {
 		 */
 		private void updateCombinedReleases(Collection<Release> releases) {
 			List<Release> list = new ArrayList<>(releases);
-			list.sort(ReleaseSortOrder.PUBLISH_DATE_DESC);
+			list.sort(ReleaseSortOrder.PUBLISH_DATE_DESC.thenComparing(ReleaseSortOrder.ARTIST_AND_TITLE));
 			combinedReleases.clear();
 			combinedReleases.addAll(list);
 		}
@@ -198,18 +200,21 @@ class ResultsView extends AnchorPane {
 	void addTab() {
 		if (tabPane.isDisabled())
 			return;
-		
+
 		Tab tab = new Tab("New search (" + ++tabIndex + ")");
+		tab.setContent(ReleaseTableView.create(mainForm, releasePlayer));
 		tab.setOnCloseRequest(event -> {
 			if (isLastTab(tab))
 				selectionModel.selectPrevious();
 			else
 				selectionModel.selectLast();
 		});
-		tab.setOnClosed(event -> combinedResultsTab.updateReleases());
+		tab.setOnClosed(event -> {
+			logDeletedSearchResult(tab.getUserData());
+			combinedResultsTab.updateReleases();
+		});
 		// Don't allow to close tabs if there's only one "normal" tab left
 		tab.closableProperty().bind(Bindings.size(tabs).greaterThan(numOfUnclosableTabs));
-		tab.setContent(ReleaseTableView.create(mainForm, releasePlayer));
 
 		tabs.add(tab);
 		selectionModel.select(tab);
@@ -236,22 +241,19 @@ class ResultsView extends AnchorPane {
 		}
 
 		// Add new result
+		logDeletedSearchResult(selected.getUserData());
+		selected.setUserData(result);
 		ObservableList<Release> releases = getReleasesOnTab(selected);
 		releases.clear();
 		result.forEach(releases::add);
 		combinedResultsTab.updateReleases();
 
 		// Update tab's header and tooltip accordingly
-		SearchParams params = result.getSearchParams();
-		selected.setText(params.searchQuery());
-		StringBuilder tooltipText = new StringBuilder(params.searchType().toString())
-		.append(": ").append(params.searchQuery()).append(" (").append(params.pages())
-		.append(params.pages() > 1 ? " pages" : " page").append(", ").append(result.size())
-		.append(" releases found)");
+		selected.setText(result.getSearchParams().searchQuery());
 		Tooltip tooltip = selected.getTooltip();
 		if (tooltip == null)
 			selected.setTooltip(tooltip = new Tooltip());
-		tooltip.setText(tooltipText.toString());
+		tooltip.setText(result.toString());
 	}
 
 
@@ -357,18 +359,44 @@ class ResultsView extends AnchorPane {
 	/**
 	 * Clears search result from a specified tab.
 	 * 
-	 * @param tab a tab
+	 * @param tab a tab (cannot be a combined results tab)
 	 * @throws NullPointerException if tab is null
 	 */
 	private void clearTab(Tab tab) {
+		assert tab != combinedResultsTab;
 		getReleasesOnTab(tab).clear();
-		Tooltip tooltip = tab.getTooltip();
-		if (tooltip != null) {
-			String text = tooltip.getText();
-			String del = "(DELETED) ";
-			if (!text.startsWith(del))
-				tooltip.setText(del + text);
-		}
+
+		Object searchResult = tab.getUserData();
+		if (searchResult instanceof SearchResult) {
+			String resultText = searchResult.toString();
+			Tooltip tooltip = tab.getTooltip();
+			if (tooltip != null)
+				tooltip.setText("(DELETED) " + resultText);
+			logDeletedSearchResult(resultText);
+			tab.setUserData(null);
+		}		
+	}
+
+
+	/**
+	 * Log the deletion of specified search result.
+	 * 
+	 * @param searchResult a search result object; the deletion won't be logged
+	 *        if this parameter is null or not instance of SearchResult class
+	 */
+	private void logDeletedSearchResult(Object searchResult) {
+		if (searchResult instanceof SearchResult)
+			logDeletedSearchResult(searchResult.toString());
+	}	
+
+
+	/**
+	 * Logs the deletion of search result.
+	 * 
+	 * @param resultText text representation of search result
+	 */
+	private void logDeletedSearchResult(String resultText) {
+		LOGGER.info("Search result removed: " + resultText);
 	}
 
 
@@ -386,23 +414,12 @@ class ResultsView extends AnchorPane {
 
 
 	/**
-	 * Returns a release table view that resides on a specified tab.
-	 * 
-	 * @param tab a tab
-	 * @throws NullPointerException if tab is null
-	 */
-	private ReleaseTableView getReleaseTableOnTab(Tab tab) {
-		return (ReleaseTableView)tab.getContent();
-	}
-
-
-	/**
 	 * Gets a list of releases displayed as search result on a specified tab.
 	 * 
 	 * @param tab a tab
 	 */
 	private ObservableList<Release> getReleasesOnTab(Tab tab) {
-		return getReleaseTableOnTab(tab).getReleases();
+		return ((ReleaseTableView)tab.getContent()).getReleases();
 	}
 
 
