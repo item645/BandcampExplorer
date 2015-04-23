@@ -2,6 +2,7 @@ package com.bandcamp.explorer.data;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
@@ -13,19 +14,24 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 import com.bandcamp.explorer.util.ExceptionUnchecker;
 
 /**
  * This class is used to load an arbitrary page using specified URL string
- * and collect all Bandcamp releases, encountered on that page, in a form
- * of Callable objects.
+ * and collect all unique links to Bandcamp releases, encountered on that page.
+ * A {@link ReleaseLoader} task is then created for each found release link. List of 
+ * release loaders can be obtained via {@link #getReleaseLoaders()}.
  */
 class Page {
 
+	private static final Logger LOGGER = Logger.getLogger(Page.class.getName());
+
 	private static final Pattern RELEASE_LINK = Pattern.compile(
-			"(https?://[^/]+\\.[^/\\+\"]+)??/(album|track)/[^/\\+]+?(?=(\"|\\?|<|\\s))", Pattern.CASE_INSENSITIVE);
+			"(https?://[^/]+\\.[^/\\+\"]+)??/(album|track)/[^/\\+\"]+?(?=(\"|\\?|<|\\s))", Pattern.CASE_INSENSITIVE);
 
 	private final List<ReleaseLoader> releaseLoaders = new ArrayList<>();
 	private final SearchTask parentTask;
@@ -73,9 +79,29 @@ class Page {
 					link = new StringBuilder(url.getProtocol())
 					.append("://").append(url.getHost()).append(link).toString();
 				}
-				if (links.add(link)) // ensure that we don't create a loader for same link more than once
-					releaseLoaders.add(new ReleaseLoader(link, parentTask));
+				if (links.add(link)) { // ensure that we don't create a loader for same link more than once
+					ReleaseLoader loader = createLoader(link);
+					if (loader != null)
+						releaseLoaders.add(loader);
+				}
 			}
+		}
+	}
+
+
+	/**
+	 * Creates a release loader for the specified link.
+	 * 
+	 * @param link release link
+	 * @return instance of release loader or null, if release link is not valid
+	 */
+	private ReleaseLoader createLoader(String link) {
+		try {
+			return new ReleaseLoader(link, parentTask);
+		}
+		catch (URISyntaxException e) {
+			LOGGER.log(Level.FINER, "Release URL is not valid: " + link, e);
+			return null;
 		}
 	}
 

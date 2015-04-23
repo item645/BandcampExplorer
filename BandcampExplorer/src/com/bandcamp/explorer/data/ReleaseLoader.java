@@ -1,6 +1,7 @@
 package com.bandcamp.explorer.data;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.logging.Level;
@@ -24,12 +25,12 @@ class ReleaseLoader implements Callable<Release> {
 	 * 
 	 * @param url URL string to load release from
 	 * @param parentTask an instance of SearchTask that requests a release load
-	 * @throws IllegalArgumentException if supplied URL string is not valid
+	 * @throws URISyntaxException if supplied URL string is not valid
 	 * @throws NullPointerException if parent task is null
 	 */
-	ReleaseLoader(String url, SearchTask parentTask) {
+	ReleaseLoader(String url, SearchTask parentTask) throws URISyntaxException {
 		this.parentTask = Objects.requireNonNull(parentTask);
-		this.uri = URI.create(url);
+		this.uri = new URI(url);
 		this.releaseID = Release.createID(this.uri);
 	}
 
@@ -59,7 +60,7 @@ class ReleaseLoader implements Callable<Release> {
 
 	/** 
 	 * Returns the Release object corresponding to this loader's URL string.
-	 * This method does not throw exceptions. If release load results in exception
+	 * This implementation does not throw exceptions. If release load results in exception
 	 * or if this loader's parent task has been cancelled, it simply returns null.
 	 */
 	@Override
