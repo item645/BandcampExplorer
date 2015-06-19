@@ -108,12 +108,12 @@ class ReleaseTableView extends AnchorPane {
 	private SortedList<Release> sortedItems = new SortedList<>(filteredItems);
 
 	/**
-	 * Special-purpose forwarding wrapper for items list that features modified clear()
+	 * Special-purpose decorator for items list that features modified clear()
 	 * method to deal with the problem of stale Release references in a SortedList.
-	 * Reference to this wrapper is handed to class clients so they can transparently
+	 * Reference to this decorator is handed to class clients so they can transparently
 	 * call modified version of clear().
 	 */
-	private final ObservableList<Release> itemsForwarder = new ModifiableObservableListBase<Release>() {
+	private final ObservableList<Release> itemsDecorator = new ModifiableObservableListBase<Release>() {
 
 		/** 
 		 * {@inheritDoc}
@@ -125,7 +125,14 @@ class ReleaseTableView extends AnchorPane {
 		 */
 		@Override
 		public void clear() {
+			if (hasListeners()) {
+				beginChange();
+				nextRemove(0, this);
+			}
 			items.clear();
+			if (hasListeners())
+				endChange();
+
 			sortedItems.comparatorProperty().unbind();
 			releaseTableView.setItems(sortedItems = new SortedList<>(filteredItems));
 			sortedItems.comparatorProperty().bind(releaseTableView.comparatorProperty());
@@ -293,7 +300,7 @@ class ReleaseTableView extends AnchorPane {
 	 * Returns an observable list of releases in this table view. 
 	 */
 	ObservableList<Release> getReleases() {
-		return itemsForwarder;
+		return itemsDecorator;
 	}
 
 

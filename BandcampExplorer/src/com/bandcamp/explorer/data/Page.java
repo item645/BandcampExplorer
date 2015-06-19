@@ -31,7 +31,7 @@ class Page {
 	private static final Logger LOGGER = Logger.getLogger(Page.class.getName());
 
 	private static final Pattern RELEASE_LINK = Pattern.compile(
-			"(https?://[^/]+\\.[^/\\+\"]+)??/(album|track)/[^/\\+\"]+?(?=(\"|\\?|<|\\s))", Pattern.CASE_INSENSITIVE);
+			"(https?://[^/]+\\.[^/\\+\"]+)??/(album|track)/[^/\\+\"]+?(?=(\"|\\?|<|\\s|\\&|\\u005C))", Pattern.CASE_INSENSITIVE);
 
 	private final List<ReleaseLoader> releaseLoaders = new ArrayList<>();
 	private final SearchTask parentTask;
