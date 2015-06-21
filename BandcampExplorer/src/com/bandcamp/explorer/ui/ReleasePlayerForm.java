@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
@@ -27,8 +28,11 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.Slider;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TableCell;
@@ -96,6 +100,7 @@ public class ReleasePlayerForm extends SplitPane {
 	@FXML private TableColumn<Track, Time> timeColumn;
 
 	private TrackListView trackListView;
+	private final TrackListContextMenu trackListContextMenu = new TrackListContextMenu();
 	private final AudioPlayer audioPlayer = new AudioPlayer();
 	private final ObjectProperty<Release> release = new SimpleObjectProperty<>(null);
 
@@ -109,7 +114,11 @@ public class ReleasePlayerForm extends SplitPane {
 
 		private final TableView<Track> tableView;
 		private final ObservableList<Track> observableTracks = FXCollections.observableArrayList();
-		private final SortedList<Track> sortedTracks = new SortedList<>(observableTracks);
+		
+		/**
+		 * Reference to a sorted list wrapper around table view items
+		 */
+		final SortedList<Track> sortedTracks = new SortedList<>(observableTracks);
 
 		/**
 		 * Holds a list of play buttons from table's first column
@@ -194,6 +203,15 @@ public class ReleasePlayerForm extends SplitPane {
 
 
 		/**
+		 * Returns the track currently selected in a tracklist table view.
+		 * If there is no track selected, returns null.
+		 */
+		Track getSelectedTrack() {
+			return tableView.getSelectionModel().getSelectedItem();
+		}
+
+
+		/**
 		 * Removes all items from this track list view.
 		 */
 		void clear() {
@@ -210,6 +228,97 @@ public class ReleasePlayerForm extends SplitPane {
 		 */
 		void addAll(Collection<Track> tracks) {
 			observableTracks.addAll(tracks);
+		}
+
+	}
+
+
+	/**
+	 * Implements a context menu for tracklist table cells.
+	 */
+	private class TrackListContextMenu extends CellContextMenu {
+
+		/**
+		 * Creates a context menu instance.
+		 */
+		TrackListContextMenu() {
+			MenuItem play = new MenuItem("Play");
+			MenuItem pause = new MenuItem("Pause");
+			MenuItem stop = new MenuItem("Stop");
+			MenuItem previous = new MenuItem("Previous");
+			MenuItem next = new MenuItem("Next");
+
+			pause.setOnAction(event -> audioPlayer.pause());
+			stop.setOnAction(event -> audioPlayer.stop());
+
+			setOnShowing(windowEvent -> {
+				// Update control items on menu popup
+				Track track = trackListView.getSelectedTrack();
+				if (track != null && track.isPlayable()) {
+					if (audioPlayer.isPlayingTrack(track)) {
+						play.setDisable(true);
+						pause.setDisable(false);
+					}
+					else {
+						play.setDisable(false);
+						play.setOnAction(actionEvent -> {
+							audioPlayer.setTrack(track);
+							audioPlayer.play();
+						});
+						pause.setDisable(true);
+					}
+					stop.setDisable(false);
+				}
+				else {
+					play.setDisable(true);
+					pause.setDisable(true);
+					stop.setDisable(true);
+				}
+
+				updatePrevNextItem(previous, trackListView.getPreviousPlayableTrack(track));
+				updatePrevNextItem(next, trackListView.getNextPlayableTrack(track));
+			});
+
+			MenuItem copyText = new MenuItem("Copy Text");
+			copyText.setOnAction(event -> {
+				TableCell<?,?> cell = getSelectedCell();
+				if (cell != null)
+					Utils.toClipboardAsString(cell.getItem());
+			});
+
+			MenuItem copyTrackText = new MenuItem("Copy Track as Text");
+			copyTrackText.setOnAction(event -> Utils.toClipboardAsString(trackListView.getSelectedTrack()));
+
+			MenuItem copyAllTracksText = new MenuItem("Copy All Tracks as Text");
+			copyAllTracksText.setOnAction(event -> {
+				Utils.toClipboardAsString(trackListView.sortedTracks.stream()
+						.map(Track::toString)
+						.collect(Collectors.joining("\n")));
+			});
+
+			getItems().addAll(play, pause, stop, previous, next, new SeparatorMenuItem(),
+					copyText, copyTrackText, copyAllTracksText);
+		}
+
+
+		/**
+		 * Sets up previous/next menu item for playing specified track.
+		 * 
+		 * @param menuItem previous or next menu item
+		 * @param track a track to play when item is selected
+		 */
+		private void updatePrevNextItem(MenuItem menuItem, Track track) {
+			if (track == null)
+				menuItem.setDisable(true);
+			else {
+				menuItem.setDisable(false);
+				menuItem.setOnAction(event -> {
+					boolean wasPlaying = audioPlayer.isPlaying();
+					audioPlayer.setTrack(track);
+					if (wasPlaying)
+						audioPlayer.play();
+				});
+			}
 		}
 
 	}
@@ -778,7 +887,7 @@ public class ReleasePlayerForm extends SplitPane {
 	 * Plays a track selected in track list view.
 	 */
 	private void playSelectedTrack() {
-		Track track = tracksTableView.getSelectionModel().getSelectedItem();
+		Track track = trackListView.getSelectedTrack();
 		if (track != null && track.isPlayable()) {
 			audioPlayer.setTrack(track);
 			audioPlayer.play();
@@ -883,8 +992,8 @@ public class ReleasePlayerForm extends SplitPane {
 
 		// Setting a custom cell factory that creates play/pause button 
 		// for each playable track, saves references to these buttons for
-		// later access from audio player and also highlights the track
-		// that is loaded in audio player
+		// later access from audio player, highlights the track that is
+		// loaded in audio player and also adds a context menu for each cell
 		playButtonColumn.setCellFactory(new CellFactory<>(
 				CellCustomizer.cellNode(track -> {
 					if (track != null && track.isPlayable()) {
@@ -920,15 +1029,19 @@ public class ReleasePlayerForm extends SplitPane {
 				(cell, track, empty) -> {
 					if (track != null)
 						highlightTableRow(cell.getTableRow(), track == audioPlayer.getTrack());
-				}
+				},
+				// Also, add a customizer for context menu
+				trackListContextMenu.customizer()
 			)
 		);
 		playButtonColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue()));
 		playButtonColumn.setSortable(false);
 
+		trackNumberColumn.setCellFactory(new CellFactory<>(trackListContextMenu.customizer()));
 		trackNumberColumn.setCellValueFactory(cellData -> cellData.getValue().numberProperty());
 
-		CellFactory<Track, String> tooltip = new CellFactory<>(CellCustomizer.tooltip());
+		CellFactory<Track, String> tooltip = new CellFactory<>(
+				CellCustomizer.tooltip(), trackListContextMenu.customizer());
 
 		artistColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
 		artistColumn.setCellFactory(tooltip);
@@ -938,9 +1051,14 @@ public class ReleasePlayerForm extends SplitPane {
 		titleColumn.setCellFactory(tooltip);
 		titleColumn.setCellValueFactory(cellData -> cellData.getValue().titleProperty());
 
+		timeColumn.setCellFactory(new CellFactory<>(trackListContextMenu.customizer()));
 		timeColumn.setCellValueFactory(cellData -> cellData.getValue().timeProperty());
 
 		unloadReleaseButton.disableProperty().bind(Bindings.isNull(release));
+
+		MenuItem copyReleaseLink = new MenuItem("Copy");
+		copyReleaseLink.setOnAction(event -> Utils.toClipboardAsString(releaseLink.getText()));
+		releaseLink.setContextMenu(new ContextMenu(copyReleaseLink));
 
 		playButton.setGraphic(PLAY_ICON);
 		stopButton.setGraphic(STOP_ICON);

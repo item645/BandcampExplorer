@@ -231,7 +231,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 
 			String report = String.format("Search finished: %1$d %2$s found. Search time: %3$ds.",
 					result.size(),
-					result.size() > 1 ? "releases" : "release",
+					result.size() == 1 ? "release" : "releases",
 					Duration.between(task.getStartTime(), Instant.now()).getSeconds());
 			writeStatusBar(report);
 			LOGGER.info(report);
@@ -266,7 +266,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 			progressBar.hideAndReset(0);
 		});
 
-		new Thread(task).start();
+		executorService.execute(task);
 	}
 
 

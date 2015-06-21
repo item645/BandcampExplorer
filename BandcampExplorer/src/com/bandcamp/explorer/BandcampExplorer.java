@@ -35,7 +35,7 @@ public final class BandcampExplorer extends Application {
 	/**
 	 * App title with current version number
 	 */
-	private static final String APP_TITLE = "Bandcamp Explorer 0.3.3";
+	private static final String APP_TITLE = "Bandcamp Explorer 0.3.4";
 
 	/**
 	 * A reference to app's top level stage.
@@ -45,7 +45,7 @@ public final class BandcampExplorer extends Application {
 	/**
 	 * Executor service employed for performing various asynchronous operations
 	 */
-	private final ExecutorService executorService = Executors.newFixedThreadPool(6);
+	private final ExecutorService executorService = Executors.newFixedThreadPool(7);
 
 
 
@@ -53,7 +53,7 @@ public final class BandcampExplorer extends Application {
 	public void start(Stage primaryStage) {
 		this.primaryStage = primaryStage;
 		this.primaryStage.setTitle(APP_TITLE);
-		this.primaryStage.setOnCloseRequest(event -> executorService.shutdown());
+		this.primaryStage.setOnCloseRequest(event -> executorService.shutdownNow());
 
 		try {
 			initUI();

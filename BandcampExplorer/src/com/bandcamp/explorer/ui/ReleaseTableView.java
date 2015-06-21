@@ -27,7 +27,6 @@ import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.ContextMenu;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
@@ -40,7 +39,6 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 
@@ -146,69 +144,44 @@ class ReleaseTableView extends AnchorPane {
 		@Override protected Release doRemove(int index)               {return items.remove(index);}
 	};
 
-	private final CellContextMenu cellContextMenu = new CellContextMenu();
+	private final ReleaseTableContextMenu releaseTableContextMenu = new ReleaseTableContextMenu();
 	private TableViewResizeHelper resizeHelper;
 
 
 
 	/**
-	 * This class provides a context menu for table cells.
+	 * This class provides a context menu for cells in a release table.
 	 */
-	private class CellContextMenu extends ContextMenu {
-
-		/**
-		 * Holds a reference to a right-click mouse event that caused this menu to pop up
-		 */
-		private MouseEvent showMenuEvent;
-
-		/**
-		 * Cell customizer that attaches this context menu to table cells.
-		 */
-		private final CellCustomizer<?,?> customizer = (cell, newItem, empty) -> {
-			cell.setContextMenu(this);
-			cell.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
-				if (event.getButton() == MouseButton.SECONDARY)
-					showMenuEvent = event;
-			});
-		};
-
+	private class ReleaseTableContextMenu extends CellContextMenu {
 
 		/**
 		 * Creates a context menu instance.
 		 */
-		CellContextMenu() {
-			setOnHidden(event -> showMenuEvent = null);
-			setConsumeAutoHidingEvents(false);
-			createItems();
-		}
+		ReleaseTableContextMenu() {
+			MenuItem searchArtist = new MenuItem();
+			MenuItem moreFromDomain = new MenuItem();
 
-
-		/**
-		 * Returns a type-checked reference to cell customizer that adds this menu to a cell.
-		 */
-		@SuppressWarnings("unchecked")
-		<S,T> CellCustomizer<S,T> customizer() {
-			// Type cast is safe here because for this customizer type parameters don't matter.
-			return (CellCustomizer<S,T>)customizer;
-		}
-
-
-		/**
-		 * Creates items for this menu.
-		 */
-		private void createItems() {
-			MenuItem searchArtist = new MenuItem("Search this Artist");
-			searchArtist.setOnAction(event -> {
+			setOnShowing(windowEvent -> {
+				// On menu popup we update "Search..." and "More from..." items text and action
+				// using data from selected release
 				Release release = getSelectedRelease();
-				if (release != null)
-					mainForm.searchReleases(release.getArtist(), SearchType.SEARCH, true);
-			});
-
-			MenuItem moreFromDomain = new MenuItem("More Releases from this Domain");
-			moreFromDomain.setOnAction(event -> {
-				Release release = getSelectedRelease();
-				if (release != null)
-					mainForm.searchReleases(release.getDiscographyURI().toString(), SearchType.DIRECT, true);
+				if (release != null) {
+					String artist = release.getArtist();
+					searchArtist.setText(String.format("Search \"%1$s\"", artist));
+					searchArtist.setOnAction(
+							actionEvent -> mainForm.searchReleases(artist, SearchType.SEARCH, true));
+					
+					URI discographyURI = release.getDiscographyURI();
+					moreFromDomain.setText(String.format("More from \"%1$s\"", discographyURI.getAuthority()));
+					moreFromDomain.setOnAction(
+							actionEvent -> mainForm.searchReleases(discographyURI.toString(), SearchType.DIRECT, true));
+				}
+				else {
+					searchArtist.setText(null);
+					searchArtist.setOnAction(null);
+					moreFromDomain.setText(null);
+					moreFromDomain.setOnAction(null);
+				}
 			});
 
 			MenuItem viewOnBandcamp = new MenuItem("View on Bandcamp");
@@ -251,20 +224,6 @@ class ReleaseTableView extends AnchorPane {
 			getItems().addAll(searchArtist, moreFromDomain, new SeparatorMenuItem(), viewOnBandcamp,
 					viewDiscogOnBandcamp, new SeparatorMenuItem(), copyText, copyReleaseText,
 					copyAllReleasesText, new SeparatorMenuItem(), playRelease);
-		}
-
-
-		/**
-		 * Returns a table cell on which this menu popped up after mouse right-click
-		 * event occured.
-		 */
-		private TableCell<?,?> getSelectedCell() {
-			if (showMenuEvent != null) {
-				Object source = showMenuEvent.getSource();
-				if (source instanceof TableCell)
-					return (TableCell<?,?>)source;
-			}
-			return null;
 		}
 
 	}
@@ -482,9 +441,9 @@ class ReleaseTableView extends AnchorPane {
 		// Custom cell factories for text and date columns (each custom factory also
 		// adds a context menu to cells)
 		CellFactory<Release, String> tooltip = new CellFactory<>(
-				CellCustomizer.tooltip(), cellContextMenu.customizer());
+				CellCustomizer.tooltip(), releaseTableContextMenu.customizer());
 		CellFactory<Release, LocalDate> centered = new CellFactory<>(
-				CellCustomizer.alignment(Pos.CENTER), cellContextMenu.customizer());
+				CellCustomizer.alignment(Pos.CENTER), releaseTableContextMenu.customizer());
 
 		artistColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
 		artistColumn.setCellFactory(tooltip);
@@ -495,10 +454,10 @@ class ReleaseTableView extends AnchorPane {
 		titleColumn.setCellValueFactory(cellData -> cellData.getValue().titleProperty());
 
 		timeColumn.setCellFactory(new CellFactory<>(
-				CellCustomizer.alignment(Pos.CENTER_RIGHT), cellContextMenu.customizer()));
+				CellCustomizer.alignment(Pos.CENTER_RIGHT), releaseTableContextMenu.customizer()));
 		timeColumn.setCellValueFactory(cellData -> cellData.getValue().timeProperty());
 
-		dlTypeColumn.setCellFactory(new CellFactory<>(cellContextMenu.customizer()));
+		dlTypeColumn.setCellFactory(new CellFactory<>(releaseTableContextMenu.customizer()));
 		dlTypeColumn.setCellValueFactory(cellData -> cellData.getValue().downloadTypeProperty());
 
 		releaseDateColumn.setCellFactory(centered);
@@ -527,7 +486,7 @@ class ReleaseTableView extends AnchorPane {
 					else
 						return null;
 				}),
-				cellContextMenu.customizer()
+				releaseTableContextMenu.customizer()
 			)
 		);
 		urlColumn.setCellValueFactory(cellData -> cellData.getValue().uriProperty());
