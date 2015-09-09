@@ -1,5 +1,6 @@
 package com.bandcamp.explorer.data;
 
+import java.net.HttpURLConnection;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -10,6 +11,8 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.function.BiFunction;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javafx.concurrent.Task;
 
@@ -17,17 +20,25 @@ import javafx.concurrent.Task;
  * An implementation of JavaFX Task used to execute a search for releases
  * on Bandcamp using specified search parameters.
  * The get() and getValue() methods of this task return a SearchResult object,
- * containing all the releases found during this search session.
+ * containing all the releases found and successfully loaded during this search session.
  * The sort order of releases in a returned SearchResult is determined by
  * sortOrder option specified by search parameters.
  */
 public final class SearchTask extends Task<SearchResult> {
 
+	private static final Logger LOGGER = Logger.getLogger(SearchTask.class.getName());
+
+	private static final int MAX_RELEASE_LOAD_ATTEMPTS = 4;
+	private static final int PAUSE_MLS_ON_503 = 5000;
+
+	private final Object pauseLock = new Object();
+	private volatile boolean paused = false;
+
 	private final ExecutorService executor;
 	private final SearchParams searchParams;
 	private final String requestingDataMsg;
 	private final BiFunction<Integer, Integer, String> loadingReleasesMsg;
-	private Instant startTime;
+	private Instant startTime; // read and updated only from JavaFX thread
 
 
 	/**
@@ -61,6 +72,30 @@ public final class SearchTask extends Task<SearchResult> {
 	 */
 	public Instant getStartTime() {
 		return startTime;
+	}
+
+
+	/**
+	 * If this task is in paused state, calling this method causes the current
+	 * thread to wait until this task's thread resumes execution.
+	 * This method provides a means for search task to pause the execution of
+	 * release loaders when it is put in paused state.
+	 * If task is not paused, calling await() will have no effect.
+	 */
+	void await() {
+		if (paused) {
+			synchronized (pauseLock) {
+				try {
+					while (paused)
+						pauseLock.wait();
+				}
+				catch (InterruptedException e) {
+					Thread t = Thread.currentThread();
+					t.interrupt();
+					LOGGER.warning("Loader " + t + " interrupted");
+				}
+			}
+		}
 	}
 
 
@@ -109,25 +144,82 @@ public final class SearchTask extends Task<SearchResult> {
 
 		// Submitting loaders to completion service so that results can be
 		// processed upon completion
-		ExecutorCompletionService<Release> completionService = new ExecutorCompletionService<>(executor);
+		ExecutorCompletionService<ReleaseLoader.Result> completionService = new ExecutorCompletionService<>(executor);
 		releaseLoaders.forEach(completionService::submit);
 
-		// Gathering loaded Release objects
+		// Processing results and gathering loaded Release objects
 		List<Release> releases = new ArrayList<>();
-		for (int i = 1; i <= numTasks; i++) {
+		for (int taskCounter = 1; taskCounter <= numTasks; ) {
 			if (isCancelled())
 				return new SearchResult(searchParams);
-			Release release = completionService.take().get();
-			if (release != null)
-				releases.add(release);
-			if (loadingReleasesMsg != null)
-				updateMessage(loadingReleasesMsg.apply(i, numTasks));
-			updateProgress(i, numTasks);
+
+			boolean repeat = false;
+			ReleaseLoader.Result result = completionService.take().get();
+			if (result != null) {
+				try {
+					releases.add(result.getRelease());
+				}
+				catch (Exception e) {
+					ReleaseLoader loader = result.getLoader();
+					String msg = "Error loading release: " + loader.getURI() + " (" + e.getMessage() + ")";
+					int responseCode = e instanceof ReleaseLoadingException
+							? ((ReleaseLoadingException)e).getHttpResponseCode()
+							: 0;
+					if (responseCode == HttpURLConnection.HTTP_UNAVAILABLE) {
+						// Here we do a special treatment for HTTP 503 (Service Unavailable)
+						// errors which arise due to the high load that we have probably
+						// imposed on Bandcamp server.
+						LOGGER.warning(msg); // don't log exception for HTTP 503, only message
+						pause(PAUSE_MLS_ON_503); // let Bandcamp server cool down a bit
+						if (loader.getAttempts() <= MAX_RELEASE_LOAD_ATTEMPTS) {
+							// If we haven't yet exceeded max load attempts for this release loader,
+							// try to run it again by re-submitting to completion service.
+							repeat = true;
+							completionService.submit(loader);
+						}
+					}
+					else
+						LOGGER.log(Level.WARNING, msg, e);
+				}
+			}
+
+			if (!repeat) {
+				if (loadingReleasesMsg != null)
+					updateMessage(loadingReleasesMsg.apply(taskCounter, numTasks));
+				updateProgress(taskCounter, numTasks);
+				taskCounter++;
+			}
 		}
 
-		SearchResult result = new SearchResult(releases, searchParams);
-		result.sort(searchParams.sortOrder());
-		return result;
+		SearchResult searchResult = new SearchResult(releases, searchParams);
+		searchResult.sort(searchParams.sortOrder());
+		return searchResult;
 	}
 
+
+	/**
+	 * Pauses the execution of this task's thread for the specified number of milliseconds.
+	 * 
+	 * @param millis the length of time to pause in milliseconds
+	 */
+	private void pause(long millis) {
+		assert millis >= 0;
+		
+		paused = true;
+		try {
+			LOGGER.info("Search paused for " + millis + " milliseconds");
+			Thread.sleep(millis);
+		}
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			LOGGER.warning("Search task thread interrupted");
+		}
+		finally {
+			paused = false;
+			synchronized (pauseLock) {
+				pauseLock.notifyAll();
+			}
+		}
+	}
+	
 }

@@ -3,8 +3,8 @@ package com.bandcamp.explorer.data;
 import java.io.IOException;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
+import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -32,11 +32,8 @@ import java.util.stream.Collectors;
 
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
-import javafx.beans.property.ReadOnlySetProperty;
-import javafx.beans.property.ReadOnlySetWrapper;
 import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.beans.property.ReadOnlyStringWrapper;
-import javafx.collections.FXCollections;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
@@ -105,10 +102,10 @@ public final class Release {
 	private final ReadOnlyObjectProperty<Time> time;
 	private final ReadOnlyObjectProperty<LocalDate> releaseDate;
 	private final ReadOnlyObjectProperty<LocalDate> publishDate;
-	private final ReadOnlySetProperty<String> tags;
 	private final ReadOnlyStringProperty tagsString;
 	private final ReadOnlyObjectProperty<URI> uri;
 	private final String artworkThumbLink;
+	private final Set<String> tags;
 	private final List<Track> tracks;
 	private final String information;
 	private final String credits;
@@ -224,13 +221,13 @@ public final class Release {
 		 *        it is not in cache yet; the function must not return null when invoked
 		 *        and must not involve direct or indirect call to {@link ReleaseCache#getRelease}
 		 * @return a release
-		 * @throws IOException if there was an IO error while loading release web page
-		 *         or if release page does not contain valid data
+		 * @throws ReleaseLoadingException if there was an error during instantiation
+		 *         of Release object
 		 * @throws RuntimeException wraps any other exception (checked or unchecked)
 		 *         that might occur during release instantiation or internal operations
 		 *         within a cache
 		 */
-		Release getRelease(String id, Callable<Release> instantiator) throws IOException {
+		Release getRelease(String id, Callable<Release> instantiator) throws ReleaseLoadingException {
 			assert id != null;
 			assert instantiator != null;
 
@@ -262,8 +259,8 @@ public final class Release {
 						Thread.currentThread().interrupt();
 					else if (e instanceof ExecutionException) {
 						Throwable cause = e.getCause();
-						if (cause instanceof IOException)
-							throw (IOException)cause;
+						if (cause instanceof ReleaseLoadingException)
+							throw (ReleaseLoadingException)cause;
 					}
 					throw new RuntimeException(e);
 				}
@@ -309,13 +306,41 @@ public final class Release {
 	 * 
 	 * @param uri a URI representing a location to load release from
 	 * @return a release object
-	 * @throws IOException if there was an IO error while loading release web page
-	 *         or if release page does not contain valid data
+	 * @throws ReleaseLoadingException if there was an error during instantiation
+	 *         of Release object
 	 * @throws NullPointerException if uri is null
 	 */
-	public static Release forURI(URI uri) throws IOException {
+	public static Release forURI(URI uri) throws ReleaseLoadingException {
+		return forURI(uri, 0);
+	}
+
+
+	/**
+	 * Returns the release corresponding to the specified Bandcamp URI.
+	 * If release object for this URI is available in cache,
+	 * then cached version is returned. Otherwise, new release object is
+	 * created, using data loaded from the URI, added to cache and then returned.
+	 * 
+	 * @param uri a URI representing a location to load release from
+	 * @param attempt the number of attempt to load the release; if > 0 then
+	 *        this number will be included in a log message; this parameter is
+	 *        intended to be used by ReleaseLoader tasks when they perform repeated
+	 *        attempts to load the release in case the server was unavailable
+	 *        on the first try
+	 * @return a release object
+	 * @throws ReleaseLoadingException if there was an error during instantiation
+	 *         of Release object
+	 * @throws NullPointerException if uri is null
+	 */
+	static Release forURI(URI uri, int attempt) throws ReleaseLoadingException {
 		return RELEASE_CACHE.getRelease(createID(uri), () -> {
-			LOGGER.info("Loading release: " + uri);
+			String message;
+			if (attempt > 0)
+				message = new StringBuilder("Loading release: ").append(uri).append(" (")
+				.append("attempt #").append(attempt).append(')').toString();
+			else
+				message = "Loading release: " + uri;
+			LOGGER.info(message);
 			return new Release(uri);
 		});
 	}
@@ -339,72 +364,100 @@ public final class Release {
 	 * Loads the release using specified URI.
 	 * 
 	 * @param uri a URI to load release from
-	 * @throws IOException if there was an IO error while loading release web page
-	 *         or if release page does not contain valid data
+	 * @throws ReleaseLoadingException if there was an error during instantiation
+	 *         of Release object
 	 */
-	private Release(URI uri) throws IOException {
-		URLConnection connection = uri.toURL().openConnection();
+	private Release(URI uri) throws ReleaseLoadingException {
+		HttpURLConnection connection;
+		try {
+			connection = (HttpURLConnection)uri.toURL().openConnection();
+		}
+		catch (Exception e) {
+			throw new ReleaseLoadingException(e);
+		}
 		// 60 seconds timeout for both connect and read
 		connection.setConnectTimeout(60000);
 		connection.setReadTimeout(60000);
 
 		try (Scanner input = new Scanner(connection.getInputStream(), StandardCharsets.UTF_8.name())) {
-			String artist_, title_;
-			DownloadType downloadType_;
-			LocalDate releaseDate_, publishDate_;
-
 			// Finding a variable containing release data and feeding it to JS engine so that we could
 			// then handily read any property values we need.
 			try {
 				JS.eval(input.findWithinHorizon(RELEASE_DATA, 0));
 			}
 			catch (Exception e) {
-				throw new IOException("Release data is not valid or cannot be located", e);
+				throw new ReleaseLoadingException("Release data is not valid or cannot be located", e);
 			}
 
-			this.uri = new ReadOnlyObjectWrapper<>(uri).getReadOnlyProperty();
-			artist_ = Objects.toString(property("artist", String.class));
-			title_ = Objects.toString(property("current.title", String.class));
-			releaseDate_ = propertyDate("album_release_date");
-			publishDate_ = propertyDate("current.publish_date");
-			downloadType_ = determineDownloadType();
-			Set<String> tags_ = loadTags(input);
-			tracks = loadTracks(artist_);
-			artworkThumbLink = loadArtworkThumbLink();
-			information = Objects.toString(property("current.about", String.class), "");
-			credits = Objects.toString(property("current.credits", String.class), "");
-			int time_ = tracks.stream().collect(Collectors.summingInt(track -> track.getTime().getSeconds()));
-
-			// Wrapping all necessary stuff in JFX-compliant properties
-			artist = new ReadOnlyStringWrapper(artist_).getReadOnlyProperty();
-			title = new ReadOnlyStringWrapper(title_).getReadOnlyProperty();
-			downloadType = new ReadOnlyObjectWrapper<>(downloadType_).getReadOnlyProperty();
-			time = new ReadOnlyObjectWrapper<Time>(new Time(time_)).getReadOnlyProperty();
-			releaseDate = new ReadOnlyObjectWrapper<>(releaseDate_).getReadOnlyProperty();
-			publishDate = new ReadOnlyObjectWrapper<>(publishDate_).getReadOnlyProperty();
-			tags = new ReadOnlySetWrapper<>(FXCollections.unmodifiableObservableSet(FXCollections.observableSet(tags_)));
-			tagsString = new ReadOnlyStringWrapper(tags_.stream().collect(Collectors.joining(", "))).getReadOnlyProperty();
+			this.uri = createObjectProperty(uri);
+			artist = createStringProperty(Objects.toString(property("artist")));
+			title = createStringProperty(Objects.toString(property("current.title")));
+			downloadType = createObjectProperty(readDownloadType());
+			releaseDate = createObjectProperty(propertyDate("album_release_date"));
+			publishDate = createObjectProperty(propertyDate("current.publish_date"));
+			tags = readTags(input);
+			tagsString = createStringProperty(tags.stream().collect(Collectors.joining(", ")));
+			artworkThumbLink = readArtworkThumbLink();
+			information = Objects.toString(property("current.about"), "");
+			credits = Objects.toString(property("current.credits"), "");
+			tracks = readTracks(artist.get());
+			time = createObjectProperty(new Time(
+					tracks.stream().collect(Collectors.summingInt(track -> track.getTime().getSeconds()))));
+		}
+		catch (IOException e) {
+			int responseCode = 0;
+			try {
+				responseCode = connection.getResponseCode();
+			}
+			catch (IOException e1) {
+				LOGGER.finer("Unable to get server response code for " + uri);
+			}
+			throw new ReleaseLoadingException(e, responseCode);
 		}
 	}
 
 
 	/**
-	 * Determines the download type.
+	 * Creates a read-only JavaFX object property for the given value of 
+	 * arbitrary type.
+	 * 
+	 * @param value initial value to wrap in a property
+	 * @return read-only object property
 	 */
-	private DownloadType determineDownloadType() {
+	private static <T> ReadOnlyObjectProperty<T> createObjectProperty(T value) {
+		return new ReadOnlyObjectWrapper<>(value).getReadOnlyProperty();
+	}
+
+
+	/**
+	 * Creates a read-only JavaFX string property for the given string value.
+	 * 
+	 * @param value initial value to wrap in a property
+	 * @return read-only string property
+	 */
+	private static ReadOnlyStringProperty createStringProperty(String value) {
+		return new ReadOnlyStringWrapper(value).getReadOnlyProperty();
+	}
+
+
+	/**
+	 * Determines the download type by reading and interpreting relevant
+	 * values in JSON data.
+	 */
+	private DownloadType readDownloadType() {
 		DownloadType result = DownloadType.UNAVAILABLE;
-		Number dlPref = property("current.download_pref", Number.class);
+		Number dlPref = property("current.download_pref");
 		if (dlPref != null) {
 			switch (dlPref.intValue()) {
 			case 1:
 				result = DownloadType.FREE;
 				break;
 			case 2:
-				Number minPrice = property("current.minimum_price", Number.class);
+				Number minPrice = property("current.minimum_price");
 				if (minPrice != null && minPrice.doubleValue() > 0.0)
 					result = DownloadType.PAID;
 				else {
-					Number isSet = property("current.is_set_price", Number.class);
+					Number isSet = property("current.is_set_price");
 					result = isSet != null && isSet.intValue() == 1 
 							? DownloadType.PAID : DownloadType.NAME_YOUR_PRICE;
 				}
@@ -417,9 +470,10 @@ public final class Release {
 
 
 	/**
-	 * Loads a set of tags for this release, fetching them from the input source.
+	 * Reads all tags for release from the input source and returns them
+	 * as unmodifiable set of strings.
 	 */
-	private static Set<String> loadTags(Scanner input) {
+	private static Set<String> readTags(Scanner input) {
 		// Tags are not included in JSON data so we need to fetch them from raw HTML.
 		// Resetting to 0 position is not required here because tags are located
 		// after TralbumData in HTML source.
@@ -432,7 +486,7 @@ public final class Release {
 			if (i != -1)
 				tags.add(unescape(tagData.substring(i+1).trim().toLowerCase(Locale.ENGLISH)));
 		}
-		return tags;
+		return Collections.unmodifiableSet(tags);
 	}
 
 
@@ -465,21 +519,21 @@ public final class Release {
 
 
 	/**
-	 * Loads all the tracks from JSON data and returns them as unmodifiable
+	 * Reads the tracklist information from JSON data and returns tracks as unmodifiable
 	 * list of Track objects.
 	 * 
 	 * @param releaseArtist the artist of this release
 	 */
-	private List<Track> loadTracks(String releaseArtist) {
+	private List<Track> readTracks(String releaseArtist) {
 		List<Track> result = new ArrayList<>();
 
 		Pattern splitter = null;
-		Number numTracks = property("trackinfo.length", Number.class);
+		Number numTracks = property("trackinfo.length");
 		if (numTracks != null) {
 			for (int i = 0; i < numTracks.intValue(); i++) {
 				String trackDataID = "trackinfo[" + i + "].";
 
-				String artistTitle = property(trackDataID + "title", String.class);
+				String artistTitle = property(trackDataID + "title");
 				String artist = releaseArtist;
 				String title = artistTitle;
 				if (artistTitle != null && artistTitle.contains(" - ")) {
@@ -497,7 +551,7 @@ public final class Release {
 					// stripped (escaped) form. After we have both versions (taken from title and
 					// title_link), we can decide whether the title property value should be split
 					// (if it contains track artist) or left intact (if it contains only track title).
-					String titleLink = property(trackDataID + "title_link", String.class);
+					String titleLink = property(trackDataID + "title_link");
 					if (titleLink != null) {
 
 						// Get the first token (word) from title_link
@@ -530,14 +584,14 @@ public final class Release {
 					}
 				}
 
-				Number duration = property(trackDataID + "duration", Number.class);
+				Number duration = property(trackDataID + "duration");
 				float durationValue = duration != null ? duration.floatValue() : 0.0f;
 				if (durationValue < 0.0f || Float.isNaN(durationValue))
 					durationValue = 0.0f;
 
 				String fileLink = null;
-				if (property(trackDataID + "file", Object.class) != null)
-					fileLink = property(trackDataID + "file['mp3-128']", String.class);
+				if (property(trackDataID + "file") != null)
+					fileLink = property(trackDataID + "file['mp3-128']");
 
 				result.add(new Track(
 						i + 1,
@@ -555,9 +609,9 @@ public final class Release {
 
 	/**
 	 * Gets a link to release artwork thumbnail image.
-	 * Returns null if there's not artwork for this release.
+	 * Returns null if there's no artwork for this release.
 	 */
-	private String loadArtworkThumbLink() {
+	private String readArtworkThumbLink() {
 		// We get an URL to small 100x100 thumbnail and modify that URL
 		// so it will point to a bigger 350x350 image (a standard image used
 		// to display artwork on release page). The URL is changed by replacing 
@@ -566,7 +620,7 @@ public final class Release {
 		// as of present JavaFX is unable to load images from bcbits.com (Bandcamp's
 		// image storage) using https URLs due to a problem with SSL certificates.
 		// Replacement is done at char array level to avoid using slow regex-based methods of String.
-		String s = property("artThumbURL", String.class);
+		String s = property("artThumbURL");
 		if (s != null) {
 			int u = s.lastIndexOf('_');
 			char[] chars;
@@ -597,7 +651,7 @@ public final class Release {
 	 */
 	private LocalDate propertyDate(String name) {
 		LocalDate result = LocalDate.MIN;
-		String dateStr = property(name, String.class);
+		String dateStr = property(name);
 		if (dateStr != null) {
 			try {
 				result = LocalDate.parse(dateStr, DateTimeFormatter.RFC_1123_DATE_TIME);
@@ -614,11 +668,11 @@ public final class Release {
 	 * Helper method for extracting the value of named JSON property in typesafe manner.
 	 * 
 	 * @param name property name
-	 * @param type a target type to convert property value to
 	 */
-	private <T> T property(String name, Class<T> type) {
+	@SuppressWarnings("unchecked")
+	private <T> T property(String name) {
 		try {
-			return type.cast(JS.eval("TralbumData." + name));
+			return (T)JS.eval("TralbumData." + name);
 		} 
 		catch (ScriptException | ClassCastException e) {
 			logError(e);
@@ -814,14 +868,6 @@ public final class Release {
 	 * Returns an unmodifiable set of tags describing this release.
 	 */
 	public Set<String> getTags() {
-		return tags.get();
-	}
-
-
-	/**
-	 * Returns a set of tags as read-only JavaFX property.
-	 */
-	public ReadOnlySetProperty<String> tagsProperty() {
 		return tags;
 	}
 

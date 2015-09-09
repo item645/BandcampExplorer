@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Level;
@@ -928,7 +929,7 @@ public class ReleasePlayerForm extends SplitPane {
 	private void loadRelease() {
 		Optional<String> url = Dialogs.inputBox("Enter a release URL to load:", "Load Release", stage);
 		if (url.isPresent()) {
-			String u = url.get().trim();
+			String u = url.get().trim().toLowerCase(Locale.ROOT);
 			if (!u.isEmpty()) {
 				try {
 					if (!u.startsWith("http://") && !u.startsWith("https://"))
@@ -936,7 +937,7 @@ public class ReleasePlayerForm extends SplitPane {
 					setRelease(Release.forURI(URI.create(u)));
 				} 
 				catch (Exception e) {
-					String errMsg = "Error loading release: " + e;
+					String errMsg = "Error loading release: " + e.getMessage();
 					LOGGER.log(Level.WARNING, errMsg, e);
 					Dialogs.messageBox(errMsg, "Error", stage);
 				}
