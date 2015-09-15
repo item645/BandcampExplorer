@@ -229,9 +229,13 @@ public class BandcampExplorerMainForm extends BorderPane {
 			SearchResult result = ExceptionUnchecker.uncheck(() -> task.get());
 			resultsView.setSearchResult(result);
 
-			String report = String.format("Search finished: %1$d %2$s found. Search time: %3$ds.",
-					result.size(),
-					result.size() == 1 ? "release" : "releases",
+			int loaded = result.size();
+			int failed = result.getFailedCount();
+			int total = loaded + failed;
+			String report = String.format("Search finished: %1$d %2$s found%3$s. Search time: %4$ds.",
+					total,
+					total == 1 ? "release" : "releases",
+					failed > 0 ? String.format(", %1$d failed to load", failed) : "",
 					Duration.between(task.getStartTime(), Instant.now()).getSeconds());
 			writeStatusBar(report);
 			LOGGER.info(report);

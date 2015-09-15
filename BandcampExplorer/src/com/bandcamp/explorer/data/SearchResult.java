@@ -3,10 +3,8 @@ package com.bandcamp.explorer.data;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Represents a search result returned by SearchTask after conducting a search.
@@ -15,6 +13,8 @@ public final class SearchResult implements Iterable<Release> {
 
 	private final List<Release> result = new ArrayList<>();
 	private final SearchParams searchParams;
+	private final int failed;
+	private final String asString;
 
 
 	/**
@@ -24,7 +24,7 @@ public final class SearchResult implements Iterable<Release> {
 	 * @throws NullPointerException if searchParams is null
 	 */
 	SearchResult(SearchParams searchParams) {
-		this(null, searchParams);
+		this(null, 0, searchParams);
 	}
 
 
@@ -33,13 +33,40 @@ public final class SearchResult implements Iterable<Release> {
 	 * of releases found during search.
 	 * 
 	 * @param result a collection of releases found during search
+	 * @param failed the number of releases that failed to load
 	 * @param searchParams parameters that were passed to SearchTask
-	 * @throws NullPointerException if searchParams is null
 	 */
-	SearchResult(Collection<Release> result, SearchParams searchParams) {
+	SearchResult(Collection<Release> result, int failed, SearchParams searchParams) {
+		assert failed >= 0;
+		assert searchParams != null;
+
+		this.searchParams = searchParams;
+		this.failed = failed;
 		if (result != null)
 			this.result.addAll(result);
-		this.searchParams = Objects.requireNonNull(searchParams);
+
+		this.asString = toString(this.result, this.failed, this.searchParams);
+	}
+
+
+	/**
+	 * Creates string representation for the search result.
+	 * 
+	 * @param result a collection of releases found during search
+	 * @param failed the number of releases that failed to load
+	 * @param searchParams parameters that were passed to SearchTask
+	 * @return string representation of the search result
+	 */
+	private static String toString(List<Release> result, int failed, SearchParams searchParams) {
+		return String.format("%1$s: %2$s (%3$d %4$s, %5$d found, %6$d loaded, %7$d failed)",
+				searchParams.searchType(),
+				searchParams.searchQuery(),
+				searchParams.pages(),
+				searchParams.pages() > 1 ? "pages" : "page",
+				result.size() + failed,
+				result.size(),
+				failed
+		);
 	}
 
 
@@ -53,21 +80,18 @@ public final class SearchResult implements Iterable<Release> {
 
 
 	/**
-	 * Sorts the releases contained in this result object using
-	 * supplied comparator.
-	 * 
-	 * @param cmp a comparator used to compare releases
-	 */
-	void sort(Comparator<Release> cmp) {
-		result.sort(cmp);
-	}
-
-
-	/**
 	 * Returns the number of releases in this search result.
 	 */
 	public int size() {
 		return result.size();
+	}
+
+
+	/**
+	 * Returns the number of releases that failed to load.
+	 */
+	public int getFailedCount() {
+		return failed;
 	}
 
 
@@ -86,10 +110,7 @@ public final class SearchResult implements Iterable<Release> {
 	 */
 	@Override
 	public String toString() {
-		return new StringBuilder(searchParams.searchType().toString())
-		.append(": ").append(searchParams.searchQuery()).append(" (").append(searchParams.pages())
-		.append(searchParams.pages() > 1 ? " pages" : " page").append(", ").append(result.size())
-		.append(" releases found)").toString();
+		return asString;
 	}
 
 }

@@ -15,6 +15,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import javafx.application.Platform;
+import javafx.beans.InvalidationListener;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
@@ -259,16 +260,17 @@ public class ReleasePlayerForm extends SplitPane {
 					if (audioPlayer.isPlayingTrack(track)) {
 						play.setDisable(true);
 						pause.setDisable(false);
+						stop.setDisable(false);
 					}
 					else {
 						play.setDisable(false);
-						play.setOnAction(actionEvent -> {
+						play.setOnAction(actionEvent -> Platform.runLater(() -> {
 							audioPlayer.setTrack(track);
 							audioPlayer.play();
-						});
+						}));
 						pause.setDisable(true);
+						stop.setDisable(!audioPlayer.isPausedTrack(track));
 					}
-					stop.setDisable(false);
 				}
 				else {
 					play.setDisable(true);
@@ -313,12 +315,12 @@ public class ReleasePlayerForm extends SplitPane {
 				menuItem.setDisable(true);
 			else {
 				menuItem.setDisable(false);
-				menuItem.setOnAction(event -> {
+				menuItem.setOnAction(event -> Platform.runLater(() -> {
 					boolean wasPlaying = audioPlayer.isPlaying();
 					audioPlayer.setTrack(track);
 					if (wasPlaying)
 						audioPlayer.play();
-				});
+				}));
 			}
 		}
 
@@ -380,11 +382,12 @@ public class ReleasePlayerForm extends SplitPane {
 
 		private static final String LOADING_TRACK_MSG = "Loading track...";
 
+		private final InvalidationListener timeListener = observable -> updateTrackProgress();
+		private ChangeListener<Number> timeSliderValueListener;
+		private ChangeListener<Number> volumeSliderValueListener;
 		private MediaPlayer player;
 		private Track track;
 		private Duration duration;
-		private ChangeListener<Number> timeSliderValueListener;
-		private ChangeListener<Number> volumeSliderValueListener;
 		private long currentSecond = -1;
 		private boolean preventTimeSliderSeek;
 		private boolean quit = true;
@@ -412,25 +415,29 @@ public class ReleasePlayerForm extends SplitPane {
 			quit = false;
 
 			setStateTransitionHandlers();
-			
+
 			highlightCurrentTrack();
 
 			player.setVolume(volumeSlider.getValue() / volumeSlider.getMax());
-			player.currentTimeProperty().addListener(observable -> updateTrackProgress());
+			player.currentTimeProperty().addListener(timeListener);
 			nowPlayingInfo.setText(LOADING_TRACK_MSG);
 
-			timeSlider.setDisable(false);
-			timeSlider.valueProperty().addListener(
+			if (timeSliderValueListener == null) {
 				timeSliderValueListener = (observable, oldValue, newValue) -> {
 					if (!quit && !preventTimeSliderSeek)
 						player.seek(duration.multiply(newValue.doubleValue() / timeSlider.getMax()));
-			});
-			volumeSlider.setDisable(false);
-			volumeSlider.valueProperty().addListener(
+				};
+				timeSlider.valueProperty().addListener(timeSliderValueListener);
+			}
+			timeSlider.setDisable(false);
+			if (volumeSliderValueListener == null) {
 				volumeSliderValueListener = (observable, oldValue, newValue) -> {
 					if (!quit)
 						player.setVolume(newValue.doubleValue() / volumeSlider.getMax());
-			});
+				};
+				volumeSlider.valueProperty().addListener(volumeSliderValueListener);
+			}
+			volumeSlider.setDisable(false);
 
 			disablePlayerButtons(false);
 			playButton.setOnAction(event -> play());
@@ -491,7 +498,19 @@ public class ReleasePlayerForm extends SplitPane {
 					}
 					else {
 						stop();
-						updateTrackProgress();
+						// Contrary to what documentation says, a call to player.seek() while
+						// player is in STOPPED state DOES have a side effect of changing the
+						// value of player's internal flag variable isUpdateTimeEnabled to true,
+						// which allows for automatic updating of currentTime property (and triggering
+						// corresponding notifications) on resuming playback later on after stopping
+						// when player has reached end of media.
+						// Here we're doing a call to player.seek() to trigger the aforementioned effect
+						// as a workaround for the bug with time slider and now playing info label not
+						// reflecting track progress when playback has been started after reaching 
+						// the end of media for current track. The bug is caused by the fact that player
+						// stops updating currentTime property on playback due to isUpdateTimeEnabled
+						// flag being set to false after track ended.
+						player.seek(Duration.ZERO);
 					}
 				}
 			});
@@ -523,6 +542,16 @@ public class ReleasePlayerForm extends SplitPane {
 		 */
 		boolean isPlayingTrack(Track track) {
 			return this.track == track && isPlaying();
+		}
+
+
+		/**
+		 * Checks if player is currently holding specified track on pause.
+		 * 
+		 * @param track a track to check for pause
+		 */
+		boolean isPausedTrack(Track track) {
+			return this.track == track && player != null && player.getStatus() == Status.PAUSED;
 		}
 
 
@@ -573,10 +602,6 @@ public class ReleasePlayerForm extends SplitPane {
 				player.dispose();
 				player = null;
 			}
-			if (timeSliderValueListener != null)
-				timeSlider.valueProperty().removeListener(timeSliderValueListener);
-			if (volumeSliderValueListener != null)
-				volumeSlider.valueProperty().removeListener(volumeSliderValueListener);
 			timeSlider.setDisable(true);
 			volumeSlider.setDisable(true);
 			track = null;
@@ -694,9 +719,9 @@ public class ReleasePlayerForm extends SplitPane {
 			else
 				currentSecond = second;
 
-			nowPlayingInfo.setText(getNowPlayingInfo(currentTime));
+			nowPlayingInfo.setText(getNowPlayingInfo(track, currentTime, duration));
 
-			timeSlider.setDisable(duration.isUnknown());
+			timeSlider.setDisable(duration == null || duration.isUnknown());
 			if (!timeSlider.isDisabled() && duration.greaterThan(Duration.ZERO) && !timeSlider.isValueChanging()) {
 				preventTimeSliderSeek = true; // prevents unnecessary firing of time slider seek listener
 				timeSlider.setValue(currentTime.divide(duration.toMillis()).toMillis() * timeSlider.getMax());
@@ -706,15 +731,21 @@ public class ReleasePlayerForm extends SplitPane {
 
 
 		/**
-		 * Builds a string to display in nowPlayingInfo label using current track time.
+		 * Builds a string to display in nowPlayingInfo label using current track,
+		 * current time and total time.
 		 * 
+		 * @param track a track
 		 * @param currentTime a current track time elsapsed
+		 * @param totalTime total time duration of a track
 		 * @return info text
 		 */
-		private String getNowPlayingInfo(Duration currentTime) {
-			return new StringBuilder(track.getArtist()).append(" - ").append(track.getTitle())
-					.append(" (").append(formatTime(currentTime)).append('/')
-					.append(formatTime(duration)).append(")").toString();
+		private String getNowPlayingInfo(Track track, Duration currentTime, Duration totalTime) {
+			if (track != null && currentTime != null && totalTime != null)
+				return new StringBuilder(track.getArtist()).append(" - ").append(track.getTitle())
+						.append(" (").append(formatTime(currentTime)).append('/')
+						.append(formatTime(totalTime)).append(')').toString();
+			else
+				return "";
 		}
 
 
@@ -730,6 +761,7 @@ public class ReleasePlayerForm extends SplitPane {
 		}
 
 	}
+
 
 
 	/**

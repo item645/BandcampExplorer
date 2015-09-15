@@ -1,28 +1,22 @@
 package com.bandcamp.explorer.ui;
 
-import java.awt.Desktop;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 import java.util.Objects;
 import java.util.function.Supplier;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import javafx.fxml.FXMLLoader;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.Region;
 
+import com.bandcamp.explorer.BandcampExplorer;
 import com.bandcamp.explorer.util.ExceptionUnchecker;
 
 /**
  * Contains some general utility stuff for UI.
  */
 class Utils {
-
-	private static final Logger LOGGER = Logger.getLogger(Utils.class.getName());
-
 
 	private Utils() {}
 
@@ -91,22 +85,11 @@ class Utils {
 
 	/**
 	 * Launches the default browser and navigates to specified URI.
-	 * If java.awt.Desktop is not supported, does nothing except logging
-	 * a message about that.
 	 * 
 	 * @param uri URI to open in a browser
 	 */
 	static void browse(URI uri) {
-		if (Desktop.isDesktopSupported()) {
-			try {
-				Desktop.getDesktop().browse(uri);
-			}
-			catch (Exception e) {
-				LOGGER.log(Level.SEVERE, "URL browse error: " + e.getMessage(), e);
-			}
-		}
-		else
-			LOGGER.warning("java.awt.Desktop is not supported");
+		BandcampExplorer.hostServices().showDocument(uri.toString());
 	}
 
 

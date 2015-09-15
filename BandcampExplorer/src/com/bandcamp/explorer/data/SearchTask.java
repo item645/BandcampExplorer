@@ -138,9 +138,7 @@ public final class SearchTask extends Task<SearchResult> {
 			return new SearchResult(searchParams);
 
 		int numTasks = releaseLoaders.size();
-		updateProgress(0, numTasks);
-		if (loadingReleasesMsg != null)
-			updateMessage(loadingReleasesMsg.apply(0, numTasks));
+		updateMessageAndProgress(0, numTasks);
 
 		// Submitting loaders to completion service so that results can be
 		// processed upon completion
@@ -149,6 +147,7 @@ public final class SearchTask extends Task<SearchResult> {
 
 		// Processing results and gathering loaded Release objects
 		List<Release> releases = new ArrayList<>();
+		int failed = 0;
 		for (int taskCounter = 1; taskCounter <= numTasks; ) {
 			if (isCancelled())
 				return new SearchResult(searchParams);
@@ -159,17 +158,17 @@ public final class SearchTask extends Task<SearchResult> {
 				try {
 					releases.add(result.getRelease());
 				}
-				catch (Exception e) {
+				catch (Exception exception) {
 					ReleaseLoader loader = result.getLoader();
-					String msg = "Error loading release: " + loader.getURI() + " (" + e.getMessage() + ")";
-					int responseCode = e instanceof ReleaseLoadingException
-							? ((ReleaseLoadingException)e).getHttpResponseCode()
+					String message = "Error loading release: " + loader.getURI() + " (" + exception.getMessage() + ")";
+					int responseCode = exception instanceof ReleaseLoadingException
+							? ((ReleaseLoadingException)exception).getHttpResponseCode()
 							: 0;
 					if (responseCode == HttpURLConnection.HTTP_UNAVAILABLE) {
 						// Here we do a special treatment for HTTP 503 (Service Unavailable)
 						// errors which arise due to the high load that we have probably
 						// imposed on Bandcamp server.
-						LOGGER.warning(msg); // don't log exception for HTTP 503, only message
+						LOGGER.warning(message); // don't log exception for HTTP 503, only message
 						pause(PAUSE_MLS_ON_503); // let Bandcamp server cool down a bit
 						if (loader.getAttempts() <= MAX_RELEASE_LOAD_ATTEMPTS) {
 							// If we haven't yet exceeded max load attempts for this release loader,
@@ -179,21 +178,32 @@ public final class SearchTask extends Task<SearchResult> {
 						}
 					}
 					else
-						LOGGER.log(Level.WARNING, msg, e);
+						LOGGER.log(Level.WARNING, message, exception);
+					if (!repeat)
+						failed++;
 				}
 			}
 
-			if (!repeat) {
-				if (loadingReleasesMsg != null)
-					updateMessage(loadingReleasesMsg.apply(taskCounter, numTasks));
-				updateProgress(taskCounter, numTasks);
-				taskCounter++;
-			}
+			if (!repeat)
+				updateMessageAndProgress(taskCounter++, numTasks);
 		}
 
-		SearchResult searchResult = new SearchResult(releases, searchParams);
-		searchResult.sort(searchParams.sortOrder());
-		return searchResult;
+		releases.sort(searchParams.sortOrder());
+		return new SearchResult(releases, failed, searchParams);
+	}
+
+
+	/**
+	 * Updates message, progress, workDone and totalWork properties with 
+	 * current processed and total number of releases.
+	 * 
+	 * @param processed the number of releases processed already
+	 * @param total total number of releases to process by this task
+	 */
+	private void updateMessageAndProgress(int processed, int total) {
+		updateProgress(processed, total);
+		if (loadingReleasesMsg != null)
+			updateMessage(loadingReleasesMsg.apply(processed, total));
 	}
 
 

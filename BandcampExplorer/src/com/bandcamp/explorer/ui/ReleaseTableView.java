@@ -104,6 +104,11 @@ class ReleaseTableView extends AnchorPane {
 	private final ObservableList<Release> items = FXCollections.observableArrayList();
 	private final FilteredList<Release> filteredItems = new FilteredList<>(items);
 	private SortedList<Release> sortedItems = new SortedList<>(filteredItems);
+	private final ObservableList<Release> itemsDecorator = new ItemsDecorator();
+
+	private final ReleaseTableContextMenu releaseTableContextMenu = new ReleaseTableContextMenu();
+	private TableViewResizeHelper resizeHelper;
+
 
 	/**
 	 * Special-purpose decorator for items list that features modified clear()
@@ -111,7 +116,7 @@ class ReleaseTableView extends AnchorPane {
 	 * Reference to this decorator is handed to class clients so they can transparently
 	 * call modified version of clear().
 	 */
-	private final ObservableList<Release> itemsDecorator = new ModifiableObservableListBase<Release>() {
+	private class ItemsDecorator extends ModifiableObservableListBase<Release> {
 
 		/** 
 		 * {@inheritDoc}
@@ -142,11 +147,7 @@ class ReleaseTableView extends AnchorPane {
 		@Override protected void doAdd(int index, Release element)    {items.add(index, element);}
 		@Override protected Release doSet(int index, Release element) {return items.set(index, element);}
 		@Override protected Release doRemove(int index)               {return items.remove(index);}
-	};
-
-	private final ReleaseTableContextMenu releaseTableContextMenu = new ReleaseTableContextMenu();
-	private TableViewResizeHelper resizeHelper;
-
+	}
 
 
 	/**
@@ -433,7 +434,8 @@ class ReleaseTableView extends AnchorPane {
 		filteredStatusLabel.textProperty().bind(
 				Bindings.createStringBinding(
 						() -> String.format(
-								"Displaying: %1$s of %2$s", filteredItems.size(), items.size()), filteredItems));
+								"Displaying: %1$s of %2$s", filteredItems.size(), items.size()),
+								filteredItems, items));
 		
 		releaseTableView.setItems(sortedItems);
 		sortedItems.comparatorProperty().bind(releaseTableView.comparatorProperty());

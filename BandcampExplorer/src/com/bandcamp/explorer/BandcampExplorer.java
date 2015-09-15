@@ -7,6 +7,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javafx.application.Application;
+import javafx.application.HostServices;
+import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
@@ -47,6 +49,21 @@ public final class BandcampExplorer extends Application {
 	 */
 	private final ExecutorService executorService = Executors.newFixedThreadPool(7);
 
+	/**
+	 * Host services for the application.
+	 */
+	private static HostServices hostServices;
+
+
+	/**
+	 * Returns the instance of HostServices.
+	 * This method can be called only from Java FX Application Thread.
+	 */
+	public static HostServices hostServices() {
+		if (!Platform.isFxApplicationThread())
+			throw new IllegalStateException("This method can be called only from Java FX Application Thread");
+		return hostServices;
+	}
 
 
 	@Override
@@ -54,6 +71,8 @@ public final class BandcampExplorer extends Application {
 		this.primaryStage = primaryStage;
 		this.primaryStage.setTitle(APP_TITLE);
 		this.primaryStage.setOnCloseRequest(event -> executorService.shutdownNow());
+
+		hostServices = getHostServices();
 
 		try {
 			initUI();
