@@ -3,8 +3,12 @@ package com.bandcamp.explorer.ui;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
+import java.util.Collection;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+
 import javafx.fxml.FXMLLoader;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
@@ -108,4 +112,19 @@ class Utils {
 		}
 	}
 
+
+	/**
+	 * Converts the specified data taken from each element in collection to string,
+	 * concatenates resulting strings using delimiter and puts into a system clipboard. 
+	 * 
+	 * @param items a collection of elements
+	 * @param mapper a mapping function that produces textual content to be copied,
+	 *        deriving it from the collection element
+	 * @param delimiter the delimiter to be used to separate strings created from
+	 *        individual elements
+	 */
+	static <T> void toClipboardAsString(Collection<T> items, Function<T, String> mapper, CharSequence delimiter) {
+		toClipboardAsString(items.stream().map(mapper).collect(Collectors.joining(delimiter)));
+	}
+	
 }

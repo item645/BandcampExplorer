@@ -46,7 +46,7 @@ public final class SearchTask extends Task<SearchResult> {
 	 * 
 	 * @param params search parameters
 	 * @param executor an instance of executor service that will be employed
-	 *        to execute all page and release loading operations 
+	 *        to execute all resource and release loading operations 
 	 * @param requestingDataMsg a text for updating message property when data
 	 *        requesting stage is performed (if null, message is not updated)
 	 * @param loadingReleasesMsg a callback function that accepts two int arguments (number of
@@ -117,13 +117,13 @@ public final class SearchTask extends Task<SearchResult> {
 		if (requestingDataMsg != null)
 			updateMessage(requestingDataMsg);
 
-		// Loading and processing search pages
-		List<Future<Page>> pages = new ArrayList<>();
-		int numPages = searchParams.searchType().isMultiPage ? searchParams.pages() : 1;
+		// Loading and processing resources
+		List<Future<Resource>> resources = new ArrayList<>();
+		int numPages = searchParams.searchType().isMultiPage() ? searchParams.pages() : 1;
 		for (int i = 1; i <= numPages; i++) {
 			int pageNum = i;
-			pages.add(executor.submit(
-					() -> searchParams.searchType().loadPage(searchParams.searchQuery(), pageNum, this)));
+			resources.add(executor.submit(
+					() -> searchParams.searchType().loadResource(searchParams.searchQuery(), pageNum, this)));
 		}
 
 		// Collecting loaders for all release URLs found during search.
@@ -131,8 +131,8 @@ public final class SearchTask extends Task<SearchResult> {
 		// loader for each unique release URL string, because Bandcamp search and tag
 		// pages with different numbers can duplicate same releases.
 		Set<ReleaseLoader> releaseLoaders = new HashSet<>();
-		for (Future<Page> page : pages)
-			releaseLoaders.addAll(page.get().getReleaseLoaders());
+		for (Future<Resource> resource : resources)
+			releaseLoaders.addAll(resource.get().getReleaseLoaders());
 
 		if (isCancelled())
 			return new SearchResult(searchParams);
@@ -225,8 +225,8 @@ public final class SearchTask extends Task<SearchResult> {
 			LOGGER.warning("Search task thread interrupted");
 		}
 		finally {
-			paused = false;
 			synchronized (pauseLock) {
+				paused = false;
 				pauseLock.notifyAll();
 			}
 		}

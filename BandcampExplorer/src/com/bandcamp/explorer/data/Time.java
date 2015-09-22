@@ -31,14 +31,31 @@ public final class Time implements Comparable<Time> {
 		if (seconds < 0)
 			throw new IllegalArgumentException("A number of seconds is negative: " + seconds);
 
-		int m = seconds / 60 % 60;
-		int s = seconds % 60;
+		StringBuilder result = new StringBuilder();
+
 		if (seconds >= 3600) {
-			int h = seconds / 3600;
-			return String.format("%02d:%02d:%02d", h, m, s);
+			appendWithLeadingZero(result, seconds / 3600);
+			result.append(':');
 		}
-		else
-			return String.format("%02d:%02d", m, s);
+		appendWithLeadingZero(result, seconds / 60 % 60);
+		result.append(':');
+		appendWithLeadingZero(result, seconds % 60);
+
+		return result.toString();
+	}
+
+
+	/**
+	 * Appends the given number to string builder, adding leading zero
+	 * if number < 10.
+	 * 
+	 * @param sb string builder
+	 * @param n a number
+	 */
+	private static void appendWithLeadingZero(StringBuilder sb, int n) {
+		if (n < 10)
+			sb.append('0');
+		sb.append(Integer.toString(n));
 	}
 
 
@@ -57,8 +74,7 @@ public final class Time implements Comparable<Time> {
 	 */
 	@Override
 	public boolean equals(Object other) {
-		if (this == other) return true;
-		return other instanceof Time ? this.seconds == ((Time)other).seconds : false;
+		return this == other || other instanceof Time && this.seconds == ((Time)other).seconds;
 	}
 
 

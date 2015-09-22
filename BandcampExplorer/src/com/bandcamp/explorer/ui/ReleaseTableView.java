@@ -8,6 +8,7 @@ import java.net.URI;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
@@ -210,21 +211,22 @@ class ReleaseTableView extends AnchorPane {
 			copyReleaseText.setOnAction(event -> Utils.toClipboardAsString(getSelectedRelease()));
 
 			MenuItem copyAllReleasesText = new MenuItem("Copy All Releases as Text");
-			copyAllReleasesText.setOnAction(event -> {
-				// NOTE: we don't use System.lineSeparator() to separate lines here
-				// due to a possible bug in JavaFX clipboard implementation.
-				// More details: http://stackoverflow.com/questions/18827217/javafx-clipboard-double-newlines
-				Utils.toClipboardAsString(sortedItems.stream()
-						.map(Release::toString)
-						.collect(Collectors.joining("\n")));
-			});
+			// NOTE: we don't use System.lineSeparator() as a delimiter
+			// due to a possible bug in JavaFX clipboard implementation.
+			// More details: http://stackoverflow.com/questions/18827217/javafx-clipboard-double-newlines
+			// (same goes for copyAllURLs)
+			copyAllReleasesText.setOnAction(event -> Utils.toClipboardAsString(sortedItems, Release::toString, "\n"));
+
+			MenuItem copyAllURLs = new MenuItem("Copy All URLs");
+			copyAllURLs.setOnAction(event -> Utils.toClipboardAsString(
+					sortedItems, release -> release.getURI().toString(), "\n"));
 
 			MenuItem playRelease = new MenuItem("Play Release...");
 			playRelease.setOnAction(event -> playSelectedRelease());
 
 			getItems().addAll(searchArtist, moreFromDomain, new SeparatorMenuItem(), viewOnBandcamp,
 					viewDiscogOnBandcamp, new SeparatorMenuItem(), copyText, copyReleaseText,
-					copyAllReleasesText, new SeparatorMenuItem(), playRelease);
+					copyAllReleasesText, copyAllURLs, new SeparatorMenuItem(), playRelease);
 		}
 
 	}
@@ -251,7 +253,7 @@ class ReleaseTableView extends AnchorPane {
 	static ReleaseTableView create(BandcampExplorerMainForm mainForm, ReleasePlayerForm releasePlayer) {
 		assert mainForm != null;
 		assert releasePlayer != null;
-		FXML_STREAM.reset(); // for BAIS reset is always supported
+		FXML_STREAM.reset();
 		return Utils.loadFXMLComponent(FXML_STREAM, () -> new ReleaseTableView(mainForm, releasePlayer));
 	}
 
@@ -492,6 +494,8 @@ class ReleaseTableView extends AnchorPane {
 			)
 		);
 		urlColumn.setCellValueFactory(cellData -> cellData.getValue().uriProperty());
+		// ignore protocol on sorting
+		urlColumn.setComparator(Comparator.comparing(URI::getSchemeSpecificPart));
 
 		// Setting a callback to display an information about selected
 		// release in text area.

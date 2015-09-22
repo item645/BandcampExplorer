@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.logging.Formatter;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -28,7 +29,6 @@ public class EventLog extends AnchorPane {
 	private static EventLog EVENT_LOG;
 
 	private static final DateTimeFormatter HH_mm_ss = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.ENGLISH);
-	private static final String LINE_SEPARATOR = System.lineSeparator();
 
 	/**
 	 * A handler that transfers messages and exceptions from logger to an
@@ -64,7 +64,7 @@ public class EventLog extends AnchorPane {
 			@Override
 			public String format(LogRecord record) {
 				return new StringBuilder(HH_mm_ss.format(LocalDateTime.now()))
-				.append("   ").append(formatMessage(record)).append(LINE_SEPARATOR).toString();
+				.append("   ").append(formatMessage(record)).append(System.lineSeparator()).toString();
 			}
 		});
 
@@ -84,7 +84,7 @@ public class EventLog extends AnchorPane {
 			StringWriter output = new StringWriter();
 			output.write(HH_mm_ss.format(LocalDateTime.now()) + "   ");
 			exception.printStackTrace(new PrintWriter(output, true));
-			output.write("--------------------------------" + LINE_SEPARATOR);
+			output.write("--------------------------------" + System.lineSeparator());
 			return output.toString();
 		}
 		else
@@ -124,10 +124,11 @@ public class EventLog extends AnchorPane {
 	 * @param owner the owner of event log window
 	 * @throws NullPointerException if owner is null
 	 * @throws IllegalStateException if this method has been called more than once
+	 *         or if it is called from the thread other than JavaFX Application Thread
 	 */
 	public static EventLog create(Window owner) {
 		if (!Platform.isFxApplicationThread())
-			throw new IllegalStateException("This component can be created only from Java FX Application Thread");
+			throw new IllegalStateException("This component can be created only from JavaFX Application Thread");
 		if (EVENT_LOG != null)
 			throw new IllegalStateException("This component can't be instantiated more than once");
 		Objects.requireNonNull(owner);
@@ -152,6 +153,18 @@ public class EventLog extends AnchorPane {
 	 */
 	void show() {
 		stage.show();
+	}
+
+
+	/**
+	 * Clears all content from events and exceptions text areas and logs
+	 * message about that.
+	 */
+	@FXML
+	private void clear() {
+		eventsTextArea.clear();
+		exceptionsTextArea.clear();
+		Logger.getLogger(EventLog.class.getName()).info("Event Log cleared");
 	}
 
 

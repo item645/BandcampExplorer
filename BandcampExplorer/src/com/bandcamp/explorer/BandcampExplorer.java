@@ -90,9 +90,11 @@ public final class BandcampExplorer extends Application {
 		// Loading and configuring components
 		EventLog eventLog = EventLog.create(primaryStage);
 		configureLogging(eventLog.getLogHandler());
-		ReleasePlayerForm releasePlayer = ReleasePlayerForm.create(primaryStage);
-		BandcampExplorerMainForm mainForm = BandcampExplorerMainForm.create(primaryStage, releasePlayer, eventLog);
-		mainForm.setExecutorService(executorService);
+		BandcampExplorerMainForm mainForm = BandcampExplorerMainForm.create(
+				primaryStage,
+				ReleasePlayerForm.create(primaryStage),
+				eventLog,
+				executorService);
 
 		// When everything's prepared, show app's window
 		primaryStage.setScene(new Scene(mainForm));

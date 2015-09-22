@@ -21,32 +21,34 @@ import java.util.regex.Pattern;
 import com.bandcamp.explorer.util.ExceptionUnchecker;
 
 /**
- * This class is used to load an arbitrary page using specified URL string
- * and collect all unique links to Bandcamp releases, encountered on that page.
- * A {@link ReleaseLoader} task is then created for each found release link. List of 
- * release loaders can be obtained via {@link #getReleaseLoaders()}.
+ * Represents a resource for obtaining links to Bandcamp releases.
+ * The resource can be either a web page or a file on local or network drive.
+ * Instance of this class loads the resource referenced by the specified URL
+ * string and collects all unique links to Bandcamp releases found in that
+ * resource, creating a {@link ReleaseLoader} task for each found release
+ * link. List of release loaders can be obtained via {@link #getReleaseLoaders()}.
  */
-class Page {
+class Resource {
 
-	private static final Logger LOGGER = Logger.getLogger(Page.class.getName());
+	private static final Logger LOGGER = Logger.getLogger(Resource.class.getName());
 
 	private static final Pattern RELEASE_LINK = Pattern.compile(
-			"(https?://[^/]+\\.[^/\\+\"]+)??/(album|track)/[^/\\+\"]+?(?=(\"|\\?|<|\\s|\\&|\\u005C))", Pattern.CASE_INSENSITIVE);
+			"((https?://)?[a-z0-9\\-\\.]+)?/(album|track)/[a-z0-9\\-]+", Pattern.CASE_INSENSITIVE);
 
 	private final List<ReleaseLoader> releaseLoaders = new ArrayList<>();
 	private final SearchTask parentTask;
 
 
 	/**
-	 * Constructs a page object using specified URL string and loads it.
+	 * Constructs a resource object using specified URL string and loads it.
 	 * 
 	 * @param url URL string
-	 * @param parentTask an instance of SearchTask that requests a page loading
-	 * @throws IOException if page cannot be loaded for some reason 
+	 * @param parentTask an instance of SearchTask that requests the resource
+	 * @throws IOException if resource cannot be loaded for some reason 
 	 * @throws IllegalArgumentException if supplied URL string is not valid
 	 * @throws NullPointerException if URL string or parent task is null
 	 */
-	Page(String url, SearchTask parentTask) throws IOException {
+	Resource(String url, SearchTask parentTask) throws IOException {
 		this.parentTask = Objects.requireNonNull(parentTask);
 
 		// Pushing URL string through multi-arg constructor and ASCII string 
@@ -58,8 +60,8 @@ class Page {
 
 
 	/**
-	 * Loads a page using supplied URL and creates a loader for every unique release 
-	 * link found on this page.
+	 * Loads a resource using supplied URL and creates a loader for every unique release 
+	 * link found in this resource.
 	 */
 	private void load(URL url) throws IOException {
 		if (parentTask.isCancelled())
@@ -71,13 +73,23 @@ class Page {
 		connection.setReadTimeout(60000);
 
 		try (Scanner input = new Scanner(connection.getInputStream(), StandardCharsets.UTF_8.name())) {
+			boolean isFile = url.getProtocol().toLowerCase(Locale.ROOT).equals("file");
 			Set<String> links = new HashSet<>();
-			String link = null;
-			while ((link = input.findWithinHorizon(RELEASE_LINK, 0)) != null) {
+
+			for (String link; (link = input.findWithinHorizon(RELEASE_LINK, 0)) != null; ) {
 				link = link.toLowerCase(Locale.ROOT);
-				if (link.startsWith("/album") || link.startsWith("/track")) {
-					link = new StringBuilder(url.getProtocol())
-					.append("://").append(url.getHost()).append(link).toString();
+				boolean noHost = link.startsWith("/album") || link.startsWith("/track");
+				if (isFile) {
+					if (noHost)
+						continue; // if reading from file, skip links with no host
+					else 
+						if (!link.startsWith("http://") && !link.startsWith("https://"))
+							link = "http://" + link;
+				}
+				else {
+					if (noHost)
+						link = new StringBuilder(url.getProtocol())
+						.append("://").append(url.getHost()).append(link).toString();
 				}
 				if (links.add(link)) { // ensure that we don't create a loader for same link more than once
 					ReleaseLoader loader = createLoader(link);
@@ -108,7 +120,7 @@ class Page {
 
 	/**
 	 * Returns an unmodifiable list of release loaders, corresponding to every unique
-	 * release link found on this page.
+	 * release link found in this resource.
 	 */
 	List<ReleaseLoader> getReleaseLoaders() {
 		return Collections.unmodifiableList(releaseLoaders);

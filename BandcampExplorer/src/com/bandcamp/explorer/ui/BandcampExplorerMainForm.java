@@ -42,7 +42,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 	private static BandcampExplorerMainForm INSTANCE;
 
 	@FXML private ComboBox<SearchType> searchType;
-	@FXML private ComboBox<Integer> page;
+	@FXML private ComboBox<Integer> pages;
 	@FXML private TextField searchQuery;
 	@FXML private CheckBox showCombinedResults;
 	@FXML private Text statusText;
@@ -54,7 +54,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 	private final ReleasePlayerForm releasePlayer;
 	private final EventLog eventLog;
 	private final ProgressBarDialog progressBar;
-	private ExecutorService executorService;
+	private final ExecutorService executorService;
 
 	/**
 	 * Holds a reference to currently running search task.
@@ -65,10 +65,13 @@ public class BandcampExplorerMainForm extends BorderPane {
 	/**
 	 * Creates an instance of main form.
 	 */
-	private BandcampExplorerMainForm(Stage primaryStage, ReleasePlayerForm releasePlayer, EventLog eventLog) {
+	private BandcampExplorerMainForm(Stage primaryStage, ReleasePlayerForm releasePlayer,
+			EventLog eventLog, ExecutorService executorService) {
 		this.releasePlayer = releasePlayer;
 		this.eventLog = eventLog;
+		this.executorService = executorService;
 		this.progressBar = ProgressBarDialog.create(primaryStage);
+		this.progressBar.setExecutor(executorService);
 
 		setCenter(this.resultsView = ResultsView.create(this, releasePlayer));
 
@@ -113,38 +116,29 @@ public class BandcampExplorerMainForm extends BorderPane {
 	 * @param primaryStage reference to app's primary stage
 	 * @param releasePlayer reference to a release player
 	 * @param eventLog reference to event log
+	 * @param executorService an executor service for performing various asynchronous operations
 	 * 
 	 * @throws NullPointerException if any of passed parameters is null
 	 * @throws IllegalStateException if this method has been called more than once
+	 *         or if it is called from the thread other than JavaFX Application Thread
 	 */
 	public static BandcampExplorerMainForm create(
 			Stage primaryStage,
 			ReleasePlayerForm releasePlayer,
-			EventLog eventLog) {
+			EventLog eventLog,
+			ExecutorService executorService) {
 		if (!Platform.isFxApplicationThread())
-			throw new IllegalStateException("This component can be created only from Java FX Application Thread");
+			throw new IllegalStateException("This component can be created only from JavaFX Application Thread");
 		if (INSTANCE != null)
 			throw new IllegalStateException("This component can't be instantiated more than once");
 		Objects.requireNonNull(primaryStage);
 		Objects.requireNonNull(releasePlayer);
 		Objects.requireNonNull(eventLog);
+		Objects.requireNonNull(executorService);
 
 		return (INSTANCE = Utils.loadFXMLComponent(
 				BandcampExplorerMainForm.class.getResource("BandcampExplorerMainForm.fxml"),
-				() -> new BandcampExplorerMainForm(primaryStage, releasePlayer, eventLog)));
-	}
-
-
-	/**
-	 * Sets an executor service to be used for performing various
-	 * asynchronous operations.
-	 * 
-	 * @param executorService an executor service
-	 * @throws NullPointerException if executorService is null
-	 */
-	public void setExecutorService(ExecutorService executorService) {
-		this.executorService = Objects.requireNonNull(executorService);
-		progressBar.setExecutor(executorService);
+				() -> new BandcampExplorerMainForm(primaryStage, releasePlayer, eventLog, executorService)));
 	}
 
 
@@ -188,7 +182,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 			return;
 
 		SearchParams params = new SearchParams.Builder(
-				query, searchType.getValue()).pages(page.getValue()).build();
+				query, searchType.getValue()).pages(pages.getValue()).build();
 
 		SearchTask task = new SearchTask(
 				params,
@@ -324,7 +318,6 @@ public class BandcampExplorerMainForm extends BorderPane {
 	 * @param text text to write
 	 */
 	private void writeStatusBar(String text) {
-		statusText.textProperty().unbind();
 		statusText.setText(text);
 	}
 
@@ -351,16 +344,16 @@ public class BandcampExplorerMainForm extends BorderPane {
 
 	/**
 	 * Handler invoked when search type combobox changes its value.
-	 * Disables pages combobox if search type set to DIRECT.
+	 * Disables pages combobox if search type does not support using multiple pages.
 	 */
 	@FXML
 	private void onSearchTypeChange() {
-		if (searchType.getValue() == SearchType.DIRECT) {
-			page.setValue(1);
-			page.setDisable(true);
+		if (!searchType.getValue().isMultiPage()) {
+			pages.setValue(1);
+			pages.setDisable(true);
 		}
 		else
-			page.setDisable(false);
+			pages.setDisable(false);
 	}
 
 
@@ -387,8 +380,8 @@ public class BandcampExplorerMainForm extends BorderPane {
 		ObservableList<Integer> pageNums = FXCollections.observableArrayList();
 		for (int i = 1; i <= 10; i++)
 			pageNums.add(i);
-		page.setItems(pageNums);
-		page.setValue(1);
+		pages.setItems(pageNums);
+		pages.setValue(1);
 	}
 
 
@@ -401,7 +394,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 		assert statusText != null : "fx:id=\"statusText\" was not injected: check your FXML file 'BandcampExplorerMainForm.fxml'.";
 		assert searchQuery != null : "fx:id=\"searchQuery\" was not injected: check your FXML file 'BandcampExplorerMainForm.fxml'.";
 		assert findReleases != null : "fx:id=\"findReleases\" was not injected: check your FXML file 'BandcampExplorerMainForm.fxml'.";
-		assert page != null : "fx:id=\"page\" was not injected: check your FXML file 'BandcampExplorerMainForm.fxml'.";
+		assert pages != null : "fx:id=\"pages\" was not injected: check your FXML file 'BandcampExplorerMainForm.fxml'.";
 		assert clearSelected != null : "fx:id=\"clearSelected\" was not injected: check your FXML file 'BandcampExplorerMainForm.fxml'.";
 		assert clearAll != null : "fx:id=\"clearAll\" was not injected: check your FXML file 'BandcampExplorerMainForm.fxml'.";
 		assert showCombinedResults != null : "fx:id=\"showCombinedResults\" was not injected: check your FXML file 'BandcampExplorerMainForm.fxml'.";

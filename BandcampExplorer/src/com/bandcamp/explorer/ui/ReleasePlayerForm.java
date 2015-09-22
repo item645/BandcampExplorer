@@ -12,7 +12,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
@@ -293,11 +292,8 @@ public class ReleasePlayerForm extends SplitPane {
 			copyTrackText.setOnAction(event -> Utils.toClipboardAsString(trackListView.getSelectedTrack()));
 
 			MenuItem copyAllTracksText = new MenuItem("Copy All Tracks as Text");
-			copyAllTracksText.setOnAction(event -> {
-				Utils.toClipboardAsString(trackListView.sortedTracks.stream()
-						.map(Track::toString)
-						.collect(Collectors.joining("\n")));
-			});
+			copyAllTracksText.setOnAction(event -> Utils.toClipboardAsString(
+					trackListView.sortedTracks, Track::toString, "\n"));
 
 			getItems().addAll(play, pause, stop, previous, next, new SeparatorMenuItem(),
 					copyText, copyTrackText, copyAllTracksText);
@@ -388,6 +384,7 @@ public class ReleasePlayerForm extends SplitPane {
 		private MediaPlayer player;
 		private Track track;
 		private Duration duration;
+		private String durationText;
 		private long currentSecond = -1;
 		private boolean preventTimeSliderSeek;
 		private boolean quit = true;
@@ -466,6 +463,7 @@ public class ReleasePlayerForm extends SplitPane {
 			player.setOnReady(() -> {
 				if (!quit) {
 					duration = player.getMedia().getDuration();
+					durationText = formatTime(duration);
 					updateTrackProgress();
 				}
 			});
@@ -606,6 +604,7 @@ public class ReleasePlayerForm extends SplitPane {
 			volumeSlider.setDisable(true);
 			track = null;
 			duration = null;
+			durationText = null;
 			currentSecond = -1;
 			playButton.setGraphic(PLAY_ICON);
 			nowPlayingInfo.setText("");
@@ -719,7 +718,7 @@ public class ReleasePlayerForm extends SplitPane {
 			else
 				currentSecond = second;
 
-			nowPlayingInfo.setText(getNowPlayingInfo(track, currentTime, duration));
+			nowPlayingInfo.setText(getNowPlayingInfo(track, currentTime, durationText));
 
 			timeSlider.setDisable(duration == null || duration.isUnknown());
 			if (!timeSlider.isDisabled() && duration.greaterThan(Duration.ZERO) && !timeSlider.isValueChanging()) {
@@ -736,14 +735,14 @@ public class ReleasePlayerForm extends SplitPane {
 		 * 
 		 * @param track a track
 		 * @param currentTime a current track time elsapsed
-		 * @param totalTime total time duration of a track
+		 * @param totalTimeText text representation of total duration of a track
 		 * @return info text
 		 */
-		private String getNowPlayingInfo(Track track, Duration currentTime, Duration totalTime) {
-			if (track != null && currentTime != null && totalTime != null)
+		private String getNowPlayingInfo(Track track, Duration currentTime, String totalTimeText) {
+			if (track != null && currentTime != null && totalTimeText != null)
 				return new StringBuilder(track.getArtist()).append(" - ").append(track.getTitle())
 						.append(" (").append(formatTime(currentTime)).append('/')
-						.append(formatTime(totalTime)).append(')').toString();
+						.append(totalTimeText).append(')').toString();
 			else
 				return "";
 		}
@@ -757,7 +756,9 @@ public class ReleasePlayerForm extends SplitPane {
 		 * @return duration as text
 		 */
 		private String formatTime(Duration duration) {
-			return Time.formatSeconds((int)Math.round(duration.toSeconds()));
+			return Time.formatSeconds(!duration.equals(Duration.INDEFINITE) && !duration.equals(Duration.UNKNOWN)
+					? (int)Math.round(duration.toSeconds())
+					: 0);
 		}
 
 	}
@@ -802,10 +803,11 @@ public class ReleasePlayerForm extends SplitPane {
 	 * @param owner the owner of player form window
 	 * @throws NullPointerException if owner is null
 	 * @throws IllegalStateException if this method has been called more than once
+	 *         or if it is called from the thread other than JavaFX Application Thread
 	 */
 	public static ReleasePlayerForm create(Window owner) {
 		if (!Platform.isFxApplicationThread())
-			throw new IllegalStateException("This component can be created only from Java FX Application Thread");
+			throw new IllegalStateException("This component can be created only from JavaFX Application Thread");
 		if (INSTANCE != null)
 			throw new IllegalStateException("This component can't be instantiated more than once");
 		Objects.requireNonNull(owner);
