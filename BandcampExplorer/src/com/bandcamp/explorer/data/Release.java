@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -60,28 +62,60 @@ public final class Release {
 	private static final Pattern RELEASE_DATA = Pattern.compile("var TralbumData = \\{.+?\\};", Pattern.DOTALL);
 
 	/**
-	 * Pattern for locating tags
+	 * Pattern for locating tags.
 	 */
 	private static final Pattern TAG_DATA = Pattern.compile("<a class=\"tag\".+?>.+?(?=(</a>))", Pattern.DOTALL);
 
 	/**
-	 * Pattern for numeric HTML escape codes
+	 * Pattern for splitting the value of "title" JSON property when it contains
+	 * both artist and title.
+	 */
+	private static final Pattern TRACK_TITLE_SPLITTER = Pattern.compile(" - ");
+
+	/**
+	 * A list of patterns capturing some frequently used artist names for V/A-type releases,
+	 * mostly compilations.
+	 */
+	private static final List<Pattern> VARIOUS_ARTISTS_PATTERNS;
+	static {
+		List<Pattern> patterns = new ArrayList<>();
+		int flags = Pattern.CASE_INSENSITIVE;
+
+		// "Various", "Various Artist", "Various Artists"
+		patterns.add(Pattern.compile("(various){1}(\\sartists?)?", flags));
+		// <...> Recs, <...> Records, <...> Recordings, <...> Music, <...> Productions,
+		// <...> Prod., <...> Label Group and all these in parentheses,
+		// e.g. <...> (<...> Records) and the like
+		patterns.add(Pattern.compile(
+				".+\\s(rec(ord)?s|rec(ordings|\\.)|music|prod(uctions)?\\.?|label\\sgroup)\\)?", flags));
+		// "V/A", "V\A", "VA", "V-A"
+		patterns.add(Pattern.compile("v(/|-|\\\\)?a", flags));
+		// beatspace
+		patterns.add(Pattern.compile("(beatspace(-|\\.).+|.+(\\.|-)beatspace)", flags));
+
+		VARIOUS_ARTISTS_PATTERNS = Collections.unmodifiableList(patterns);
+	}
+
+	/**
+	 * Pattern for numeric HTML escape codes.
 	 */
 	private static final Pattern HTML_ESCAPE_CODE = Pattern.compile("&#\\d+;");
 
 	/**
-	 * Sets some mappings for HTML escape chars to use in tags unescaping operation
+	 * Some mappings for HTML escape chars to use in tags unescaping operation.
 	 */
-	private static final Map<String, String> HTML_SPECIALS = new HashMap<>();
+	private static final Map<String, String> HTML_SPECIALS;
 	static {
-		HTML_SPECIALS.put("&amp;", "&");
-		HTML_SPECIALS.put("&quot;", "\"");
-		HTML_SPECIALS.put("&lt;", "<");
-		HTML_SPECIALS.put("&gt;", ">");
+		Map<String, String> specials = new HashMap<>();
+		specials.put("&amp;", "&");
+		specials.put("&quot;", "\"");
+		specials.put("&lt;", "<");
+		specials.put("&gt;", ">");
+		HTML_SPECIALS = Collections.unmodifiableMap(specials);
 	}
 
 	/**
-	 * A factory for JavaScript engines allowing to reuse instantiated engines on per-thread basis
+	 * A factory for JavaScript engines allowing to reuse instantiated engines on per-thread basis.
 	 */
 	private static final ThreadLocal<ScriptEngine> JS_ENGINES = new ThreadLocal<ScriptEngine>() {
 		@Override
@@ -390,8 +424,8 @@ public final class Release {
 			}
 
 			this.uri = createObjectProperty(uri);
-			artist = createStringProperty(Objects.toString(property("artist")));
-			title = createStringProperty(Objects.toString(property("current.title")));
+			artist = createStringProperty(Objects.toString(property("artist")).trim());
+			title = createStringProperty(Objects.toString(property("current.title")).trim());
 			downloadType = createObjectProperty(readDownloadType());
 			releaseDate = createObjectProperty(propertyDate("album_release_date"));
 			publishDate = createObjectProperty(propertyDate("current.publish_date"));
@@ -527,83 +561,144 @@ public final class Release {
 	private List<Track> readTracks(String releaseArtist) {
 		List<Track> result = new ArrayList<>();
 
-		Pattern splitter = null;
 		Number numTracks = property("trackinfo.length");
-		if (numTracks != null) {
-			for (int i = 0; i < numTracks.intValue(); i++) {
-				String trackDataID = "trackinfo[" + i + "].";
-
-				String artistTitle = property(trackDataID + "title");
-				String artist = releaseArtist;
-				String title = artistTitle;
-				if (artistTitle != null && artistTitle.contains(" - ")) {
-
-					// Here we are trying to figure out whether the title property contains not
-					// only the title of a track, but also its artist name, that is different
-					// from the release artist (this usually happens for various artists type
-					// compilations and splits).
-					// In that case artist and title are separated by " - ", however, additional
-					// check should be made to correctly handle situations where title property
-					// doesn't specify track artist and " - " is actually a part of track title.
-					// Since there is no JSON property that explicitly defines track artist,
-					// the only reliable way to do such check is to use title_link property from
-					// which the actual title (without artist) can be extracted, although in
-					// stripped (escaped) form. After we have both versions (taken from title and
-					// title_link), we can decide whether the title property value should be split
-					// (if it contains track artist) or left intact (if it contains only track title).
-					String titleLink = property(trackDataID + "title_link");
-					if (titleLink != null) {
-
-						// Get the first token (word) from title_link
-						String linkToken = titleLink.substring(titleLink.lastIndexOf('/') + 1);
-						int h1 = linkToken.indexOf('-');
-						if (h1 != -1) 
-							linkToken = linkToken.substring(0, h1);
-						linkToken = linkToken.toLowerCase(Locale.ENGLISH);
-
-						// Get the first token (word) from title 
-						int s = artistTitle.indexOf(' ');
-						int h2 = artistTitle.indexOf('-');
-						String titleToken = artistTitle.substring(0, Math.min(s, h2)).toLowerCase(Locale.ENGLISH);
-
-						// Compare the tokens. If they are different, it means that title property
-						// contains track artist and thus should be split.
-						// Still, this won't work in some corner cases. For example, when on
-						// some single-artist release some track has " - " in its title and
-						// the first word in that title contains some illegal chars which were dropped
-						// from it in title_link.
-						// However, such cases are expected to be quite rare and won't be a good reason
-						// to throw in additional checks and complicating the logic even more.
-						if (!linkToken.equals(titleToken)) {
-							if (splitter == null)
-								splitter = Pattern.compile(" - ");
-							String[] vals = splitter.split(artistTitle, 2);
-							artist = vals[0];
-							title = vals[1];
-						}
-					}
+		if (numTracks != null && numTracks.intValue() > 0) {
+			// Checking if this release is (probably) a multi-artist compilation by
+			// testing release artist against a list of known naming patterns for
+			// V/A-releases.
+			// This serves mostly as a heuristic hint for trackinfo parsing code
+			// to help with determining correct artist and title for each track.
+			boolean isMultiArtist = false;
+			for (Pattern pattern : VARIOUS_ARTISTS_PATTERNS) {
+				if (pattern.matcher(releaseArtist).matches()) {
+					isMultiArtist = true;
+					break;
 				}
-
-				Number duration = property(trackDataID + "duration");
-				float durationValue = duration != null ? duration.floatValue() : 0.0f;
-				if (durationValue < 0.0f || Float.isNaN(durationValue))
-					durationValue = 0.0f;
-
-				String fileLink = null;
-				if (property(trackDataID + "file") != null)
-					fileLink = property(trackDataID + "file['mp3-128']");
-
-				result.add(new Track(
-						i + 1,
-						Objects.toString(artist),
-						Objects.toString(title),
-						durationValue,
-						fileLink)
-				);
 			}
+			for (int i = 0; i < numTracks.intValue(); i++)
+				result.add(createTrack(releaseArtist, i, isMultiArtist));
 		}
 
 		return Collections.unmodifiableList(result);
+	}
+
+
+	/**
+	 * Creates a Track object for the entry with specified index in JSON data. 
+	 * 
+	 * @param releaseArtist the artist of this release
+	 * @param trackIndex index corresponding to the current element of trackinfo
+	 *        array in JSON data
+	 * @param isMultiArtist indicates whether this release has tracks by multiple artists
+	 * @return a Track instance
+	 */
+	private Track createTrack(String releaseArtist, int trackIndex, boolean isMultiArtist) {
+		assert releaseArtist != null;
+		assert trackIndex >= 0;
+
+		String trackDataID = "trackinfo[" + trackIndex + "].";
+
+		// Trying to figure out correct artist and title
+		String artistTitle = property(trackDataID + "title");
+		String artist = releaseArtist;
+		String title = artistTitle;
+		if (artistTitle != null && artistTitle.contains(" - ")) {
+			if (isMultiArtist) {
+				String[] vals = TRACK_TITLE_SPLITTER.split(artistTitle, 2);
+				artist = vals[0];
+				title = vals[1];
+			}
+			else {
+				// If this release is most likely not a multi-artist release, we are doing
+				// additional check by examining the value of "title_link" which, in case the
+				// heuristic failed and release is nevertheless a V/A, contains
+				// minimized version of title without artist (while "title" property has both
+				// artist and title).
+				// Note that this approach still won't work if release owner did not add correct
+				// multi-artist tags by specifiying artist separately for each track. But in such
+				// case there's really nothing more we can do.
+				String titleLink = property(trackDataID + "title_link");
+				if (titleLink != null) {
+					String linkToken = titleLink.substring(titleLink.lastIndexOf('/') + 1)
+							.toLowerCase(Locale.ENGLISH);
+					if (!linkToken.equals(minimizeTitle(artistTitle))) {
+						String[] vals = TRACK_TITLE_SPLITTER.split(artistTitle, 2);
+						artist = vals[0];
+						title = vals[1];
+					}
+				}
+			}
+		}
+
+		// Track time
+		Number duration = property(trackDataID + "duration");
+		float durationValue = duration != null ? duration.floatValue() : 0.0f;
+		if (durationValue < 0.0f || Float.isNaN(durationValue))
+			durationValue = 0.0f;
+
+		// Link to audio file
+		String fileLink = null;
+		if (property(trackDataID + "file") != null) {
+			fileLink = property(trackDataID + "file['mp3-128']");
+			if (fileLink != null) {
+				// occasionally, for some unknown reason, file link is read without protocol from JSON data 
+				if (!fileLink.startsWith("http:") && !fileLink.startsWith("https:"))
+					fileLink = "http:" + fileLink;
+				try {
+					// additional sanity check
+					new URL(fileLink);
+				}
+				catch (MalformedURLException e) {
+					logError(e);
+					fileLink = null;
+				}
+			}
+		}
+
+		// Create a track
+		return new Track(
+				trackIndex + 1,
+				Objects.toString(artist).trim(),
+				Objects.toString(title).trim(),
+				durationValue,
+				fileLink);
+	}
+
+
+	/**
+	 * Performs a "minimization" of track title, replacing and removing unnecessary
+	 * characters from it. This method tries to mimic the minimization algorithm used by
+	 * Bandcamp for converting their release and track titles into URL paths. 
+	 * 
+	 * @param title a track title
+	 * @return minimized title
+	 */
+	private static String minimizeTitle(String title) {
+		if (title.isEmpty())
+			return "-";
+
+		StringBuilder result = new StringBuilder(title.length());
+		for (int i = 0; i < title.length(); i++) {
+			char c = title.charAt(i);
+			if (c >= '0' && c <= '9' || c >= 'a' && c <= 'z')
+				result.append(c);
+			else if (c >= 'A' && c <= 'Z')
+				result.append((char)(c + 32)); // convert to lowercase
+			else if (c != '\'' && (result.length() == 0 || result.charAt(result.length() - 1) != '-'))
+				result.append('-');
+		}
+
+		int len = result.length();
+		if (len == 0 || len == 1 && result.charAt(0) == '-')
+			return "-";
+		else {
+			int start = 0;
+			if (result.charAt(0) == '-')
+				start++;
+			if (result.charAt(len-1) == '-')
+				len--;
+			return result.substring(start, len);
+		}
 	}
 
 

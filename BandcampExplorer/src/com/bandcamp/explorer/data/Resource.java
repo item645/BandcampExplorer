@@ -33,7 +33,8 @@ class Resource {
 	private static final Logger LOGGER = Logger.getLogger(Resource.class.getName());
 
 	private static final Pattern RELEASE_LINK = Pattern.compile(
-			"((https?://)?[a-z0-9\\-\\.]+)?/(album|track)/[a-z0-9\\-]+", Pattern.CASE_INSENSITIVE);
+			"((https?://)?[a-z0-9\\-\\.]+\\.[a-z0-9]+)?/(album|track)/[a-z0-9\\-]+",
+			Pattern.CASE_INSENSITIVE);
 
 	private final List<ReleaseLoader> releaseLoaders = new ArrayList<>();
 	private final SearchTask parentTask;
@@ -86,10 +87,9 @@ class Resource {
 						if (!link.startsWith("http://") && !link.startsWith("https://"))
 							link = "http://" + link;
 				}
-				else {
-					if (noHost)
-						link = new StringBuilder(url.getProtocol())
-						.append("://").append(url.getHost()).append(link).toString();
+				else if (noHost) {
+					link = new StringBuilder(url.getProtocol())
+					.append("://").append(url.getHost()).append(link).toString();
 				}
 				if (links.add(link)) { // ensure that we don't create a loader for same link more than once
 					ReleaseLoader loader = createLoader(link);
