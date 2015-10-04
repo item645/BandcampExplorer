@@ -26,7 +26,7 @@ import com.bandcamp.explorer.util.ExceptionUnchecker;
  * Instance of this class loads the resource referenced by the specified URL
  * string and collects all unique links to Bandcamp releases found in that
  * resource, creating a {@link ReleaseLoader} task for each found release
- * link. List of release loaders can be obtained via {@link #getReleaseLoaders()}.
+ * link. List of release loaders can be obtained via {@link #releaseLoaders()}.
  */
 class Resource {
 
@@ -83,9 +83,8 @@ class Resource {
 				if (isFile) {
 					if (noHost)
 						continue; // if reading from file, skip links with no host
-					else 
-						if (!link.startsWith("http://") && !link.startsWith("https://"))
-							link = "http://" + link;
+					else if (!link.startsWith("http://") && !link.startsWith("https://"))
+						link = "http://" + link;
 				}
 				else if (noHost) {
 					link = new StringBuilder(url.getProtocol())
@@ -122,7 +121,7 @@ class Resource {
 	 * Returns an unmodifiable list of release loaders, corresponding to every unique
 	 * release link found in this resource.
 	 */
-	List<ReleaseLoader> getReleaseLoaders() {
+	List<ReleaseLoader> releaseLoaders() {
 		return Collections.unmodifiableList(releaseLoaders);
 	}
 

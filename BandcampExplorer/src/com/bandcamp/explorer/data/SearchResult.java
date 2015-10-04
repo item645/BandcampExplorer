@@ -21,7 +21,6 @@ public final class SearchResult implements Iterable<Release> {
 	 * Constructs an empty search result.
 	 * 
 	 * @param searchParams parameters that were passed to SearchTask
-	 * @throws NullPointerException if searchParams is null
 	 */
 	SearchResult(SearchParams searchParams) {
 		this(null, 0, searchParams);
@@ -32,7 +31,7 @@ public final class SearchResult implements Iterable<Release> {
 	 * Constructs a search result object for the specified collection
 	 * of releases found during search.
 	 * 
-	 * @param result a collection of releases found during search
+	 * @param result a collection of releases found and loaded during search
 	 * @param failed the number of releases that failed to load
 	 * @param searchParams parameters that were passed to SearchTask
 	 */
@@ -74,7 +73,7 @@ public final class SearchResult implements Iterable<Release> {
 	 * Returns search parameters that were passed to a SearchTask which
 	 * produced this result.
 	 */
-	public SearchParams getSearchParams() {
+	public SearchParams searchParams() {
 		return searchParams;
 	}
 
@@ -82,7 +81,7 @@ public final class SearchResult implements Iterable<Release> {
 	/**
 	 * Returns the number of releases in this search result.
 	 */
-	public int size() {
+	public int loaded() {
 		return result.size();
 	}
 
@@ -90,7 +89,7 @@ public final class SearchResult implements Iterable<Release> {
 	/**
 	 * Returns the number of releases that failed to load.
 	 */
-	public int getFailedCount() {
+	public int failed() {
 		return failed;
 	}
 

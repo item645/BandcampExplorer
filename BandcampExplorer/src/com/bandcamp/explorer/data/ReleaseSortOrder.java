@@ -15,7 +15,7 @@ public enum ReleaseSortOrder implements Comparator<Release> {
 	PUBLISH_DATE_ASC {
 		@Override
 		public int compare(Release r1, Release r2) {
-			return r1.getPublishDate().compareTo(r2.getPublishDate());
+			return r1.publishDate().compareTo(r2.publishDate());
 		}
 	},
 
@@ -25,7 +25,7 @@ public enum ReleaseSortOrder implements Comparator<Release> {
 	PUBLISH_DATE_DESC {
 		@Override
 		public int compare(Release r1, Release r2) {
-			return r2.getPublishDate().compareTo(r1.getPublishDate());
+			return r2.publishDate().compareTo(r1.publishDate());
 		}
 	},
 
@@ -35,7 +35,7 @@ public enum ReleaseSortOrder implements Comparator<Release> {
 	RELEASE_DATE_ASC {
 		@Override
 		public int compare(Release r1, Release r2) {
-			return r1.getReleaseDate().compareTo(r2.getReleaseDate());
+			return r1.releaseDate().compareTo(r2.releaseDate());
 		}
 	},
 
@@ -45,7 +45,7 @@ public enum ReleaseSortOrder implements Comparator<Release> {
 	RELEASE_DATE_DESC {
 		@Override
 		public int compare(Release r1, Release r2) {
-			return r2.getReleaseDate().compareTo(r1.getReleaseDate());
+			return r2.releaseDate().compareTo(r1.releaseDate());
 		}
 	},
 
@@ -55,8 +55,8 @@ public enum ReleaseSortOrder implements Comparator<Release> {
 	ARTIST_AND_TITLE {
 		@Override
 		public int compare(Release r1, Release r2) {
-			int result = r1.getArtist().compareToIgnoreCase(r2.getArtist());
-			return result != 0 ? result : r1.getTitle().compareToIgnoreCase(r2.getTitle());
+			int result = r1.artist().compareToIgnoreCase(r2.artist());
+			return result != 0 ? result : r1.title().compareToIgnoreCase(r2.title());
 		}
 	};
 

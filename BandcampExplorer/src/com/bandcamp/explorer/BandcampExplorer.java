@@ -89,7 +89,7 @@ public final class BandcampExplorer extends Application {
 	private void initUI() {
 		// Loading and configuring components
 		EventLog eventLog = EventLog.create(primaryStage);
-		configureLogging(eventLog.getLogHandler());
+		configureLogging(eventLog.logHandler());
 		BandcampExplorerMainForm mainForm = BandcampExplorerMainForm.create(
 				primaryStage,
 				ReleasePlayerForm.create(primaryStage),

@@ -70,7 +70,7 @@ public final class SearchTask extends Task<SearchResult> {
 	 * 
 	 * @return an instant of time; null, if task is not started yet
 	 */
-	public Instant getStartTime() {
+	public Instant startTime() {
 		return startTime;
 	}
 
@@ -132,7 +132,7 @@ public final class SearchTask extends Task<SearchResult> {
 		// pages with different numbers can duplicate same releases.
 		Set<ReleaseLoader> releaseLoaders = new HashSet<>();
 		for (Future<Resource> resource : resources)
-			releaseLoaders.addAll(resource.get().getReleaseLoaders());
+			releaseLoaders.addAll(resource.get().releaseLoaders());
 
 		if (isCancelled())
 			return new SearchResult(searchParams);
@@ -156,11 +156,11 @@ public final class SearchTask extends Task<SearchResult> {
 			ReleaseLoader.Result result = completionService.take().get();
 			if (result != null) {
 				try {
-					releases.add(result.getRelease());
+					releases.add(result.release());
 				}
 				catch (Exception exception) {
-					ReleaseLoader loader = result.getLoader();
-					String message = "Error loading release: " + loader.getURI() + " (" + exception.getMessage() + ")";
+					ReleaseLoader loader = result.loader();
+					String message = "Error loading release: " + loader.uri() + " (" + exception.getMessage() + ")";
 					int responseCode = exception instanceof ReleaseLoadingException
 							? ((ReleaseLoadingException)exception).getHttpResponseCode()
 							: 0;
@@ -170,7 +170,7 @@ public final class SearchTask extends Task<SearchResult> {
 						// imposed on Bandcamp server.
 						LOGGER.warning(message); // don't log exception for HTTP 503, only message
 						pause(PAUSE_MLS_ON_503); // let Bandcamp server cool down a bit
-						if (loader.getAttempts() <= MAX_RELEASE_LOAD_ATTEMPTS) {
+						if (loader.attempts() <= MAX_RELEASE_LOAD_ATTEMPTS) {
 							// If we haven't yet exceeded max load attempts for this release loader,
 							// try to run it again by re-submitting to completion service.
 							repeat = true;

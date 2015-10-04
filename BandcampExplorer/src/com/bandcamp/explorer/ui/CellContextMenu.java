@@ -78,7 +78,7 @@ class CellContextMenu extends ContextMenu {
 	 * event occured.
 	 * In case it is not possible to obtain a table cell reference, returns null.
 	 */
-	final TableCell<?,?> getSelectedCell() {
+	final TableCell<?,?> selectedCell() {
 		if (showMenuEvent != null) {
 			Object source = showMenuEvent.getSource();
 			if (source instanceof TableCell)

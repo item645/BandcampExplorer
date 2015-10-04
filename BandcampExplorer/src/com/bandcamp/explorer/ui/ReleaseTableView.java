@@ -168,12 +168,12 @@ class ReleaseTableView extends AnchorPane {
 				// using data from selected release
 				Release release = getSelectedRelease();
 				if (release != null) {
-					String artist = release.getArtist();
+					String artist = release.artist();
 					searchArtist.setText(String.format("Search \"%1$s\"", artist));
 					searchArtist.setOnAction(
 							actionEvent -> mainForm.searchReleases(artist, SearchType.SEARCH, true));
 					
-					URI discographyURI = release.getDiscographyURI();
+					URI discographyURI = release.discographyURI();
 					moreFromDomain.setText(String.format("More from \"%1$s\"", discographyURI.getAuthority()));
 					moreFromDomain.setOnAction(
 							actionEvent -> mainForm.searchReleases(discographyURI.toString(), SearchType.DIRECT, true));
@@ -190,19 +190,19 @@ class ReleaseTableView extends AnchorPane {
 			viewOnBandcamp.setOnAction(event -> {
 				Release release = getSelectedRelease();
 				if (release != null)
-					Utils.browse(release.getURI());
+					Utils.browse(release.uri());
 			});
 
 			MenuItem viewDiscogOnBandcamp = new MenuItem("View Discography on Bandcamp");
 			viewDiscogOnBandcamp.setOnAction(event -> {
 				Release release = getSelectedRelease();
 				if (release != null)
-					Utils.browse(release.getDiscographyURI());
+					Utils.browse(release.discographyURI());
 			});
 
 			MenuItem copyText = new MenuItem("Copy Text");
 			copyText.setOnAction(event -> {
-				TableCell<?,?> cell = getSelectedCell();
+				TableCell<?,?> cell = selectedCell();
 				if (cell != null)
 					Utils.toClipboardAsString(cell.getItem());
 			});
@@ -219,7 +219,7 @@ class ReleaseTableView extends AnchorPane {
 
 			MenuItem copyAllURLs = new MenuItem("Copy All URLs");
 			copyAllURLs.setOnAction(event -> Utils.toClipboardAsString(
-					sortedItems, release -> release.getURI().toString(), "\n"));
+					sortedItems, release -> release.uri().toString(), "\n"));
 
 			MenuItem playRelease = new MenuItem("Play Release...");
 			playRelease.setOnAction(event -> playSelectedRelease());
@@ -261,7 +261,7 @@ class ReleaseTableView extends AnchorPane {
 	/**
 	 * Returns an observable list of releases in this table view. 
 	 */
-	ObservableList<Release> getReleases() {
+	ObservableList<Release> releases() {
 		return itemsDecorator;
 	}
 
@@ -288,12 +288,12 @@ class ReleaseTableView extends AnchorPane {
 			filters.add(ReleaseFilters.byTags(
 					Arrays.stream(tags.split(","))
 					.map(tag -> tag.trim().toLowerCase(Locale.ENGLISH))
-					.collect(Collectors.toSet()),
-					null));
+					.filter(tag -> !tag.isEmpty())
+					.collect(Collectors.toSet())));
 
 		String url = urlFilter.getText().trim();
 		if (!url.isEmpty())
-			filters.add(ReleaseFilters.urlContains(url));
+			filters.add(ReleaseFilters.uriContains(url));
 
 		filters.add(ReleaseFilters.byDownloadType(selectedDownloadTypes));
 
@@ -468,7 +468,7 @@ class ReleaseTableView extends AnchorPane {
 		releaseDateColumn.setCellValueFactory(cellData -> {
 			// display empty cell instead of LocalDate.MIN
 			Release release =  cellData.getValue();
-			return release.getReleaseDate().equals(LocalDate.MIN) ? null : release.releaseDateProperty();
+			return release.releaseDate().equals(LocalDate.MIN) ? null : release.releaseDateProperty();
 		});
 
 		publishDateColumn.setCellFactory(centered);
@@ -503,13 +503,13 @@ class ReleaseTableView extends AnchorPane {
 		.addListener((observable, oldRelease, newRelease) -> {
 			if (newRelease != null) {
 				StringBuilder sb = new StringBuilder();
-				if (!newRelease.getInformation().isEmpty())
-					sb.append(newRelease.getInformation()).append('\n').append('\n');
-				if (!newRelease.getCredits().isEmpty())
-					sb.append(newRelease.getCredits()).append('\n').append('\n');
-				if (!newRelease.getTracks().isEmpty()) {
+				if (!newRelease.information().isEmpty())
+					sb.append(newRelease.information()).append('\n').append('\n');
+				if (!newRelease.credits().isEmpty())
+					sb.append(newRelease.credits()).append('\n').append('\n');
+				if (!newRelease.tracks().isEmpty()) {
 					sb.append("Tracklist:\n");
-					newRelease.getTracks().forEach(track -> sb.append(track).append('\n'));
+					newRelease.tracks().forEach(track -> sb.append(track).append('\n'));
 				}
 				releaseInfo.setText(sb.append('\n').toString());
 			}

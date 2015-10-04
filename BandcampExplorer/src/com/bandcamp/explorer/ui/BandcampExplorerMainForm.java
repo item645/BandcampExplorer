@@ -202,17 +202,20 @@ public class BandcampExplorerMainForm extends BorderPane {
 
 		task.setOnRunning(event -> {
 			runningTask = task;
-			disableControlsOnSearch(true);
-			progressBar.initProgress(task.progressProperty());
-			progressBar.show();
 
 			String report = String.format(" search: %1$s: %2$s (%3$d %4$s)",
 					params.searchType(),
 					params.searchQuery(),
 					params.pages(),
 					params.pages() > 1 ? "pages" : "page");
-			writeStatusBar("Running" + report);
+			// calling this before more heavy UI updating code (below) to minimize the chance
+			// for messages from background release loaders to precede this starting message in event log
 			LOGGER.info("Starting" + report);
+			writeStatusBar("Running" + report);
+
+			disableControlsOnSearch(true);
+			progressBar.initProgress(task.progressProperty());
+			progressBar.show();
 		});
 		task.setOnSucceeded(event -> {
 			runningTask = null;
@@ -223,14 +226,14 @@ public class BandcampExplorerMainForm extends BorderPane {
 			SearchResult result = ExceptionUnchecker.uncheck(() -> task.get());
 			resultsView.setSearchResult(result);
 
-			int loaded = result.size();
-			int failed = result.getFailedCount();
+			int loaded = result.loaded();
+			int failed = result.failed();
 			int total = loaded + failed;
 			String report = String.format("Search finished: %1$d %2$s found%3$s. Search time: %4$ds.",
 					total,
 					total == 1 ? "release" : "releases",
 					failed > 0 ? String.format(", %1$d failed to load", failed) : "",
-					Duration.between(task.getStartTime(), Instant.now()).getSeconds());
+					Duration.between(task.startTime(), Instant.now()).getSeconds());
 			writeStatusBar(report);
 			LOGGER.info(report);
 		});

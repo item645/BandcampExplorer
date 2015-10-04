@@ -57,7 +57,7 @@ class ReleaseLoader implements Callable<ReleaseLoader.Result> {
 		/**
 		 * Returns the reference to a ReleaseLoader task that produced this result.
 		 */
-		ReleaseLoader getLoader() {
+		ReleaseLoader loader() {
 			return ReleaseLoader.this;
 		}
 
@@ -70,7 +70,7 @@ class ReleaseLoader implements Callable<ReleaseLoader.Result> {
 		 * @return loaded release
 		 * @throws Exception if release load failed with exception
 		 */
-		Release getRelease() throws Exception {
+		Release release() throws Exception {
 			if (exception != null)
 				throw exception;
 			else
@@ -111,17 +111,15 @@ class ReleaseLoader implements Callable<ReleaseLoader.Result> {
 	 */
 	@Override
 	public boolean equals(Object other) {
-		if (this == other) return true;
-		return other instanceof ReleaseLoader 
-				? Objects.equals(this.releaseID, ((ReleaseLoader)other).releaseID)
-				: false;
+		return this == other || other instanceof ReleaseLoader
+				&& Objects.equals(this.releaseID, ((ReleaseLoader)other).releaseID);
 	}
 
 
 	/**
 	 * Returns a URI of the release which this loader attempts to load.
 	 */
-	URI getURI() {
+	URI uri() {
 		return uri;
 	}
 
@@ -130,7 +128,7 @@ class ReleaseLoader implements Callable<ReleaseLoader.Result> {
 	 * Returns current number of attempts happened to load the release
 	 * using this loader.
 	 */
-	int getAttempts() {
+	int attempts() {
 		return attempts.get();
 	}
 

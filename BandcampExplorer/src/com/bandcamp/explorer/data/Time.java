@@ -100,7 +100,7 @@ public final class Time implements Comparable<Time> {
 	/**
 	 * Returns a duration of this time in seconds.
 	 */
-	public int getSeconds() {
+	public int seconds() {
 		return seconds;
 	}
 }

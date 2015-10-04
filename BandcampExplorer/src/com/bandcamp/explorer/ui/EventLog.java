@@ -143,7 +143,7 @@ public class EventLog extends AnchorPane {
 	 * Returns a log handler that transfers messages and exceptions from logger
 	 * to this EventLog.
 	 */
-	public Handler getLogHandler() {
+	public Handler logHandler() {
 		return logHandler;
 	}
 

@@ -52,7 +52,7 @@ class ResultsView extends AnchorPane {
 	private class CombinedResultsTab extends Tab {
 
 		private final ReleaseTableView releaseTable = ReleaseTableView.create(mainForm, releasePlayer);
-		private final ObservableList<Release> combinedReleases = releaseTable.getReleases();
+		private final ObservableList<Release> combinedReleases = releaseTable.releases();
 		private final BooleanProperty visible = new SimpleBooleanProperty(false);
 
 
@@ -249,7 +249,7 @@ class ResultsView extends AnchorPane {
 		combinedResultsTab.updateReleases();
 
 		// Update tab's header and tooltip accordingly
-		selected.setText(result.getSearchParams().searchQuery());
+		selected.setText(result.searchParams().searchQuery());
 		Tooltip tooltip = selected.getTooltip();
 		if (tooltip == null)
 			selected.setTooltip(tooltip = new Tooltip());
@@ -419,7 +419,7 @@ class ResultsView extends AnchorPane {
 	 * @param tab a tab
 	 */
 	private ObservableList<Release> getReleasesOnTab(Tab tab) {
-		return ((ReleaseTableView)tab.getContent()).getReleases();
+		return ((ReleaseTableView)tab.getContent()).releases();
 	}
 
 

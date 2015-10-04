@@ -436,7 +436,7 @@ public final class Release {
 			credits = Objects.toString(property("current.credits"), "");
 			tracks = readTracks(artist.get());
 			time = createObjectProperty(new Time(
-					tracks.stream().collect(Collectors.summingInt(track -> track.getTime().getSeconds()))));
+					tracks.stream().collect(Collectors.summingInt(track -> track.time().seconds()))));
 		}
 		catch (IOException e) {
 			int responseCode = 0;
@@ -837,7 +837,7 @@ public final class Release {
 	/**
 	 * Returns an artist of this release.
 	 */
-	public String getArtist() {
+	public String artist() {
 		return artist.get();
 	}
 
@@ -853,7 +853,7 @@ public final class Release {
 	/**
 	 * Returns a title of this release.
 	 */
-	public String getTitle() {
+	public String title() {
 		return title.get();
 	}
 
@@ -869,7 +869,7 @@ public final class Release {
 	/**
 	 * Returns a download type of this release.
 	 */
-	public DownloadType getDownloadType() {
+	public DownloadType downloadType() {
 		return downloadType.get();
 	}
 
@@ -886,7 +886,7 @@ public final class Release {
 	 * Returns a total time of this release. The returned instance of time represents
 	 * a total duration of all tracks on this release.
 	 */
-	public Time getTime() {
+	public Time time() {
 		return time.get();
 	}
 
@@ -903,7 +903,7 @@ public final class Release {
 	 * Returns a release date.
 	 * On some releases the date is not specified, in that case LocalDate.MIN is returned.
 	 */
-	public LocalDate getReleaseDate() {
+	public LocalDate releaseDate() {
 		return releaseDate.get();
 	}
 
@@ -920,7 +920,7 @@ public final class Release {
 	 * Returns a publish date, that is, the date when release was 
 	 * originally published on Bandcamp.
 	 */
-	public LocalDate getPublishDate() {
+	public LocalDate publishDate() {
 		return publishDate.get();
 	}
 
@@ -936,7 +936,7 @@ public final class Release {
 	/**
 	 * Returns a URI of this release.
 	 */
-	public URI getURI() {
+	public URI uri() {
 		return uri.get();
 	}
 
@@ -952,7 +952,7 @@ public final class Release {
 	/**
 	 * Returns a URI of a discography page on this release's parent domain.
 	 */
-	public URI getDiscographyURI() {
+	public URI discographyURI() {
 		URI u = uri.get();
 		return URI.create(new StringBuilder(u.getScheme())
 		.append("://").append(u.getAuthority()).append("/music").toString());
@@ -962,7 +962,7 @@ public final class Release {
 	/**
 	 * Returns an unmodifiable set of tags describing this release.
 	 */
-	public Set<String> getTags() {
+	public Set<String> tags() {
 		return tags;
 	}
 
@@ -971,7 +971,7 @@ public final class Release {
 	 * Returns a set of tags as string where individual tags
 	 * are separated by comma and space.
 	 */
-	public String getTagsString() {
+	public String tagsString() {
 		return tagsString.get();
 	}
 
@@ -988,7 +988,7 @@ public final class Release {
 	 * Returns an unmodifiable list of all tracks on this release.
 	 * If no tracks were found, returns empty list.
 	 */
-	public List<Track> getTracks() {
+	public List<Track> tracks() {
 		return tracks;
 	}
 
@@ -997,9 +997,9 @@ public final class Release {
 	 * Returns a string URL to an album artwork thumbnail image.
 	 * The returned URL points to a standard 350x350 image which is used on
 	 * Bandcamp's release pages to represent artwork.
-	 * If image is not specified, returns null.
+	 * If this release has no artwork, returns null.
 	 */
-	public String getArtworkThumbLink() {
+	public String artworkThumbLink() {
 		return artworkThumbLink;
 	}
 
@@ -1008,7 +1008,7 @@ public final class Release {
 	 * Returns an information about this release.
 	 * If there's no information provided, returns empty string.
 	 */
-	public String getInformation() {
+	public String information() {
 		return information;
 	}
 
@@ -1017,7 +1017,7 @@ public final class Release {
 	 * Returns the credits for this release.
 	 * If there are no credits provided, returns empty string.
 	 */
-	public String getCredits() {
+	public String credits() {
 		return credits;
 	}
 

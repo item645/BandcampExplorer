@@ -147,7 +147,7 @@ public class ReleasePlayerForm extends SplitPane {
 		 * @return a track
 		 * @throws IndexOutOfBoundsException if index is out of range
 		 */
-		Track getTrack(int index) {
+		Track track(int index) {
 			return observableTracks.get(index);
 		}
 
@@ -157,7 +157,7 @@ public class ReleasePlayerForm extends SplitPane {
 		 * 
 		 * @return first playable track; null, if no such track found
 		 */
-		Track getFirstPlayableTrack() {
+		Track firstPlayableTrack() {
 			for (Track t : observableTracks)
 				if (t.isPlayable())
 					return t;
@@ -173,8 +173,8 @@ public class ReleasePlayerForm extends SplitPane {
 		 * @return closest playable track; null if no such track found
 		 * @throws NullPointerException if track is null
 		 */
-		Track getPreviousPlayableTrack(Track track) {
-			ListIterator<Track> itr = observableTracks.listIterator(track.getNumber() - 1);
+		Track previousPlayableTrack(Track track) {
+			ListIterator<Track> itr = observableTracks.listIterator(track.number() - 1);
 			while (itr.hasPrevious()) {
 				Track t = itr.previous();
 				if (t != track && t.isPlayable())
@@ -192,8 +192,8 @@ public class ReleasePlayerForm extends SplitPane {
 		 * @return closest playable track; null if no such track found
 		 * @throws NullPointerException if track is null
 		 */
-		Track getNextPlayableTrack(Track track) {
-			ListIterator<Track> itr = observableTracks.listIterator(track.getNumber() - 1);
+		Track nextPlayableTrack(Track track) {
+			ListIterator<Track> itr = observableTracks.listIterator(track.number() - 1);
 			while (itr.hasNext()) {
 				Track t = itr.next();
 				if (t != track && t.isPlayable())
@@ -207,7 +207,7 @@ public class ReleasePlayerForm extends SplitPane {
 		 * Returns the track currently selected in a tracklist table view.
 		 * If there is no track selected, returns null.
 		 */
-		Track getSelectedTrack() {
+		Track selectedTrack() {
 			return tableView.getSelectionModel().getSelectedItem();
 		}
 
@@ -254,7 +254,7 @@ public class ReleasePlayerForm extends SplitPane {
 
 			setOnShowing(windowEvent -> {
 				// Update control items on menu popup
-				Track track = trackListView.getSelectedTrack();
+				Track track = trackListView.selectedTrack();
 				if (track != null && track.isPlayable()) {
 					if (audioPlayer.isPlayingTrack(track)) {
 						play.setDisable(true);
@@ -277,19 +277,19 @@ public class ReleasePlayerForm extends SplitPane {
 					stop.setDisable(true);
 				}
 
-				updatePrevNextItem(previous, trackListView.getPreviousPlayableTrack(track));
-				updatePrevNextItem(next, trackListView.getNextPlayableTrack(track));
+				updatePrevNextItem(previous, trackListView.previousPlayableTrack(track));
+				updatePrevNextItem(next, trackListView.nextPlayableTrack(track));
 			});
 
 			MenuItem copyText = new MenuItem("Copy Text");
 			copyText.setOnAction(event -> {
-				TableCell<?,?> cell = getSelectedCell();
+				TableCell<?,?> cell = selectedCell();
 				if (cell != null)
 					Utils.toClipboardAsString(cell.getItem());
 			});
 
 			MenuItem copyTrackText = new MenuItem("Copy Track as Text");
-			copyTrackText.setOnAction(event -> Utils.toClipboardAsString(trackListView.getSelectedTrack()));
+			copyTrackText.setOnAction(event -> Utils.toClipboardAsString(trackListView.selectedTrack()));
 
 			MenuItem copyAllTracksText = new MenuItem("Copy All Tracks as Text");
 			copyAllTracksText.setOnAction(event -> Utils.toClipboardAsString(
@@ -407,7 +407,7 @@ public class ReleasePlayerForm extends SplitPane {
 
 			if (player != null)
 				quit();
-			player = new MediaPlayer(new Media(track.getFileLink()));
+			player = new MediaPlayer(new Media(track.fileLink()));
 			this.track = track;
 			quit = false;
 
@@ -439,8 +439,8 @@ public class ReleasePlayerForm extends SplitPane {
 			disablePlayerButtons(false);
 			playButton.setOnAction(event -> play());
 			stopButton.setOnAction(event -> stop());
-			prepareSwitchButton(previousButton, trackListView.getPreviousPlayableTrack(track));
-			prepareSwitchButton(nextButton, trackListView.getNextPlayableTrack(track));
+			prepareSwitchButton(previousButton, trackListView.previousPlayableTrack(track));
+			prepareSwitchButton(nextButton, trackListView.nextPlayableTrack(track));
 
 			currentSecond = -1;
 		}
@@ -451,7 +451,7 @@ public class ReleasePlayerForm extends SplitPane {
 		 * 
 		 * @return a track; null, if there's no track in player
 		 */
-		Track getTrack() {
+		Track track() {
 			return track;
 		}
 
@@ -488,7 +488,7 @@ public class ReleasePlayerForm extends SplitPane {
 			});
 			player.setOnEndOfMedia(() -> {
 				if (!quit) {
-					Track next = trackListView.getNextPlayableTrack(track);
+					Track next = trackListView.nextPlayableTrack(track);
 					if (next != null) {
 						updateTrackProgress();
 						setTrack(next);
@@ -669,7 +669,7 @@ public class ReleasePlayerForm extends SplitPane {
 			if (quit)
 				return;
 
-			int thisTrackIndex = track.getNumber() - 1;
+			int thisTrackIndex = track.number() - 1;
 			for (int i = 0; i < trackListView.playButtons.size(); i++) {
 				TrackListButton button = trackListView.playButtons.get(i);
 				if (button != null) {
@@ -690,7 +690,7 @@ public class ReleasePlayerForm extends SplitPane {
 						button.setOnAction(event -> {
 							// no need for isPlayable() check here because buttons are 
 							// created only for playable tracks 
-							setTrack(trackListView.getTrack(otherTrackIndex));
+							setTrack(trackListView.track(otherTrackIndex));
 							play();
 						});
 					}
@@ -740,7 +740,7 @@ public class ReleasePlayerForm extends SplitPane {
 		 */
 		private String getNowPlayingInfo(Track track, Duration currentTime, String totalTimeText) {
 			if (track != null && currentTime != null && totalTimeText != null)
-				return new StringBuilder(track.getArtist()).append(" - ").append(track.getTitle())
+				return new StringBuilder(track.artist()).append(" - ").append(track.title())
 						.append(" (").append(formatTime(currentTime)).append('/')
 						.append(totalTimeText).append(')').toString();
 			else
@@ -857,17 +857,17 @@ public class ReleasePlayerForm extends SplitPane {
 
 		if (release != null) {
 			// Loading artwork
-			String artworkLink = release.getArtworkThumbLink();
+			String artworkLink = release.artworkThumbLink();
 			artworkView.setImage(artworkLink != null ? new Image(artworkLink, true) : null);
 
 			// Setting release page link
-			releaseLink.setText(release.getURI().toString());
+			releaseLink.setText(release.uri().toString());
 
 			// Setting release info
 			releaseInfo.setText(createReleaseInfo(release));
 
 			// Setting the tracklist
-			List<Track> tracks = release.getTracks();
+			List<Track> tracks = release.tracks();
 			trackListView.clear();
 			trackListView.addAll(tracks);
 			// Grow list of play buttons to match number of tracks on release so references
@@ -876,12 +876,12 @@ public class ReleasePlayerForm extends SplitPane {
 			tracks.forEach(track -> trackListView.playButtons.add(null));
 			
 			// Prepare the first playable track to play
-			Track first = trackListView.getFirstPlayableTrack();
+			Track first = trackListView.firstPlayableTrack();
 			if (first != null)
 				audioPlayer.setTrack(first);
 
 			// Show the window
-			stage.setTitle(release.getArtist() + " - " + release.getTitle());
+			stage.setTitle(release.artist() + " - " + release.title());
 			show();
 			stage.requestFocus();
 			playButton.requestFocus();
@@ -904,16 +904,16 @@ public class ReleasePlayerForm extends SplitPane {
 	 * @param release a release to create info for
 	 */
 	private static String createReleaseInfo(Release release) {
-		LocalDate releaseDate = release.getReleaseDate();
+		LocalDate releaseDate = release.releaseDate();
 		return new StringBuilder()
-		.append(release.getArtist()).append(" - ").append(release.getTitle()).append('\n').append('\n')
-		.append("PUBLISHED: ").append(release.getPublishDate()).append('\n')
+		.append(release.artist()).append(" - ").append(release.title()).append('\n').append('\n')
+		.append("PUBLISHED: ").append(release.publishDate()).append('\n')
 		.append("RELEASED: ").append(releaseDate.equals(LocalDate.MIN) ? "-" : releaseDate).append('\n')
-		.append("DOWNLOAD TYPE: ").append(release.getDownloadType()).append('\n')
-		.append("TIME: ").append(release.getTime()).append('\n')
-		.append("TAGS: ").append(release.getTagsString()).append('\n')
-		.append('\n').append(release.getInformation()).append('\n')
-		.append('\n').append(release.getCredits())
+		.append("DOWNLOAD TYPE: ").append(release.downloadType()).append('\n')
+		.append("TIME: ").append(release.time()).append('\n')
+		.append("TAGS: ").append(release.tagsString()).append('\n')
+		.append('\n').append(release.information()).append('\n')
+		.append('\n').append(release.credits())
 		.toString();
 	}
 
@@ -922,7 +922,7 @@ public class ReleasePlayerForm extends SplitPane {
 	 * Plays a track selected in track list view.
 	 */
 	private void playSelectedTrack() {
-		Track track = trackListView.getSelectedTrack();
+		Track track = trackListView.selectedTrack();
 		if (track != null && track.isPlayable()) {
 			audioPlayer.setTrack(track);
 			audioPlayer.play();
@@ -1012,7 +1012,7 @@ public class ReleasePlayerForm extends SplitPane {
 	private void openReleasePage() {
 		Release rls = release.get();
 		if (rls != null)
-			Utils.browse(rls.getURI());
+			Utils.browse(rls.uri());
 	}
 
 
@@ -1053,7 +1053,7 @@ public class ReleasePlayerForm extends SplitPane {
 						});
 						// Saving button references so they could be later accessed from audio player's
 						// state transition handlers
-						trackListView.playButtons.set(track.getNumber() - 1, button);
+						trackListView.playButtons.set(track.number() - 1, button);
 						return button;
 					}
 					else
@@ -1063,7 +1063,7 @@ public class ReleasePlayerForm extends SplitPane {
 				// corresponds to currently loaded track
 				(cell, track, empty) -> {
 					if (track != null)
-						highlightTableRow(cell.getTableRow(), track == audioPlayer.getTrack());
+						highlightTableRow(cell.getTableRow(), track == audioPlayer.track());
 				},
 				// Also, add a customizer for context menu
 				trackListContextMenu.customizer()

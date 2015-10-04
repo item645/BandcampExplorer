@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Locale;
-import java.util.Set;
 import java.util.function.Predicate;
 
 /**
@@ -34,7 +33,7 @@ public class ReleaseFilters {
 	 * @throws NullPointerException if s is null
 	 */
 	public static Predicate<Release> artistContains(String s) {
-		return release -> containsString(release.getArtist(), s);
+		return release -> containsString(release.artist(), s);
 	}
 
 
@@ -46,19 +45,19 @@ public class ReleaseFilters {
 	 * @throws NullPointerException if s is null
 	 */
 	public static Predicate<Release> titleContains(String s) {
-		return release -> containsString(release.getTitle(), s);
+		return release -> containsString(release.title(), s);
 	}
 
 
 	/**
-	 * Returns a filter that matches only releases whose URL property
+	 * Returns a filter that matches only releases whose URI
 	 * contains given string (case insensitive).
 	 * 
-	 * @param s a string that URL must contain
+	 * @param s a string that URI must contain
 	 * @throws NullPointerException if s is null
 	 */
-	public static Predicate<Release> urlContains(String s) {
-		return release -> containsString(release.getURI().toString(), s);
+	public static Predicate<Release> uriContains(String s) {
+		return release -> containsString(release.uri().toString(), s);
 	}
 
 
@@ -82,7 +81,7 @@ public class ReleaseFilters {
 	 * @throws NullPointerException if downloadTypes is null
 	 */
 	public static Predicate<Release> byDownloadType(EnumSet<Release.DownloadType> downloadTypes) {
-		return release -> downloadTypes.contains(release.getDownloadType());
+		return release -> downloadTypes.contains(release.downloadType());
 	}
 
 
@@ -100,7 +99,7 @@ public class ReleaseFilters {
 	 * @param to date value that release date must be greater than or equal to
 	 */
 	public static Predicate<Release> byReleaseDate(LocalDate from, LocalDate to) {
-		return release -> isWithinDates(release.getReleaseDate(), from, to);
+		return release -> isWithinDates(release.releaseDate(), from, to);
 	}
 
 
@@ -116,7 +115,7 @@ public class ReleaseFilters {
 	 * @param to date value that publish date must be greater than or equal to
 	 */
 	public static Predicate<Release> byPublishDate(LocalDate from, LocalDate to) {
-		return release -> isWithinDates(release.getPublishDate(), from, to);
+		return release -> isWithinDates(release.publishDate(), from, to);
 	}
 
 
@@ -124,39 +123,25 @@ public class ReleaseFilters {
 	 * Helper method to check that given date is contained within from and to date
 	 * on time scale.
 	 */
-	private static boolean isWithinDates(LocalDate releaseDate, LocalDate from, LocalDate to) {
-		int c1 = from != null ? from.compareTo(releaseDate) : 0;
-		int c2 = to != null ? to.compareTo(releaseDate) : 0;
+	private static boolean isWithinDates(LocalDate date, LocalDate from, LocalDate to) {
+		int c1 = from != null ? from.compareTo(date) : 0;
+		int c2 = to != null ? to.compareTo(date) : 0;
 		return c1 <= 0 && c2 >= 0;
 	}
 
 
 	/**
 	 * Returns a filter that matches only releases whose set of tags contains
-	 * all strings from include collection and does not contain any string from
-	 * exclude collection.
-	 * If include is null, then this filter will match any release.
-	 * If exclude is null, then only include strings are checked.
+	 * all unique strings from given collection.
+	 * If collection is null, then this filter will match any release.
 	 * Note that character case do matter during comparison. To ensure correct matching it
-	 * is best to convert all strings in include/exclude collections to lowercase
-	 * using Locale.ENGLISH, before passing them to this method.
+	 * is best to convert all strings in collection to lowercase
+	 * using Locale.ENGLISH, before passing it to this method.
 	 * 
-	 * @param include a collection of tags all of whom must be contained by release tags
-	 * @param exclude a collection of tags that release must not contain any of
+	 * @param tags a collection of tags all of whom must be contained by release tags
 	 */
-	public static Predicate<Release> byTags(Collection<String> include, Collection<String> exclude) {
-		return release -> {
-			if (include == null)
-				return true;
-			else {
-				Set<String> tags = release.getTags();
-				if (exclude != null)
-					for (String ex : exclude)
-						if (tags.contains(ex))
-							return false;
-				return tags.containsAll(include);
-			}
-		};
+	public static Predicate<Release> byTags(Collection<String> tags) {
+		return release -> tags == null || release.tags().containsAll(tags);
 	}
 
 }

@@ -56,7 +56,7 @@ public final class Track {
 	/**
 	 * Returns a number of this track on release.
 	 */
-	public int getNumber() {
+	public int number() {
 		return number.get();
 	}
 
@@ -72,7 +72,7 @@ public final class Track {
 	/**
 	 * Returns artist name.
 	 */
-	public String getArtist() {
+	public String artist() {
 		return artist.get();
 	}
 
@@ -88,7 +88,7 @@ public final class Track {
 	/**
 	 * Returns a title of this track.
 	 */
-	public String getTitle() {
+	public String title() {
 		return title.get();
 	}
 
@@ -104,7 +104,7 @@ public final class Track {
 	/**
 	 * Returns track time.
 	 */
-	public Time getTime() {
+	public Time time() {
 		return time.get();
 	}
 
@@ -121,7 +121,7 @@ public final class Track {
 	 * Returns an URL string that points to this track's actual audio file.
 	 * If no audio file is available, returns null.
 	 */
-	public String getFileLink() {
+	public String fileLink() {
 		return fileLink;
 	}
 
