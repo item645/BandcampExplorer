@@ -138,7 +138,7 @@ public final class Release {
 	private final ReadOnlyObjectProperty<LocalDate> publishDate;
 	private final ReadOnlyStringProperty tagsString;
 	private final ReadOnlyObjectProperty<URI> uri;
-	private final String artworkThumbLink;
+	private final String artworkLink;
 	private final Set<String> tags;
 	private final List<Track> tracks;
 	private final String information;
@@ -429,9 +429,9 @@ public final class Release {
 			downloadType = createObjectProperty(readDownloadType());
 			releaseDate = createObjectProperty(propertyDate("album_release_date"));
 			publishDate = createObjectProperty(propertyDate("current.publish_date"));
+			artworkLink = readArtworkLink(input); // this must precede call to readTags()
 			tags = readTags(input);
 			tagsString = createStringProperty(tags.stream().collect(Collectors.joining(", ")));
-			artworkThumbLink = readArtworkThumbLink();
 			information = Objects.toString(property("current.about"), "");
 			credits = Objects.toString(property("current.credits"), "");
 			tracks = readTracks(artist.get());
@@ -703,40 +703,25 @@ public final class Release {
 
 
 	/**
-	 * Gets a link to release artwork thumbnail image.
-	 * Returns null if there's no artwork for this release.
+	 * Reads a link to release artwork 350x350 image from the input source.
+	 * Returns null if there's no artwork for this release or link cannot be located.
 	 */
-	private String readArtworkThumbLink() {
-		// We get an URL to small 100x100 thumbnail and modify that URL
-		// so it will point to a bigger 350x350 image (a standard image used
-		// to display artwork on release page). The URL is changed by replacing 
-		// format specifier (after '_') from 3 to 2.
-		// Also, if URL's protocol is https, we must replace that with http, because
-		// as of present JavaFX is unable to load images from bcbits.com (Bandcamp's
-		// image storage) using https URLs due to a problem with SSL certificates.
-		// Replacement is done at char array level to avoid using slow regex-based methods of String.
-		String s = property("artThumbURL");
-		if (s != null) {
-			int u = s.lastIndexOf('_');
-			char[] chars;
+	private String readArtworkLink(Scanner input) {
+		String artId = String.valueOf(property("art_id"));
+		if (artId == null)
+			return null;
 
-			if (s.startsWith("https")) {
-				chars = new char[s.length() - 1];
-				s.getChars(5, s.length(), chars, 4);
-				for (int i = 0; i < 4; i++)
-					chars[i] = s.charAt(i);
-				if (u != -1)
-					u--;
-			}
-			else
-				chars = s.toCharArray();
+		String link = input.findWithinHorizon(
+				Pattern.compile("https?://.+/a0*" + artId + "_\\d{1,2}\\.jpe?g"), 0);
+		if (link == null)
+			return null;
 
-			if (u != -1 && u < chars.length - 1 && chars[u+1] == '3')
-				chars[u+1] = '2';
-
-			s = String.valueOf(chars);
-		}
-		return s;
+		// Here we modify found artwork URL by replacing format specifier (after '_')
+		// to '2' to make it point to a 350x350 image.
+		// Replacement is done via StringBuilder to avoid using regex-based String.replace
+		return new StringBuilder(link)
+		.replace(link.lastIndexOf('_') + 1, link.lastIndexOf('.'), "2")
+		.toString();
 	}
 
 
@@ -994,13 +979,11 @@ public final class Release {
 
 
 	/**
-	 * Returns a string URL to an album artwork thumbnail image.
-	 * The returned URL points to a standard 350x350 image which is used on
-	 * Bandcamp's release pages to represent artwork.
+	 * Returns a string URL to album artwork 350x350 image.
 	 * If this release has no artwork, returns null.
 	 */
-	public String artworkThumbLink() {
-		return artworkThumbLink;
+	public String artworkLink() {
+		return artworkLink;
 	}
 
 

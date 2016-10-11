@@ -857,7 +857,7 @@ public class ReleasePlayerForm extends SplitPane {
 
 		if (release != null) {
 			// Loading artwork
-			String artworkLink = release.artworkThumbLink();
+			String artworkLink = release.artworkLink();
 			artworkView.setImage(artworkLink != null ? new Image(artworkLink, true) : null);
 
 			// Setting release page link
