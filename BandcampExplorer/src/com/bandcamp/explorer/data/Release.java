@@ -82,12 +82,13 @@ public final class Release {
 		int flags = Pattern.CASE_INSENSITIVE;
 
 		// "Various", "Various Artist", "Various Artists"
-		patterns.add(Pattern.compile("(various){1}(\\sartists?)?", flags));
+		patterns.add(Pattern.compile("various(\\sartists?)?", flags));
 		// <...> Recs, <...> Records, <...> Recordings, <...> Music, <...> Productions,
-		// <...> Prod., <...> Label Group and all these in parentheses,
-		// e.g. <...> (<...> Records) and the like
+		// <...> Prod., <...> Label Group, <...> Sounds, <...> Compilation and 
+		// all these in parentheses, e.g. <...> (<...> Records) and the like
 		patterns.add(Pattern.compile(
-				".+\\s(rec(ord)?s|rec(ordings|\\.)|music|prod(uctions)?\\.?|label\\sgroup)\\)?", flags));
+				".+\\s(rec(ord)?s|rec(ordings|\\.)|music|prod(uctions)?\\.?|label\\sgroup|sounds|compilation)\\)?",
+				flags));
 		// "V/A", "V\A", "VA", "V-A"
 		patterns.add(Pattern.compile("v(/|-|\\\\)?a", flags));
 		// beatspace
@@ -219,7 +220,7 @@ public final class Release {
 							// we won't remove the updated value, but only stale one.
 							CacheValue staleValue = (CacheValue)refQueue.remove();
 							FutureTask<CacheValue> valueTask = cache.get(staleValue.id);
-							if (valueTask.isDone()) {
+							if (valueTask != null && valueTask.isDone()) {
 								try {
 									if (valueTask.get() == staleValue) {
 										cache.remove(staleValue.id, valueTask);
@@ -707,8 +708,8 @@ public final class Release {
 	 * Returns null if there's no artwork for this release or link cannot be located.
 	 */
 	private String readArtworkLink(Scanner input) {
-		String artId = String.valueOf(property("art_id"));
-		if (artId == null)
+		String artId = Objects.toString(property("art_id"), "");
+		if (artId.isEmpty())
 			return null;
 
 		String link = input.findWithinHorizon(
