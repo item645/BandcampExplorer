@@ -16,6 +16,7 @@ public final class Track {
 	private final ReadOnlyStringProperty artist;
 	private final ReadOnlyStringProperty title;
 	private final ReadOnlyObjectProperty<Time> time;
+	private final String link;
 	private final String fileLink;
 
 
@@ -26,18 +27,21 @@ public final class Track {
 	 * @param artist artist name
 	 * @param title a title
 	 * @param seconds track time in seconds
+	 * @param link a Bandcamp URL string of this track
 	 * @param fileLink an URL string that points to this track's actual audio file
 	 */
-	Track(int number, String artist, String title, float seconds, String fileLink) {
+	Track(int number, String artist, String title, float seconds, String link, String fileLink) {
 		assert number > 0;
 		assert artist != null;
 		assert title != null;
 		assert seconds >= 0.0;
+		assert link != null;
 
 		this.number = new ReadOnlyIntegerWrapper(number).getReadOnlyProperty();
 		this.artist = new ReadOnlyStringWrapper(artist).getReadOnlyProperty();
 		this.title = new ReadOnlyStringWrapper(title).getReadOnlyProperty();
 		this.time = new ReadOnlyObjectWrapper<>(new Time(Math.round(seconds))).getReadOnlyProperty();
+		this.link = link;
 		this.fileLink = fileLink;
 	}
 
@@ -114,6 +118,14 @@ public final class Track {
 	 */
 	public ReadOnlyObjectProperty<Time> timeProperty() {
 		return time;
+	}
+
+
+	/**
+	 * Returns an URL string of this track's web page on Bandcamp.
+	 */
+	public String link() {
+		return link;
 	}
 
 

@@ -88,12 +88,24 @@ class Utils {
 
 
 	/**
-	 * Launches the default browser and navigates to specified URI.
+	 * Launches the default browser and navigates to the specified URI.
 	 * 
 	 * @param uri URI to open in a browser
+	 * @throws NullPointerException if uri is null
 	 */
 	static void browse(URI uri) {
-		BandcampExplorer.hostServices().showDocument(uri.toString());
+		browse(uri.toString());
+	}
+
+
+	/**
+	 * Launches the default browser and navigates to the specified URL string.
+	 * 
+	 * @param urlStr an URL string to open in a browser
+	 * @throws NullPointerException if urlStr is null
+	 */
+	static void browse(String urlStr) {
+		BandcampExplorer.hostServices().showDocument(Objects.requireNonNull(urlStr));
 	}
 
 

@@ -144,6 +144,7 @@ public final class Release {
 	private final List<Track> tracks;
 	private final String information;
 	private final String credits;
+	private final String downloadLink;
 
 
 
@@ -435,7 +436,8 @@ public final class Release {
 			tagsString = createStringProperty(tags.stream().collect(Collectors.joining(", ")));
 			information = Objects.toString(property("current.about"), "");
 			credits = Objects.toString(property("current.credits"), "");
-			tracks = readTracks(artist.get());
+			downloadLink = property("freeDownloadPage");
+			tracks = readTracks(artist.get(), domainForURI(uri));
 			time = createObjectProperty(new Time(
 					tracks.stream().collect(Collectors.summingInt(track -> track.time().seconds()))));
 		}
@@ -472,6 +474,14 @@ public final class Release {
 	 */
 	private static ReadOnlyStringProperty createStringProperty(String value) {
 		return new ReadOnlyStringWrapper(value).getReadOnlyProperty();
+	}
+
+
+	/**
+	 * Returns the domain URL string for the specified URI (that is, protocol and host).
+	 */
+	private static String domainForURI(URI uri) {
+		return uri.getScheme() + "://" + uri.getAuthority();
 	}
 
 
@@ -558,8 +568,9 @@ public final class Release {
 	 * list of Track objects.
 	 * 
 	 * @param releaseArtist the artist of this release
+	 * @param releaseDomain domain URL string of this release
 	 */
-	private List<Track> readTracks(String releaseArtist) {
+	private List<Track> readTracks(String releaseArtist, String releaseDomain) {
 		List<Track> result = new ArrayList<>();
 
 		Number numTracks = property("trackinfo.length");
@@ -577,7 +588,7 @@ public final class Release {
 				}
 			}
 			for (int i = 0; i < numTracks.intValue(); i++)
-				result.add(createTrack(releaseArtist, i, isMultiArtist));
+				result.add(createTrack(releaseArtist, releaseDomain, i, isMultiArtist));
 		}
 
 		return Collections.unmodifiableList(result);
@@ -588,19 +599,22 @@ public final class Release {
 	 * Creates a Track object for the entry with specified index in JSON data. 
 	 * 
 	 * @param releaseArtist the artist of this release
+	 * @param releaseDomain domain URL string of this release
 	 * @param trackIndex index corresponding to the current element of trackinfo
 	 *        array in JSON data
 	 * @param isMultiArtist indicates whether this release has tracks by multiple artists
 	 * @return a Track instance
 	 */
-	private Track createTrack(String releaseArtist, int trackIndex, boolean isMultiArtist) {
+	private Track createTrack(String releaseArtist, String releaseDomain, int trackIndex, boolean isMultiArtist) {
 		assert releaseArtist != null;
+		assert releaseDomain != null;
 		assert trackIndex >= 0;
 
 		String trackDataID = "trackinfo[" + trackIndex + "].";
 
 		// Trying to figure out correct artist and title
 		String artistTitle = property(trackDataID + "title");
+		String titleLink = property(trackDataID + "title_link");
 		String artist = releaseArtist;
 		String title = artistTitle;
 		if (artistTitle != null && artistTitle.contains(" - ")) {
@@ -618,7 +632,6 @@ public final class Release {
 				// Note that this approach still won't work if release owner did not add correct
 				// multi-artist tags by specifiying artist separately for each track. But in such
 				// case there's really nothing more we can do.
-				String titleLink = property(trackDataID + "title_link");
 				if (titleLink != null) {
 					String linkToken = titleLink.substring(titleLink.lastIndexOf('/') + 1)
 							.toLowerCase(Locale.ENGLISH);
@@ -662,6 +675,7 @@ public final class Release {
 				Objects.toString(artist).trim(),
 				Objects.toString(title).trim(),
 				durationValue,
+				releaseDomain + titleLink,
 				fileLink);
 	}
 
@@ -939,9 +953,7 @@ public final class Release {
 	 * Returns a URI of a discography page on this release's parent domain.
 	 */
 	public URI discographyURI() {
-		URI u = uri.get();
-		return URI.create(new StringBuilder(u.getScheme())
-		.append("://").append(u.getAuthority()).append("/music").toString());
+		return URI.create(domainForURI(uri.get()) + "/music");
 	}
 
 
@@ -1003,6 +1015,18 @@ public final class Release {
 	 */
 	public String credits() {
 		return credits;
+	}
+
+
+	/**
+	 * Returns the download link for this release, if available.
+	 * If there's no download link, returns null.
+	 * Usually download link is available for releases whose download type is {@link DownloadType#FREE}
+	 * or {@link DownloadType#NAME_YOUR_PRICE} where users are not required to enter their
+	 * email for receiving download link.
+	 */
+	public String downloadLink() {
+		return downloadLink;
 	}
 
 }

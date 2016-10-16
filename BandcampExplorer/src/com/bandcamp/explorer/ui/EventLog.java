@@ -101,6 +101,9 @@ public class EventLog extends AnchorPane {
 	 * Creates an instance of event log.
 	 */
 	private EventLog(Window owner) {
+		Scene scene = new Scene(this);
+		scene.getStylesheets().add(getClass().getResource("style.css").toExternalForm());
+		
 		stage = new Stage();
 		stage.initOwner(owner);
 		stage.setTitle("Event Log");
@@ -113,8 +116,7 @@ public class EventLog extends AnchorPane {
 			if (event.getCode() == KeyCode.ESCAPE)
 				stage.hide();
 		});
-		stage.setScene(new Scene(this));
-
+		stage.setScene(scene);
 	}
 
 

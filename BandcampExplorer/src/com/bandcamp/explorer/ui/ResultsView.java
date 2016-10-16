@@ -222,6 +222,16 @@ class ResultsView extends AnchorPane {
 
 
 	/**
+	 * Returns true if currently selected tab has search result
+	 * or if it's a combined results tab.
+	 */
+	boolean hasSelectedSearchResult() {
+		Tab selected = getSelectedTab();
+		return selected == combinedResultsTab || selected.getUserData() != null;
+	}
+
+
+	/**
 	 * Sets a search result to display in a currently selected result view tab.
 	 * If selected tab already contains search result, the old result gets
 	 * replaced by a new one.

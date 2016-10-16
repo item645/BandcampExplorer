@@ -31,12 +31,35 @@
                               <Font size="12.0" />
                            </font>
                         </Button>
+                        <MenuButton fx:id="moreActionsMenu" mnemonicParsing="false" text="More Actions...">
+                           <font>
+                              <Font size="12.0" />
+                           </font>
+                        </MenuButton>
                      </children>
                      <VBox.margin>
                         <Insets />
                      </VBox.margin>
                   </HBox>
-                  <Hyperlink fx:id="releaseLink" onAction="#openReleasePage" style="-fx-text-fill: blue;" wrapText="true" />
+                  <HBox>
+                     <children>
+                        <Hyperlink fx:id="releaseLink" onAction="#openReleasePage" text="View on Bandcamp" wrapText="true">
+                           <font>
+                              <Font size="14.0" />
+                           </font>
+                        </Hyperlink>
+                        <Hyperlink fx:id="discogLink" layoutX="10.0" layoutY="10.0" onAction="#openDiscographyPage" text="View Discography" wrapText="true">
+                           <font>
+                              <Font size="14.0" />
+                           </font>
+                        </Hyperlink>
+                        <Hyperlink fx:id="downloadLink" layoutX="10.0" layoutY="10.0" onAction="#openDownloadPage" text="Free Download" wrapText="true">
+                           <font>
+                              <Font size="14.0" />
+                           </font>
+                        </Hyperlink>
+                     </children>
+                  </HBox>
                   <TextArea fx:id="releaseInfo" editable="false" prefHeight="260.0" prefWidth="535.0" wrapText="true" />
                   <VBox alignment="CENTER" prefHeight="115.0" prefWidth="536.0" spacing="5.0">
                      <children>

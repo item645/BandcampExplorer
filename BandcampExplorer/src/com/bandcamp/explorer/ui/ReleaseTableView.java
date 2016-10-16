@@ -171,12 +171,12 @@ class ReleaseTableView extends AnchorPane {
 					String artist = release.artist();
 					searchArtist.setText(String.format("Search \"%1$s\"", artist));
 					searchArtist.setOnAction(
-							actionEvent -> mainForm.searchReleases(artist, SearchType.SEARCH, true));
+							actionEvent -> mainForm.searchReleases(artist, SearchType.SEARCH));
 					
 					URI discographyURI = release.discographyURI();
 					moreFromDomain.setText(String.format("More from \"%1$s\"", discographyURI.getAuthority()));
 					moreFromDomain.setOnAction(
-							actionEvent -> mainForm.searchReleases(discographyURI.toString(), SearchType.DIRECT, true));
+							actionEvent -> mainForm.searchReleases(discographyURI.toString(), SearchType.DIRECT));
 				}
 				else {
 					searchArtist.setText(null);
@@ -484,7 +484,6 @@ class ReleaseTableView extends AnchorPane {
 					if (uri != null) {
 						Hyperlink link = new Hyperlink(uri.toString());
 						link.setOnAction(event -> Utils.browse(uri));
-						link.setStyle("-fx-text-fill: blue;");
 						return link;
 					}
 					else

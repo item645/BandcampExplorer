@@ -9,15 +9,17 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
 import javafx.beans.binding.Bindings;
-import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.collections.FXCollections;
@@ -29,9 +31,9 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
-import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.Slider;
@@ -41,6 +43,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
@@ -55,6 +58,7 @@ import javafx.stage.Window;
 import javafx.util.Duration;
 
 import com.bandcamp.explorer.data.Release;
+import com.bandcamp.explorer.data.SearchType;
 import com.bandcamp.explorer.data.Time;
 import com.bandcamp.explorer.data.Track;
 import com.bandcamp.explorer.ui.CellFactory.CellCustomizer;
@@ -62,7 +66,7 @@ import com.bandcamp.explorer.ui.CellFactory.CellCustomizer;
 /**
  * Controller class for release player form.
  */
-public class ReleasePlayerForm extends SplitPane {
+class ReleasePlayerForm extends SplitPane {
 
 	private static final Logger LOGGER = Logger.getLogger(ReleasePlayerForm.class.getName());
 
@@ -80,6 +84,7 @@ public class ReleasePlayerForm extends SplitPane {
 	private static ReleasePlayerForm INSTANCE;
 
 	private final Stage stage;
+	@FXML private MenuButton moreActionsMenu;
 	@FXML private Button loadReleaseButton;
 	@FXML private Button unloadReleaseButton;
 	@FXML private Button previousButton;
@@ -88,6 +93,8 @@ public class ReleasePlayerForm extends SplitPane {
 	@FXML private Button stopButton;
 	@FXML private ImageView artworkView;
 	@FXML private Hyperlink releaseLink;
+    @FXML private Hyperlink discogLink;
+	@FXML private Hyperlink downloadLink;
 	@FXML private TextArea releaseInfo;
 	@FXML private Label nowPlayingInfo;
 	@FXML private Slider timeSlider;
@@ -100,10 +107,65 @@ public class ReleasePlayerForm extends SplitPane {
 	@FXML private TableColumn<Track, String> titleColumn;
 	@FXML private TableColumn<Track, Time> timeColumn;
 
+	private final BandcampExplorerMainForm mainForm;
 	private TrackListView trackListView;
 	private final TrackListContextMenu trackListContextMenu = new TrackListContextMenu();
 	private final AudioPlayer audioPlayer = new AudioPlayer();
-	private final ObjectProperty<Release> release = new SimpleObjectProperty<>(null);
+	private final ReleaseProperty release = new ReleaseProperty();
+
+
+	/**
+	 * Property wrapper for Release object, provides few additional helper methods mostly
+	 * inspired by {@link java.util.Optional} functionality.
+	 */
+	private static class ReleaseProperty extends SimpleObjectProperty<Release> {
+
+		/**
+		 * Returns true if release is set (i.e. non-null).
+		 */
+		boolean isPresent() {
+			return get() != null;
+		}
+
+
+		/**
+		 * If release is present, peformes the specified action on it,
+		 * otherwise does nothing.
+		 * 
+		 * @param action a consumer action, accepting the release object
+		 */
+		void ifPresent(Consumer<Release> action) {
+			Release release = get();
+			if (release != null)
+				action.accept(release);
+		}
+
+
+		/**
+		 * If release is present, extracts and returns some value from release object, 
+		 * otherwise returns the default value.
+		 * 
+		 * @param extractor extraction function which takes release object as parameter
+		 *        and returns desired value
+		 * @param defaultVal default value, returned in case the release is not set
+		 * @return extracted value or default
+		 */
+		<T> T extractOrElse(Function<Release, T> extractor, T defaultVal) {
+			Release release = get();
+			return release != null ? extractor.apply(release) : defaultVal;
+		}
+
+
+		/**
+		 * Returns true if this release is equal to the specified release object. 
+		 * 
+		 * @param otherRelease release object for comparison 
+		 */
+		boolean valueEquals(Release otherRelease) {
+			return Objects.equals(get(), otherRelease);
+		}
+
+	}
 
 
 	/**
@@ -252,33 +314,13 @@ public class ReleasePlayerForm extends SplitPane {
 			pause.setOnAction(event -> audioPlayer.pause());
 			stop.setOnAction(event -> audioPlayer.stop());
 
-			setOnShowing(windowEvent -> {
-				// Update control items on menu popup
+			MenuItem searchArtist = new MenuItem();
+			
+			MenuItem viewOnBandcamp = new MenuItem("View on Bandcamp");
+			viewOnBandcamp.setOnAction(event -> {
 				Track track = trackListView.selectedTrack();
-				if (track != null && track.isPlayable()) {
-					if (audioPlayer.isPlayingTrack(track)) {
-						play.setDisable(true);
-						pause.setDisable(false);
-						stop.setDisable(false);
-					}
-					else {
-						play.setDisable(false);
-						play.setOnAction(actionEvent -> Platform.runLater(() -> {
-							audioPlayer.setTrack(track);
-							audioPlayer.play();
-						}));
-						pause.setDisable(true);
-						stop.setDisable(!audioPlayer.isPausedTrack(track));
-					}
-				}
-				else {
-					play.setDisable(true);
-					pause.setDisable(true);
-					stop.setDisable(true);
-				}
-
-				updatePrevNextItem(previous, trackListView.previousPlayableTrack(track));
-				updatePrevNextItem(next, trackListView.nextPlayableTrack(track));
+				if (track != null)
+					Utils.browse(track.link());
 			});
 
 			MenuItem copyText = new MenuItem("Copy Text");
@@ -295,8 +337,65 @@ public class ReleasePlayerForm extends SplitPane {
 			copyAllTracksText.setOnAction(event -> Utils.toClipboardAsString(
 					trackListView.sortedTracks, Track::toString, "\n"));
 
+			MenuItem copyArtistTitle = new MenuItem("Copy Artist and Title");
+			copyArtistTitle.setOnAction(event -> {
+				Track track = trackListView.selectedTrack();
+				if (track != null)
+					Utils.toClipboardAsString(track.artist() + " - " + track.title());
+			});
+
+			MenuItem copyAudioURL = new MenuItem("Copy Audio URL");
+			copyAudioURL.setOnAction(event -> {
+				Track track = trackListView.selectedTrack();
+				if (track != null)
+					Utils.toClipboardAsString(track.fileLink());
+			});
+
+			setOnShowing(windowEvent -> {
+				// Update items on menu popup
+				Track track = trackListView.selectedTrack();
+				if (track != null) {
+					if (track.isPlayable()) {
+						if (audioPlayer.isPlayingTrack(track)) {
+							play.setDisable(true);
+							pause.setDisable(false);
+							stop.setDisable(false);
+						}
+						else {
+							play.setDisable(false);
+							play.setOnAction(actionEvent -> Platform.runLater(() -> {
+								audioPlayer.setTrack(track);
+								audioPlayer.play();
+							}));
+							pause.setDisable(true);
+							stop.setDisable(!audioPlayer.isPausedTrack(track));
+						}
+						copyAudioURL.setDisable(false);
+					}
+					else {
+						play.setDisable(true);
+						pause.setDisable(true);
+						stop.setDisable(true);
+						copyAudioURL.setDisable(true);
+					}
+					
+					updatePrevNextItem(previous, trackListView.previousPlayableTrack(track));
+					updatePrevNextItem(next, trackListView.nextPlayableTrack(track));
+					
+					String artist = track.artist();
+					searchArtist.setText(String.format("Search \"%1$s\"", artist));
+					searchArtist.setOnAction(
+							actionEvent -> mainForm.searchReleases(artist, SearchType.SEARCH));					
+				}
+				else {
+					searchArtist.setText(null);
+					searchArtist.setOnAction(null);
+				}
+			});
+
 			getItems().addAll(play, pause, stop, previous, next, new SeparatorMenuItem(),
-					copyText, copyTrackText, copyAllTracksText);
+					searchArtist, new SeparatorMenuItem(), viewOnBandcamp, new SeparatorMenuItem(),
+					copyText, copyTrackText, copyAllTracksText, copyArtistTitle, copyAudioURL);
 		}
 
 
@@ -426,7 +525,6 @@ public class ReleasePlayerForm extends SplitPane {
 				};
 				timeSlider.valueProperty().addListener(timeSliderValueListener);
 			}
-			timeSlider.setDisable(false);
 			if (volumeSliderValueListener == null) {
 				volumeSliderValueListener = (observable, oldValue, newValue) -> {
 					if (!quit)
@@ -470,11 +568,13 @@ public class ReleasePlayerForm extends SplitPane {
 			player.setOnPlaying(() -> {
 				playButton.setGraphic(PAUSE_ICON);
 				playButton.setOnAction(event -> pause());
+				timeSlider.setDisable(false);
 				updateTrackListButtons();
 			});
 			player.setOnPaused(() -> {
 				playButton.setGraphic(PLAY_ICON);
 				playButton.setOnAction(event -> play());
+				timeSlider.setDisable(false);
 				updateTrackListButtons();
 			});
 			player.setOnStopped(() -> {
@@ -485,6 +585,7 @@ public class ReleasePlayerForm extends SplitPane {
 			});
 			player.setOnStalled(() -> {
 				nowPlayingInfo.setText(LOADING_TRACK_MSG);
+				timeSlider.setDisable(true);
 			});
 			player.setOnEndOfMedia(() -> {
 				if (!quit) {
@@ -768,7 +869,12 @@ public class ReleasePlayerForm extends SplitPane {
 	/**
 	 * Creates an instance of release player form.
 	 */
-	private ReleasePlayerForm(Window owner) {
+	private ReleasePlayerForm(Window owner, BandcampExplorerMainForm mainForm) {
+		this.mainForm = mainForm;
+		
+		Scene scene = new Scene(this);
+		scene.getStylesheets().add(getClass().getResource("style.css").toExternalForm());
+		
 		stage = new Stage();
 		stage.initOwner(owner);
 		stage.setTitle(NO_RELEASE_TITLE);
@@ -781,7 +887,7 @@ public class ReleasePlayerForm extends SplitPane {
 			if (event.getCode() == KeyCode.ESCAPE)
 				stage.hide();
 		});
-		stage.setScene(new Scene(this));
+		stage.setScene(scene);
 	}
 
 
@@ -801,20 +907,19 @@ public class ReleasePlayerForm extends SplitPane {
 	 * Creates an instance of release player form component.
 	 * 
 	 * @param owner the owner of player form window
+	 * @param mainForm reference to app's main form
 	 * @throws NullPointerException if owner is null
 	 * @throws IllegalStateException if this method has been called more than once
 	 *         or if it is called from the thread other than JavaFX Application Thread
 	 */
-	public static ReleasePlayerForm create(Window owner) {
-		if (!Platform.isFxApplicationThread())
-			throw new IllegalStateException("This component can be created only from JavaFX Application Thread");
-		if (INSTANCE != null)
-			throw new IllegalStateException("This component can't be instantiated more than once");
-		Objects.requireNonNull(owner);
+	static ReleasePlayerForm create(Window owner, BandcampExplorerMainForm mainForm) {
+		assert INSTANCE == null;
+		assert owner != null;
+		assert mainForm != null;
 		
 		return (INSTANCE = Utils.loadFXMLComponent(
 				ReleasePlayerForm.class.getResource("ReleasePlayerForm.fxml"),
-				() -> new ReleasePlayerForm(owner)));
+				() -> new ReleasePlayerForm(owner, mainForm)));
 	}
 
 
@@ -845,7 +950,7 @@ public class ReleasePlayerForm extends SplitPane {
 	 * @param release a release
 	 */
 	void setRelease(Release release) {
-		if (this.release.get() != null && this.release.get().equals(release)) {
+		if (this.release.isPresent() && this.release.valueEquals(release)) {
 			// For same release just bring window to front
 			show();
 			return;
@@ -860,9 +965,6 @@ public class ReleasePlayerForm extends SplitPane {
 			String artworkLink = release.artworkLink();
 			artworkView.setImage(artworkLink != null ? new Image(artworkLink, true) : null);
 
-			// Setting release page link
-			releaseLink.setText(release.uri().toString());
-
 			// Setting release info
 			releaseInfo.setText(createReleaseInfo(release));
 
@@ -874,7 +976,7 @@ public class ReleasePlayerForm extends SplitPane {
 			// to new buttons can later be added via trackListView.playPuttons.set()
 			// on cells construction
 			tracks.forEach(track -> trackListView.playButtons.add(null));
-			
+
 			// Prepare the first playable track to play
 			Track first = trackListView.firstPlayableTrack();
 			if (first != null)
@@ -889,7 +991,6 @@ public class ReleasePlayerForm extends SplitPane {
 		else {
 			loadReleaseButton.requestFocus();
 			artworkView.setImage(null);
-			releaseLink.setText(null);
 			releaseInfo.clear();
 			trackListView.clear();
 			stage.setTitle(NO_RELEASE_TITLE);
@@ -961,22 +1062,21 @@ public class ReleasePlayerForm extends SplitPane {
 	 */
 	@FXML
 	private void loadRelease() {
-		Optional<String> url = Dialogs.inputBox("Enter a release URL to load:", "Load Release", stage);
-		if (url.isPresent()) {
-			String u = url.get().trim().toLowerCase(Locale.ROOT);
-			if (!u.isEmpty()) {
-				try {
-					if (!u.startsWith("http://") && !u.startsWith("https://"))
-						u = "http://" + u;
-					setRelease(Release.forURI(URI.create(u)));
-				} 
-				catch (Exception e) {
-					String errMsg = "Error loading release: " + e.getMessage();
-					LOGGER.log(Level.WARNING, errMsg, e);
-					Dialogs.messageBox(errMsg, "Error", stage);
-				}
+		Dialogs.inputBox("Enter a release URL to load:", "Load Release", stage)
+		.map(url -> url.trim().toLowerCase(Locale.ROOT))
+		.filter(url -> !url.isEmpty())
+		.ifPresent(url -> {
+			try {
+				if (!url.startsWith("http://") && !url.startsWith("https://"))
+					url = "http://" + url;
+				setRelease(Release.forURI(URI.create(url)));
+			} 
+			catch (Exception e) {
+				String errMsg = "Error loading release: " + e.getMessage();
+				LOGGER.log(Level.WARNING, errMsg, e);
+				Dialogs.messageBox(errMsg, "Error", stage);
 			}
-		}
+		});
 	}
 
 
@@ -1006,13 +1106,35 @@ public class ReleasePlayerForm extends SplitPane {
 
 
 	/**
-	 * Opens release web page on Bandcamp using default web browser.
+	 * Opens release web page on Bandcamp.
 	 */
 	@FXML
 	private void openReleasePage() {
-		Release rls = release.get();
-		if (rls != null)
-			Utils.browse(rls.uri());
+		release.ifPresent(release -> Utils.browse(release.uri()));
+	}
+
+
+	/**
+	 * Opens a Bandcamp discography page on this release's parent domain.
+	 */
+	@FXML
+	private void openDiscographyPage() {
+		release.ifPresent(release -> Utils.browse(release.discographyURI()));
+	}
+
+
+	/**
+	 * Opens the download web page on Bandcamp if free download link is available
+	 * for current release.
+	 * If there's no free download link, does nothing.
+	 */
+	@FXML
+	private void openDownloadPage() {
+		release.ifPresent(release -> {
+			String link = release.downloadLink();
+			if (link != null)
+				Utils.browse(link);
+		});
 	}
 
 
@@ -1022,7 +1144,101 @@ public class ReleasePlayerForm extends SplitPane {
 	@FXML
 	private void initialize() {
 		checkComponents();
+		initMenuButtons();
+		initLinks();
+		initPlayerControls();
+		initTrackListView();		
+	}
 
+
+	/**
+	 * Initialization for menu buttons.
+	 */
+	private void initMenuButtons() {
+		unloadReleaseButton.disableProperty().bind(release.isNull());
+		moreActionsMenu.disableProperty().bind(release.isNull());
+
+		MenuItem searchArtist = new MenuItem();
+		MenuItem moreFromDomain = new MenuItem();
+
+		moreActionsMenu.showingProperty().addListener((observable, oldValue, newValue) -> {
+			if (newValue) {
+				release.ifPresent(release -> {
+					String artist = release.artist();
+					searchArtist.setText(String.format("Search \"%1$s\"", artist));
+					searchArtist.setOnAction(
+							actionEvent -> mainForm.searchReleases(artist, SearchType.SEARCH));
+
+					URI discogURI = release.discographyURI();
+					moreFromDomain.setText(String.format("More from \"%1$s\"", discogURI.getAuthority()));
+					moreFromDomain.setOnAction(
+							actionEvent -> mainForm.searchReleases(discogURI.toString(), SearchType.DIRECT));
+				});
+			}
+		});
+
+		MenuItem copyReleaseText = new MenuItem("Copy Release as Text");
+		copyReleaseText.setOnAction(event -> release.ifPresent(Utils::toClipboardAsString));
+
+		MenuItem copyURL = new MenuItem("Copy URL");
+		copyURL.setOnAction(event -> release.ifPresent(release -> Utils.toClipboardAsString(release.uri())));
+
+		moreActionsMenu.getItems().addAll(searchArtist, moreFromDomain, new SeparatorMenuItem(),
+				copyReleaseText, copyURL);
+	}
+
+
+	/**
+	 * Initialization for hyperlinks.
+	 */
+	private void initLinks() {
+		addLinkTooltip(releaseLink, release -> release.uri().toString());
+		addLinkTooltip(discogLink, release -> release.discographyURI().toString());
+
+		releaseLink.disableProperty().bind(release.isNull());
+		discogLink.disableProperty().bind(release.isNull());
+
+		downloadLink.visibleProperty().bind(
+				Bindings.createBooleanBinding(
+						() -> release.isPresent() && release.get().downloadLink() != null, release));
+
+		// Prevent links from being styled as "visited"
+		BooleanProperty alwaysFalse = new SimpleBooleanProperty(false);
+		releaseLink.visitedProperty().bind(alwaysFalse);
+		discogLink.visitedProperty().bind(alwaysFalse);
+		downloadLink.visitedProperty().bind(alwaysFalse);				
+	}
+
+
+	/**
+	 * Helper for adding tooltips to hyperlinks.
+	 */
+	private void addLinkTooltip(Hyperlink link, Function<Release, String> textExtractor) {
+		Tooltip tooltip = new Tooltip();
+		tooltip.textProperty().bind(
+				Bindings.createStringBinding(
+						() -> release.extractOrElse(textExtractor, ""), release));
+		link.setTooltip(tooltip);
+	}
+
+
+	private void initPlayerControls() {
+		playButton.setGraphic(PLAY_ICON);
+		stopButton.setGraphic(STOP_ICON);
+		previousButton.setGraphic(PREVIOUS_ICON);
+		nextButton.setGraphic(NEXT_ICON);
+
+		// Make the volume label display volume percentage
+		volumeLevel.textProperty().bind(
+				Bindings.createStringBinding(
+						() -> Math.round(volumeSlider.getValue()) + "%", volumeSlider.valueProperty()));
+	}
+
+
+	/**
+	 * Performs initial setup of track list view table and its columns.
+	 */
+	private void initTrackListView() {
 		trackListView = new TrackListView(tracksTableView);
 
 		// Setting a custom cell factory that creates play/pause button 
@@ -1088,22 +1304,6 @@ public class ReleasePlayerForm extends SplitPane {
 
 		timeColumn.setCellFactory(new CellFactory<>(trackListContextMenu.customizer()));
 		timeColumn.setCellValueFactory(cellData -> cellData.getValue().timeProperty());
-
-		unloadReleaseButton.disableProperty().bind(Bindings.isNull(release));
-
-		MenuItem copyReleaseLink = new MenuItem("Copy");
-		copyReleaseLink.setOnAction(event -> Utils.toClipboardAsString(releaseLink.getText()));
-		releaseLink.setContextMenu(new ContextMenu(copyReleaseLink));
-
-		playButton.setGraphic(PLAY_ICON);
-		stopButton.setGraphic(STOP_ICON);
-		previousButton.setGraphic(PREVIOUS_ICON);
-		nextButton.setGraphic(NEXT_ICON);
-
-		// Make the volume label display volume percentage
-		volumeLevel.textProperty().bind(
-				Bindings.createStringBinding(
-						() -> Math.round(volumeSlider.getValue()) + "%", volumeSlider.valueProperty()));
 	}
 
 
@@ -1132,9 +1332,12 @@ public class ReleasePlayerForm extends SplitPane {
 		assert playButton != null : "fx:id=\"playButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert loadReleaseButton != null : "fx:id=\"loadReleaseButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert unloadReleaseButton != null : "fx:id=\"unloadReleaseButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert moreActionsMenu != null : "fx:id=\"moreActionsMenu\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert nextButton != null : "fx:id=\"nextButton\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert timeColumn != null : "fx:id=\"timeColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert releaseLink != null : "fx:id=\"releaseLink\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert discogLink != null : "fx:id=\"discogLink\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
+		assert downloadLink != null : "fx:id=\"downloadLink\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert volumeSlider != null : "fx:id=\"volumeSlider\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert playButtonColumn != null : "fx:id=\"playButtonColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";
 		assert titleColumn != null : "fx:id=\"titleColumn\" was not injected: check your FXML file 'ReleasePlayerForm.fxml'.";

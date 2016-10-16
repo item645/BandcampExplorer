@@ -1,0 +1,8 @@
+
+.hyperlink {
+	-fx-text-fill: blue;
+}
+
+.menu-item .label {
+	-fx-font-size: 14;
+}

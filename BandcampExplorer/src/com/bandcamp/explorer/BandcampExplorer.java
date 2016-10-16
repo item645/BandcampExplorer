@@ -15,7 +15,6 @@ import javafx.stage.Stage;
 import com.bandcamp.explorer.ui.BandcampExplorerMainForm;
 import com.bandcamp.explorer.ui.Dialogs;
 import com.bandcamp.explorer.ui.EventLog;
-import com.bandcamp.explorer.ui.ReleasePlayerForm;
 
 
 /**
@@ -37,7 +36,7 @@ public final class BandcampExplorer extends Application {
 	/**
 	 * App title with current version number
 	 */
-	private static final String APP_TITLE = "Bandcamp Explorer 0.3.5";
+	private static final String APP_TITLE = "Bandcamp Explorer 0.3.6";
 
 	/**
 	 * A reference to app's top level stage.
@@ -91,13 +90,12 @@ public final class BandcampExplorer extends Application {
 		EventLog eventLog = EventLog.create(primaryStage);
 		configureLogging(eventLog.logHandler());
 		BandcampExplorerMainForm mainForm = BandcampExplorerMainForm.create(
-				primaryStage,
-				ReleasePlayerForm.create(primaryStage),
-				eventLog,
-				executorService);
+				primaryStage, eventLog, executorService);
 
-		// When everything's prepared, show app's window
-		primaryStage.setScene(new Scene(mainForm));
+		// Configuring scene and displaying app window
+		Scene scene = new Scene(mainForm);
+		scene.getStylesheets().add(getClass().getResource("ui/style.css").toExternalForm());
+		primaryStage.setScene(scene);
 		primaryStage.setMaximized(true);
 		primaryStage.show();
 

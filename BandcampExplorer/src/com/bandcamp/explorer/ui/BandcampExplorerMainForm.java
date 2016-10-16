@@ -65,9 +65,8 @@ public class BandcampExplorerMainForm extends BorderPane {
 	/**
 	 * Creates an instance of main form.
 	 */
-	private BandcampExplorerMainForm(Stage primaryStage, ReleasePlayerForm releasePlayer,
-			EventLog eventLog, ExecutorService executorService) {
-		this.releasePlayer = releasePlayer;
+	private BandcampExplorerMainForm(Stage primaryStage, EventLog eventLog, ExecutorService executorService) {
+		this.releasePlayer = ReleasePlayerForm.create(primaryStage, this);
 		this.eventLog = eventLog;
 		this.executorService = executorService;
 		this.progressBar = ProgressBarDialog.create(primaryStage);
@@ -114,7 +113,6 @@ public class BandcampExplorerMainForm extends BorderPane {
 	 * Creates an instance of main form.
 	 * 
 	 * @param primaryStage reference to app's primary stage
-	 * @param releasePlayer reference to a release player
 	 * @param eventLog reference to event log
 	 * @param executorService an executor service for performing various asynchronous operations
 	 * 
@@ -124,7 +122,6 @@ public class BandcampExplorerMainForm extends BorderPane {
 	 */
 	public static BandcampExplorerMainForm create(
 			Stage primaryStage,
-			ReleasePlayerForm releasePlayer,
 			EventLog eventLog,
 			ExecutorService executorService) {
 		if (!Platform.isFxApplicationThread())
@@ -132,35 +129,33 @@ public class BandcampExplorerMainForm extends BorderPane {
 		if (INSTANCE != null)
 			throw new IllegalStateException("This component can't be instantiated more than once");
 		Objects.requireNonNull(primaryStage);
-		Objects.requireNonNull(releasePlayer);
 		Objects.requireNonNull(eventLog);
 		Objects.requireNonNull(executorService);
 
 		return (INSTANCE = Utils.loadFXMLComponent(
 				BandcampExplorerMainForm.class.getResource("BandcampExplorerMainForm.fxml"),
-				() -> new BandcampExplorerMainForm(primaryStage, releasePlayer, eventLog, executorService)));
+				() -> new BandcampExplorerMainForm(primaryStage, eventLog, executorService)));
 	}
 
 
 	/**
 	 * Puts specified query and search type as values into appropriate form fields and
 	 * runs a search using these values. After search is finished, passes the result
-	 * to a release view for display.
+	 * to a results view for display.
+	 * New tab will be added to a results view to display the result if currently selected tab 
+	 * already has a result (or if it's a combined results tab), otherwise selected tab will be used.
 	 * 
 	 * @param query search query
 	 * @param type search type
-	 * @param newResultTab if true, new tab will be opened in a results view component
-	 *        to hold the result of this search, otherwise currently selected tab will
-	 *        be used
 	 * @throws NullPointerException if search query or search type is null
 	 * @throws IllegalStateException if there's search task running now
 	 */
-	void searchReleases(String query, SearchType type, boolean newResultTab) {
+	void searchReleases(String query, SearchType type) {
 		checkForRunningTask();
 
 		searchQuery.setText(Objects.requireNonNull(query));
 		searchType.setValue(Objects.requireNonNull(type));
-		if (newResultTab)
+		if (resultsView.hasSelectedSearchResult())
 			Platform.runLater(() -> resultsView.addTab());
 
 		searchReleases();
