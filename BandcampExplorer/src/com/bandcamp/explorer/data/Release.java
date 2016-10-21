@@ -73,29 +73,35 @@ public final class Release {
 	private static final Pattern TRACK_TITLE_SPLITTER = Pattern.compile(" - ");
 
 	/**
-	 * A list of patterns capturing some frequently used artist names for V/A-type releases,
-	 * mostly compilations.
+	 * Pattern capturing some frequently used artist names for V/A-releases (compilations).
 	 */
-	private static final List<Pattern> VARIOUS_ARTISTS_PATTERNS;
+	private static final Pattern VA_ARTIST_PATTERN;
 	static {
-		List<Pattern> patterns = new ArrayList<>();
-		int flags = Pattern.CASE_INSENSITIVE;
+		StringBuilder regex = new StringBuilder();
+		regex.append("various(\\sartists?)?|");                 // "Various", "Various Artist", "Various Artists"
+		regex.append(".+\\s(");                                 // Start of expression: <...> <Pattern>
+		regex.append("rec(ord)?s|");                            // "Recs", "Records"
+		regex.append("rec(ordings|\\.)|");                      // "Recordings", "Rec."
+		regex.append("music|");                                 // "Music"
+		regex.append("prod(uctions)?\\.?|");                    // "Productions", "Prod."
+		regex.append("(net)?label(\\sgroup)?|");                // "Netlabel", "Label", "Label Group"
+		regex.append("sounds|");                                // "Sounds"
+		regex.append("comp(ilation|\\.)|");                     // "Compilation", "Comp." 
+		regex.append("sampler");                                // "Sampler"
+		regex.append(")\\)?|");                                 // End of expression (with optional ending bracket) 
+		regex.append("v(/|-|\\\\|\\.)?a\\.?|");                 // "V/A", "V\A", "VA", "V-A", "V.A.", "VA.", "V.A" 
+		regex.append("beatspace(-|\\.).+|.+(\\.|-)beatspace|"); // "beatspace" (starting or ending)
+		regex.append("vv\\.?aa\\.?|aa\\.?vv\\.?");              // "VV.AA.", "AA.VV." and dotless variants 
 
-		// "Various", "Various Artist", "Various Artists"
-		patterns.add(Pattern.compile("various(\\sartists?)?", flags));
-		// <...> Recs, <...> Records, <...> Recordings, <...> Music, <...> Productions,
-		// <...> Prod., <...> Label Group, <...> Sounds, <...> Compilation and 
-		// all these in parentheses, e.g. <...> (<...> Records) and the like
-		patterns.add(Pattern.compile(
-				".+\\s(rec(ord)?s|rec(ordings|\\.)|music|prod(uctions)?\\.?|label\\sgroup|sounds|compilation)\\)?",
-				flags));
-		// "V/A", "V\A", "VA", "V-A"
-		patterns.add(Pattern.compile("v(/|-|\\\\)?a", flags));
-		// beatspace
-		patterns.add(Pattern.compile("(beatspace(-|\\.).+|.+(\\.|-)beatspace)", flags));
-
-		VARIOUS_ARTISTS_PATTERNS = Collections.unmodifiableList(patterns);
+		VA_ARTIST_PATTERN = Pattern.compile(regex.toString(), Pattern.CASE_INSENSITIVE);
 	}
+
+	/**
+	 * Pattern capturing some possible title variations for V/A-releases (compilations).
+	 */
+	private static final Pattern VA_TITLE_PATTERN = 
+			// Matches "Split" title and titles ending with "Compilation", "Comp." or "Sampler"
+			Pattern.compile("split|(.+\\s)*(comp(ilation|\\.)|sampler)", Pattern.CASE_INSENSITIVE);	
 
 	/**
 	 * Pattern for numeric HTML escape codes.
@@ -437,7 +443,7 @@ public final class Release {
 			information = Objects.toString(property("current.about"), "");
 			credits = Objects.toString(property("current.credits"), "");
 			downloadLink = property("freeDownloadPage");
-			tracks = readTracks(artist.get(), domainForURI(uri));
+			tracks = readTracks(artist.get(), domainForURI(uri), isMultiArtist(artist.get(), title.get(), tags));
 			time = createObjectProperty(new Time(
 					tracks.stream().collect(Collectors.summingInt(track -> track.time().seconds()))));
 		}
@@ -564,29 +570,42 @@ public final class Release {
 
 
 	/**
+	 * Checks if the release is (probably) a multi-artist compilation by testing its
+	 * artist name, title and tags against some known naming patterns frequently used 
+	 * for V/A-releases.
+	 * 
+	 * @param releaseArtist release artist
+	 * @param releaseTitle release title
+	 * @param releaseTags release tags
+	 * @return true, if the release is probably a multi-artist compilation
+	 */
+	private static boolean isMultiArtist(String releaseArtist, String releaseTitle, Set<String> releaseTags) {
+		return VA_ARTIST_PATTERN.matcher(releaseArtist).matches() 
+				|| VA_TITLE_PATTERN.matcher(releaseTitle).matches()
+				|| releaseTags.contains("compilation")
+				|| releaseTags.contains("various artists")
+				|| releaseTags.contains("va")
+				|| releaseTags.contains("various")
+				|| releaseTags.contains("split")
+				|| releaseTags.contains("sampler")
+				|| releaseTags.contains("various artist");
+	}
+
+
+	/**
 	 * Reads the tracklist information from JSON data and returns tracks as unmodifiable
 	 * list of Track objects.
 	 * 
 	 * @param releaseArtist the artist of this release
 	 * @param releaseDomain domain URL string of this release
+	 * @param isMultiArtist indicates whether this release is (probably) a multi-artist
+	 *        release (compilation)
 	 */
-	private List<Track> readTracks(String releaseArtist, String releaseDomain) {
+	private List<Track> readTracks(String releaseArtist, String releaseDomain, boolean isMultiArtist) {
 		List<Track> result = new ArrayList<>();
 
 		Number numTracks = property("trackinfo.length");
 		if (numTracks != null && numTracks.intValue() > 0) {
-			// Checking if this release is (probably) a multi-artist compilation by
-			// testing release artist against a list of known naming patterns for
-			// V/A-releases.
-			// This serves mostly as a heuristic hint for trackinfo parsing code
-			// to help with determining correct artist and title for each track.
-			boolean isMultiArtist = false;
-			for (Pattern pattern : VARIOUS_ARTISTS_PATTERNS) {
-				if (pattern.matcher(releaseArtist).matches()) {
-					isMultiArtist = true;
-					break;
-				}
-			}
 			for (int i = 0; i < numTracks.intValue(); i++)
 				result.add(createTrack(releaseArtist, releaseDomain, i, isMultiArtist));
 		}
@@ -602,10 +621,13 @@ public final class Release {
 	 * @param releaseDomain domain URL string of this release
 	 * @param trackIndex index corresponding to the current element of trackinfo
 	 *        array in JSON data
-	 * @param isMultiArtist indicates whether this release has tracks by multiple artists
+	 * @param isMultiArtist indicates whether this release is (probably) a multi-artist
+	 *        release (compilation); this serves mostly as a heuristic hint for trackinfo 
+	 *        parsing code to help with determining correct artist and title for each track
 	 * @return a Track instance
 	 */
-	private Track createTrack(String releaseArtist, String releaseDomain, int trackIndex, boolean isMultiArtist) {
+	private Track createTrack(String releaseArtist, String releaseDomain, 
+			int trackIndex, boolean isMultiArtist) {
 		assert releaseArtist != null;
 		assert releaseDomain != null;
 		assert trackIndex >= 0;
