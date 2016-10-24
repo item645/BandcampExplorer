@@ -5,4 +5,5 @@
 
 .menu-item .label {
 	-fx-font-size: 14;
+	-fx-max-width: 300;
 }

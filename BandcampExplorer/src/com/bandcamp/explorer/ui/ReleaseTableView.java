@@ -160,8 +160,48 @@ class ReleaseTableView extends AnchorPane {
 		 * Creates a context menu instance.
 		 */
 		ReleaseTableContextMenu() {
-			MenuItem searchArtist = new MenuItem();
-			MenuItem moreFromDomain = new MenuItem();
+			LabeledMenuItem searchArtist = new LabeledMenuItem();
+			LabeledMenuItem moreFromDomain = new LabeledMenuItem();
+
+			LabeledMenuItem viewOnBandcamp = new LabeledMenuItem("View on Bandcamp");
+			viewOnBandcamp.setOnAction(event -> {
+				Release release = getSelectedRelease();
+				if (release != null)
+					Utils.browse(release.uri());
+			});
+
+			LabeledMenuItem viewDiscogOnBandcamp = new LabeledMenuItem("View Discography on Bandcamp");
+			viewDiscogOnBandcamp.setOnAction(event -> {
+				Release release = getSelectedRelease();
+				if (release != null)
+					Utils.browse(release.discographyURI());
+			});
+
+			LabeledMenuItem copyText = new LabeledMenuItem("Copy Text");
+			copyText.setOnAction(event -> {
+				TableCell<?,?> cell = selectedCell();
+				if (cell != null)
+					Utils.toClipboardAsString(cell.getItem());
+			});
+
+			LabeledMenuItem copyReleaseText = new LabeledMenuItem("Copy Release as Text");
+			copyReleaseText.setOnAction(event -> Utils.toClipboardAsString(getSelectedRelease()));
+
+			LabeledMenuItem copyAllReleasesText = new LabeledMenuItem("Copy All Releases as Text");
+			// NOTE: we don't use System.lineSeparator() as a delimiter
+			// due to a possible bug in JavaFX clipboard implementation.
+			// More details: http://stackoverflow.com/questions/18827217/javafx-clipboard-double-newlines
+			// (same goes for copyAllURLs)
+			copyAllReleasesText.setOnAction(event -> Utils.toClipboardAsString(sortedItems, Release::toString, "\n"));
+
+			LabeledMenuItem copyAllURLs = new LabeledMenuItem("Copy All URLs");
+			copyAllURLs.setOnAction(event -> Utils.toClipboardAsString(
+					sortedItems, release -> release.uri().toString(), "\n"));
+
+			LabeledMenuItem playRelease = new LabeledMenuItem("Play Release...");
+			playRelease.setOnAction(event -> playSelectedRelease());
+
+			ObservableList<MenuItem> menuItems = getItems();
 
 			setOnShowing(windowEvent -> {
 				// On menu popup we update "Search..." and "More from..." items text and action
@@ -169,62 +209,28 @@ class ReleaseTableView extends AnchorPane {
 				Release release = getSelectedRelease();
 				if (release != null) {
 					String artist = release.artist();
-					searchArtist.setText(String.format("Search \"%1$s\"", artist));
+					searchArtist.setLabelText(String.format("Search \"%s\"", artist));
 					searchArtist.setOnAction(
 							actionEvent -> mainForm.searchReleases(artist, SearchType.SEARCH));
 					
 					URI discographyURI = release.discographyURI();
-					moreFromDomain.setText(String.format("More from \"%1$s\"", discographyURI.getAuthority()));
+					moreFromDomain.setLabelText(String.format("More from \"%s\"", discographyURI.getAuthority()));
 					moreFromDomain.setOnAction(
 							actionEvent -> mainForm.searchReleases(discographyURI.toString(), SearchType.DIRECT));
 				}
 				else {
-					searchArtist.setText(null);
+					searchArtist.setLabelText(null);
 					searchArtist.setOnAction(null);
-					moreFromDomain.setText(null);
+					moreFromDomain.setLabelText(null);
 					moreFromDomain.setOnAction(null);
 				}
+
+				// Re-add changed items to let the menu correctly resize itself
+				menuItems.set(0, searchArtist);
+				menuItems.set(1, moreFromDomain);
 			});
 
-			MenuItem viewOnBandcamp = new MenuItem("View on Bandcamp");
-			viewOnBandcamp.setOnAction(event -> {
-				Release release = getSelectedRelease();
-				if (release != null)
-					Utils.browse(release.uri());
-			});
-
-			MenuItem viewDiscogOnBandcamp = new MenuItem("View Discography on Bandcamp");
-			viewDiscogOnBandcamp.setOnAction(event -> {
-				Release release = getSelectedRelease();
-				if (release != null)
-					Utils.browse(release.discographyURI());
-			});
-
-			MenuItem copyText = new MenuItem("Copy Text");
-			copyText.setOnAction(event -> {
-				TableCell<?,?> cell = selectedCell();
-				if (cell != null)
-					Utils.toClipboardAsString(cell.getItem());
-			});
-
-			MenuItem copyReleaseText = new MenuItem("Copy Release as Text");
-			copyReleaseText.setOnAction(event -> Utils.toClipboardAsString(getSelectedRelease()));
-
-			MenuItem copyAllReleasesText = new MenuItem("Copy All Releases as Text");
-			// NOTE: we don't use System.lineSeparator() as a delimiter
-			// due to a possible bug in JavaFX clipboard implementation.
-			// More details: http://stackoverflow.com/questions/18827217/javafx-clipboard-double-newlines
-			// (same goes for copyAllURLs)
-			copyAllReleasesText.setOnAction(event -> Utils.toClipboardAsString(sortedItems, Release::toString, "\n"));
-
-			MenuItem copyAllURLs = new MenuItem("Copy All URLs");
-			copyAllURLs.setOnAction(event -> Utils.toClipboardAsString(
-					sortedItems, release -> release.uri().toString(), "\n"));
-
-			MenuItem playRelease = new MenuItem("Play Release...");
-			playRelease.setOnAction(event -> playSelectedRelease());
-
-			getItems().addAll(searchArtist, moreFromDomain, new SeparatorMenuItem(), viewOnBandcamp,
+			menuItems.addAll(searchArtist, moreFromDomain, new SeparatorMenuItem(), viewOnBandcamp,
 					viewDiscogOnBandcamp, new SeparatorMenuItem(), copyText, copyReleaseText,
 					copyAllReleasesText, copyAllURLs, new SeparatorMenuItem(), playRelease);
 		}

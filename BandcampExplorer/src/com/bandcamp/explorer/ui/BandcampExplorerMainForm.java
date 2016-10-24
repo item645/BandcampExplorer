@@ -151,7 +151,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 	 * @throws IllegalStateException if there's search task running now
 	 */
 	void searchReleases(String query, SearchType type) {
-		checkForRunningTask();
+		ensureNoRunningTask();
 
 		searchQuery.setText(Objects.requireNonNull(query));
 		searchType.setValue(Objects.requireNonNull(type));
@@ -170,7 +170,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 	 */
 	@FXML
 	private void searchReleases() {
-		checkForRunningTask();
+		ensureNoRunningTask();
 
 		String query = searchQuery.getText().trim();
 		if (query.isEmpty())
@@ -267,11 +267,20 @@ public class BandcampExplorerMainForm extends BorderPane {
 
 
 	/**
-	 * Helper to check whether the search task is running at the moment.
-	 * Throws IllegalStateException if it is.
+	 * Returns true if there is a search running at the moment in the context of main form.
+	 * Must be called only from JavaFX Application Thread.
 	 */
-	private void checkForRunningTask() {
-		if (runningTask != null)
+	boolean isRunningSearch() {
+		assert Platform.isFxApplicationThread();
+		return runningTask != null;
+	}
+
+
+	/**
+	 * Throws IllegalStateException if there is a search task running at the moment.
+	 */
+	private void ensureNoRunningTask() {
+		if (isRunningSearch())
 			throw new IllegalStateException("Can't start a new search when there is a search task running");
 	}
 

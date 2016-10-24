@@ -93,7 +93,7 @@ class ReleasePlayerForm extends SplitPane {
 	@FXML private Button stopButton;
 	@FXML private ImageView artworkView;
 	@FXML private Hyperlink releaseLink;
-    @FXML private Hyperlink discogLink;
+	@FXML private Hyperlink discogLink;
 	@FXML private Hyperlink downloadLink;
 	@FXML private TextArea releaseInfo;
 	@FXML private Label nowPlayingInfo;
@@ -305,51 +305,53 @@ class ReleasePlayerForm extends SplitPane {
 		 * Creates a context menu instance.
 		 */
 		TrackListContextMenu() {
-			MenuItem play = new MenuItem("Play");
-			MenuItem pause = new MenuItem("Pause");
-			MenuItem stop = new MenuItem("Stop");
-			MenuItem previous = new MenuItem("Previous");
-			MenuItem next = new MenuItem("Next");
+			LabeledMenuItem play = new LabeledMenuItem("Play");
+			LabeledMenuItem pause = new LabeledMenuItem("Pause");
+			LabeledMenuItem stop = new LabeledMenuItem("Stop");
+			LabeledMenuItem previous = new LabeledMenuItem("Previous");
+			LabeledMenuItem next = new LabeledMenuItem("Next");
 
 			pause.setOnAction(event -> audioPlayer.pause());
 			stop.setOnAction(event -> audioPlayer.stop());
 
-			MenuItem searchArtist = new MenuItem();
-			
-			MenuItem viewOnBandcamp = new MenuItem("View on Bandcamp");
+			LabeledMenuItem searchArtist = new LabeledMenuItem();
+
+			LabeledMenuItem viewOnBandcamp = new LabeledMenuItem("View on Bandcamp");
 			viewOnBandcamp.setOnAction(event -> {
 				Track track = trackListView.selectedTrack();
 				if (track != null)
 					Utils.browse(track.link());
 			});
 
-			MenuItem copyText = new MenuItem("Copy Text");
+			LabeledMenuItem copyText = new LabeledMenuItem("Copy Text");
 			copyText.setOnAction(event -> {
 				TableCell<?,?> cell = selectedCell();
 				if (cell != null)
 					Utils.toClipboardAsString(cell.getItem());
 			});
 
-			MenuItem copyTrackText = new MenuItem("Copy Track as Text");
+			LabeledMenuItem copyTrackText = new LabeledMenuItem("Copy Track as Text");
 			copyTrackText.setOnAction(event -> Utils.toClipboardAsString(trackListView.selectedTrack()));
 
-			MenuItem copyAllTracksText = new MenuItem("Copy All Tracks as Text");
+			LabeledMenuItem copyAllTracksText = new LabeledMenuItem("Copy All Tracks as Text");
 			copyAllTracksText.setOnAction(event -> Utils.toClipboardAsString(
 					trackListView.sortedTracks, Track::toString, "\n"));
 
-			MenuItem copyArtistTitle = new MenuItem("Copy Artist and Title");
+			LabeledMenuItem copyArtistTitle = new LabeledMenuItem("Copy Artist and Title");
 			copyArtistTitle.setOnAction(event -> {
 				Track track = trackListView.selectedTrack();
 				if (track != null)
 					Utils.toClipboardAsString(track.artist() + " - " + track.title());
 			});
 
-			MenuItem copyAudioURL = new MenuItem("Copy Audio URL");
+			LabeledMenuItem copyAudioURL = new LabeledMenuItem("Copy Audio URL");
 			copyAudioURL.setOnAction(event -> {
 				Track track = trackListView.selectedTrack();
 				if (track != null)
 					Utils.toClipboardAsString(track.fileLink());
 			});
+
+			ObservableList<MenuItem> menuItems = getItems();
 
 			setOnShowing(windowEvent -> {
 				// Update items on menu popup
@@ -378,22 +380,26 @@ class ReleasePlayerForm extends SplitPane {
 						stop.setDisable(true);
 						copyAudioURL.setDisable(true);
 					}
-					
+
 					updatePrevNextItem(previous, trackListView.previousPlayableTrack(track));
 					updatePrevNextItem(next, trackListView.nextPlayableTrack(track));
-					
+
 					String artist = track.artist();
-					searchArtist.setText(String.format("Search \"%1$s\"", artist));
+					searchArtist.setLabelText(String.format("Search \"%s\"", artist));
 					searchArtist.setOnAction(
-							actionEvent -> mainForm.searchReleases(artist, SearchType.SEARCH));					
+							actionEvent -> mainForm.searchReleases(artist, SearchType.SEARCH));
 				}
 				else {
-					searchArtist.setText(null);
+					searchArtist.setLabelText(null);
 					searchArtist.setOnAction(null);
 				}
+
+				searchArtist.setDisable(mainForm.isRunningSearch());
+				// Re-add item to trigger menu resizing
+				menuItems.set(menuItems.indexOf(searchArtist), searchArtist);
 			});
 
-			getItems().addAll(play, pause, stop, previous, next, new SeparatorMenuItem(),
+			menuItems.addAll(play, pause, stop, previous, next, new SeparatorMenuItem(),
 					searchArtist, new SeparatorMenuItem(), viewOnBandcamp, new SeparatorMenuItem(),
 					copyText, copyTrackText, copyAllTracksText, copyArtistTitle, copyAudioURL);
 		}
@@ -405,7 +411,7 @@ class ReleasePlayerForm extends SplitPane {
 		 * @param menuItem previous or next menu item
 		 * @param track a track to play when item is selected
 		 */
-		private void updatePrevNextItem(MenuItem menuItem, Track track) {
+		private void updatePrevNextItem(LabeledMenuItem menuItem, Track track) {
 			if (track == null)
 				menuItem.setDisable(true);
 			else {
@@ -1158,32 +1164,41 @@ class ReleasePlayerForm extends SplitPane {
 		unloadReleaseButton.disableProperty().bind(release.isNull());
 		moreActionsMenu.disableProperty().bind(release.isNull());
 
-		MenuItem searchArtist = new MenuItem();
-		MenuItem moreFromDomain = new MenuItem();
+		LabeledMenuItem searchArtist = new LabeledMenuItem();
+		LabeledMenuItem moreFromDomain = new LabeledMenuItem();
+
+		LabeledMenuItem copyReleaseText = new LabeledMenuItem("Copy Release as Text");
+		copyReleaseText.setOnAction(event -> release.ifPresent(Utils::toClipboardAsString));
+
+		LabeledMenuItem copyURL = new LabeledMenuItem("Copy URL");
+		copyURL.setOnAction(event -> release.ifPresent(release -> Utils.toClipboardAsString(release.uri())));
+
+		ObservableList<MenuItem> menuItems = moreActionsMenu.getItems();
 
 		moreActionsMenu.showingProperty().addListener((observable, oldValue, newValue) -> {
 			if (newValue) {
 				release.ifPresent(release -> {
+					boolean isRunningSearch = mainForm.isRunningSearch();
+
 					String artist = release.artist();
-					searchArtist.setText(String.format("Search \"%1$s\"", artist));
+					searchArtist.setLabelText(String.format("Search \"%s\"", artist));
 					searchArtist.setOnAction(
 							actionEvent -> mainForm.searchReleases(artist, SearchType.SEARCH));
+					searchArtist.setDisable(isRunningSearch);
 
 					URI discogURI = release.discographyURI();
-					moreFromDomain.setText(String.format("More from \"%1$s\"", discogURI.getAuthority()));
+					moreFromDomain.setLabelText(String.format("More from \"%s\"", discogURI.getAuthority()));
 					moreFromDomain.setOnAction(
 							actionEvent -> mainForm.searchReleases(discogURI.toString(), SearchType.DIRECT));
+					moreFromDomain.setDisable(isRunningSearch);
 				});
+				// Re-add changed items to let the menu correctly resize itself
+				menuItems.set(0, searchArtist);
+				menuItems.set(1, moreFromDomain);
 			}
 		});
 
-		MenuItem copyReleaseText = new MenuItem("Copy Release as Text");
-		copyReleaseText.setOnAction(event -> release.ifPresent(Utils::toClipboardAsString));
-
-		MenuItem copyURL = new MenuItem("Copy URL");
-		copyURL.setOnAction(event -> release.ifPresent(release -> Utils.toClipboardAsString(release.uri())));
-
-		moreActionsMenu.getItems().addAll(searchArtist, moreFromDomain, new SeparatorMenuItem(),
+		menuItems.addAll(searchArtist, moreFromDomain, new SeparatorMenuItem(),
 				copyReleaseText, copyURL);
 	}
 

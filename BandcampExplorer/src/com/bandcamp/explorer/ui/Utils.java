@@ -5,14 +5,19 @@ import java.net.URI;
 import java.net.URL;
 import java.util.Collection;
 import java.util.Objects;
+import java.util.function.DoubleSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Point2D;
+import javafx.scene.control.Labeled;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.Region;
+import javafx.scene.text.Text;
 
 import com.bandcamp.explorer.BandcampExplorer;
 import com.bandcamp.explorer.util.ExceptionUnchecker;
@@ -138,5 +143,52 @@ class Utils {
 	static <T> void toClipboardAsString(Collection<T> items, Function<T, String> mapper, CharSequence delimiter) {
 		toClipboardAsString(items.stream().map(mapper).collect(Collectors.joining(delimiter)));
 	}
-	
+
+
+	/**
+	 * Installs a tooltip displaying textual content of the given labeled node.
+	 * The tooltip will be shown only if text displayed in a node is clipped due to layout
+	 * restrictions and does not equal to node's actual textual content.
+	 * The tooltip is triggered by mouse entering the node and gets hidden on mouse exit.
+	 * The anchorX and anchorY parameters constitute local coordinates where tooltip's
+	 * upper left corner will be positioned.
+	 * 
+	 * @param labeledNode a labeled node to install tooltip on
+	 * @param anchorX a callback function which returns the X position of the 
+	 *        tooltip anchor in node's local coordinates
+	 * @param anchorY a callback function which returns the Y position of the
+	 *        tooltip anchor in node's local coordinates
+	 */
+	static void setContentTooltip(Labeled labeledNode, DoubleSupplier anchorX, DoubleSupplier anchorY) {
+		assert anchorX != null;
+		assert anchorY != null;
+		
+		labeledNode.setOnMouseEntered(enterEvent -> {
+			// Little hack to determine whether the labeled node text is clipped.
+			// Clipping operation does not change the actual text property of a labeled node,
+			// what really gets changed instead is a labeled text (an instance of
+			// com.sun.javafx.scene.control.skin.LabeledText) that is used internally 
+			// by labeled skin implementation (com.sun.javafx.scene.control.skin.LabeledSkinBase)
+			// to actually display its content as a styled text.
+			// LabeledText has the style class "text" and is reachable via node lookup.			
+			Text displayedText = (Text)labeledNode.lookup(".text");
+			if (displayedText == null)
+				return;
+			String contentText = Objects.toString(labeledNode.getText(), "");
+
+			// If displayed text doesn't equal actual textual content of a node,
+			// then it is clipped and we need a tooltip
+			if (!contentText.isEmpty() && !contentText.equals(displayedText.getText())) {
+				// Get a screen point corresponding to given local coordinates X and Y
+				Point2D anchorPoint = labeledNode.localToScreen(anchorX.getAsDouble(), anchorY.getAsDouble());
+				// Show the tooltip
+				Tooltip tooltip = new Tooltip(contentText);
+				tooltip.show(labeledNode, anchorPoint.getX(), anchorPoint.getY());
+				labeledNode.setOnMouseExited(exitEvent -> tooltip.hide());
+			}
+			else
+				labeledNode.setOnMouseExited(null);
+		});
+	}
+
 }
