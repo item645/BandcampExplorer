@@ -314,7 +314,7 @@ class ReleasePlayerForm extends SplitPane {
 			pause.setOnAction(event -> audioPlayer.pause());
 			stop.setOnAction(event -> audioPlayer.stop());
 
-			LabeledMenuItem searchArtist = new LabeledMenuItem();
+			LabeledMenuItem searchArtist = new LabeledMenuItem(true);
 
 			LabeledMenuItem viewOnBandcamp = new LabeledMenuItem("View on Bandcamp");
 			viewOnBandcamp.setOnAction(event -> {
@@ -1164,8 +1164,8 @@ class ReleasePlayerForm extends SplitPane {
 		unloadReleaseButton.disableProperty().bind(release.isNull());
 		moreActionsMenu.disableProperty().bind(release.isNull());
 
-		LabeledMenuItem searchArtist = new LabeledMenuItem();
-		LabeledMenuItem moreFromDomain = new LabeledMenuItem();
+		LabeledMenuItem searchArtist = new LabeledMenuItem(true);
+		LabeledMenuItem moreFromDomain = new LabeledMenuItem(true);
 
 		LabeledMenuItem copyReleaseText = new LabeledMenuItem("Copy Release as Text");
 		copyReleaseText.setOnAction(event -> release.ifPresent(Utils::toClipboardAsString));

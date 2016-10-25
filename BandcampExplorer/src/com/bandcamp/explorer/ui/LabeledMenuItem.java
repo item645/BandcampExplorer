@@ -8,9 +8,9 @@ import javafx.scene.control.MenuItem;
  * {@link #graphicProperty()}) to dislay text.
  * This allows for additional styling of menu items, in particular - to set a limit
  * on menu width through CSS.
- * Also, if text displayed in this menu item is clipped due to the width limitation,
- * a tooltip with full (non-clipped) text will be shown on the right side when item
- * is selected by mouse.
+ * Also, this implementation supports setting a content tooltip for menu item. If text displayed
+ * in this menu item is clipped due to the width limitation, tooltip with full (non-clipped) text
+ * will be shown on the right side when item is selected by mouse.
  */
 class LabeledMenuItem extends MenuItem {
 
@@ -18,33 +18,49 @@ class LabeledMenuItem extends MenuItem {
 
 
 	/**
-	 * Constructs a labeled menu item with empty text.
+	 * Constructs new labeled menu item with empty text and no tooltip.
 	 */
 	LabeledMenuItem() {
-		label = new Label();
-		init();
+		this(null, false);
 	}
 
 
 	/**
-	 * Constructs a labeled menu item with the specified text.
+	 * Constructs new labeled menu item with the specified text and no tooltip.
 	 * 
 	 * @param text a text to display in menu item
 	 */
 	LabeledMenuItem(String text) {
-		label = new Label(text);
-		init();
+		this(text, false);
 	}
 
 
 	/**
-	 * Shared initialization code for constructors.
+	 * Constructs new labeled menu item with empty text and allows to add a
+	 * content tooltip to it.
+	 * 
+	 * @param addContentTooltip indicates whether a content tooltip should be added
+	 *        to this menu item
 	 */
-	private void init() {
-		setGraphic(label);
-		// Set a content tooltip to display on the right upper corner of the label
-		Utils.setContentTooltip(label, 
-				() -> label.getLayoutBounds().getMaxX(), () -> label.getLayoutBounds().getMinY());
+	LabeledMenuItem(boolean addContentTooltip) {
+		this(null, addContentTooltip);
+	}
+
+
+	/**
+	 * Constructs new labeled menu item with the specified text and allows to
+	 * add a content tooltip to it.
+	 * 
+	 * @param text a text to display in menu item
+	 * @param addContentTooltip indicates whether a content tooltip should be added
+	 *        to this menu item
+	 */
+	LabeledMenuItem(String text, boolean addContentTooltip) {
+		setGraphic(label = new Label(text));
+		if (addContentTooltip)
+			// Set a content tooltip to display on the right upper corner of the label
+			Utils.setContentTooltip(label, 
+					() -> label.getLayoutBounds().getMaxX(), () -> label.getLayoutBounds().getMinY());
 	}
 
 

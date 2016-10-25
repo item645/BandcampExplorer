@@ -160,8 +160,8 @@ class ReleaseTableView extends AnchorPane {
 		 * Creates a context menu instance.
 		 */
 		ReleaseTableContextMenu() {
-			LabeledMenuItem searchArtist = new LabeledMenuItem();
-			LabeledMenuItem moreFromDomain = new LabeledMenuItem();
+			LabeledMenuItem searchArtist = new LabeledMenuItem(true);
+			LabeledMenuItem moreFromDomain = new LabeledMenuItem(true);
 
 			LabeledMenuItem viewOnBandcamp = new LabeledMenuItem("View on Bandcamp");
 			viewOnBandcamp.setOnAction(event -> {
