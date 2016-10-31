@@ -6,10 +6,8 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Scanner;
@@ -26,7 +24,7 @@ import com.bandcamp.explorer.util.ExceptionUnchecker;
  * Instance of this class loads the resource referenced by the specified URL
  * string and collects all unique links to Bandcamp releases found in that
  * resource, creating a {@link ReleaseLoader} task for each found release
- * link. List of release loaders can be obtained via {@link #releaseLoaders()}.
+ * link. A set of release loaders can be obtained via {@link #releaseLoaders()}.
  */
 class Resource {
 
@@ -36,7 +34,7 @@ class Resource {
 			"((https?://)?[a-z0-9\\-\\.]+\\.[a-z0-9]+)?/(album|track)/[a-z0-9\\-]+",
 			Pattern.CASE_INSENSITIVE);
 
-	private final List<ReleaseLoader> releaseLoaders = new ArrayList<>();
+	private final Set<ReleaseLoader> releaseLoaders = new HashSet<>();
 	private final SearchTask parentTask;
 
 
@@ -79,17 +77,24 @@ class Resource {
 
 			for (String link; (link = input.findWithinHorizon(RELEASE_LINK, 0)) != null; ) {
 				link = link.toLowerCase(Locale.ROOT);
-				boolean noHost = link.startsWith("/album") || link.startsWith("/track");
-				if (isFile) {
-					if (noHost)
-						continue; // if reading from file, skip links with no host
-					else if (!link.startsWith("http://") && !link.startsWith("https://"))
-						link = "http://" + link;
+				if (link.startsWith("/album") || link.startsWith("/track")) {
+					if (isFile)
+						// When reading from file, skip links with no host
+						continue;
+					else {
+						String host = url.getHost();
+						if ("bandcamp.com".equalsIgnoreCase(host))
+							// Skip host-less links if page host is bandcamp.com: such links won't
+							// be valid. This usually happens when loading fan pages.
+							continue;
+						else
+							// Otherwise take missing protocol and host from the current page
+							link = new StringBuilder(url.getProtocol())
+							.append("://").append(host).append(link).toString();
+					}
 				}
-				else if (noHost) {
-					link = new StringBuilder(url.getProtocol())
-					.append("://").append(url.getHost()).append(link).toString();
-				}
+				else if (!link.startsWith("http://") && !link.startsWith("https://"))
+					link = "http://" + link;
 				if (links.add(link)) { // ensure that we don't create a loader for same link more than once
 					ReleaseLoader loader = createLoader(link);
 					if (loader != null)
@@ -118,11 +123,11 @@ class Resource {
 
 
 	/**
-	 * Returns an unmodifiable list of release loaders, corresponding to every unique
+	 * Returns an unmodifiable set of release loaders, corresponding to every unique
 	 * release link found in this resource.
 	 */
-	List<ReleaseLoader> releaseLoaders() {
-		return Collections.unmodifiableList(releaseLoaders);
+	Set<ReleaseLoader> releaseLoaders() {
+		return Collections.unmodifiableSet(releaseLoaders);
 	}
 
 }

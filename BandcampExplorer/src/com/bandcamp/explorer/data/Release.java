@@ -81,12 +81,12 @@ public final class Release {
 		regex.append("various(\\sartists?)?|");                 // "Various", "Various Artist", "Various Artists"
 		regex.append(".+\\s(");                                 // Start of expression: <...> <Pattern>
 		regex.append("rec(ord)?s|");                            // "Recs", "Records"
-		regex.append("rec(ordings|\\.)|");                      // "Recordings", "Rec."
+		regex.append("rec(ordings|\\.)?|");                     // "Recordings", "Rec.", "Rec"
 		regex.append("music|");                                 // "Music"
-		regex.append("prod(uctions)?\\.?|");                    // "Productions", "Prod."
+		regex.append("prod(uctions|\\.)?|");                    // "Productions", "Prod.", "Prod"
 		regex.append("(net)?label(\\sgroup)?|");                // "Netlabel", "Label", "Label Group"
 		regex.append("sounds|");                                // "Sounds"
-		regex.append("comp(ilation|\\.)|");                     // "Compilation", "Comp." 
+		regex.append("comp(ilation|\\.)?|");                    // "Compilation", "Comp.", "Comp" 
 		regex.append("sampler");                                // "Sampler"
 		regex.append(")\\)?|");                                 // End of expression (with optional ending bracket) 
 		regex.append("v(/|-|\\\\|\\.)?a\\.?|");                 // "V/A", "V\A", "VA", "V-A", "V.A.", "VA.", "V.A" 
@@ -100,8 +100,8 @@ public final class Release {
 	 * Pattern capturing some possible title variations for V/A-releases (compilations).
 	 */
 	private static final Pattern VA_TITLE_PATTERN = 
-			// Matches "Split" title and titles ending with "Compilation", "Comp." or "Sampler"
-			Pattern.compile("split|(.+\\s)*(comp(ilation|\\.)|sampler)", Pattern.CASE_INSENSITIVE);	
+			// Matches titles ending with "Split", "Compilation", "Comp.", "Comp" or "Sampler"
+			Pattern.compile("(.+\\s)*+(split|comp(ilation|\\.)?|sampler)", Pattern.CASE_INSENSITIVE);
 
 	/**
 	 * Pattern for numeric HTML escape codes.
@@ -443,7 +443,7 @@ public final class Release {
 			information = Objects.toString(property("current.about"), "");
 			credits = Objects.toString(property("current.credits"), "");
 			downloadLink = property("freeDownloadPage");
-			tracks = readTracks(artist.get(), domainForURI(uri), isMultiArtist(artist.get(), title.get(), tags));
+			tracks = readTracks(artist.get(), domainFromURI(uri), isMultiArtist(artist.get(), title.get(), tags));
 			time = createObjectProperty(new Time(
 					tracks.stream().collect(Collectors.summingInt(track -> track.time().seconds()))));
 		}
@@ -484,9 +484,9 @@ public final class Release {
 
 
 	/**
-	 * Returns the domain URL string for the specified URI (that is, protocol and host).
+	 * Returns the domain URL string from the specified URI (that is, protocol and host).
 	 */
-	private static String domainForURI(URI uri) {
+	private static String domainFromURI(URI uri) {
 		return uri.getScheme() + "://" + uri.getAuthority();
 	}
 
@@ -655,9 +655,11 @@ public final class Release {
 				// multi-artist tags by specifiying artist separately for each track. But in such
 				// case there's really nothing more we can do.
 				if (titleLink != null) {
-					String linkToken = titleLink.substring(titleLink.lastIndexOf('/') + 1)
-							.toLowerCase(Locale.ENGLISH);
-					if (!linkToken.equals(minimizeTitle(artistTitle))) {
+					String linkToken = removeTrailingIndex(
+							titleLink.substring(titleLink.lastIndexOf('/') + 1)
+							.toLowerCase(Locale.ENGLISH));
+					String minArtistTitle = removeTrailingIndex(minimizeTitle(artistTitle));
+					if (!linkToken.equals(minArtistTitle)) {
 						String[] vals = TRACK_TITLE_SPLITTER.split(artistTitle, 2);
 						artist = vals[0];
 						title = vals[1];
@@ -717,12 +719,21 @@ public final class Release {
 		StringBuilder result = new StringBuilder(title.length());
 		for (int i = 0; i < title.length(); i++) {
 			char c = title.charAt(i);
-			if (c >= '0' && c <= '9' || c >= 'a' && c <= 'z')
+			if (c >= 'a' && c <= 'z' || isAsciiDigit(c))
 				result.append(c);
 			else if (c >= 'A' && c <= 'Z')
 				result.append((char)(c + 32)); // convert to lowercase
-			else if (c != '\'' && (result.length() == 0 || result.charAt(result.length() - 1) != '-'))
-				result.append('-');
+			else if (result.length() == 0 || result.charAt(result.length() - 1) != '-') {
+				if (c == '.') {
+					// Special case: if '.' is surrounded by digits, it must be skipped,
+					// otherwise replaced with '-'
+					if ((i == 0 || !isAsciiDigit(title.charAt(i-1)))
+							|| (i == title.length() - 1 || !isAsciiDigit(title.charAt(i+1))))
+						result.append('-');
+				}
+				else if (c != '\'')
+					result.append('-');
+			}
 		}
 
 		int len = result.length();
@@ -736,6 +747,65 @@ public final class Release {
 				len--;
 			return result.substring(start, len);
 		}
+	}
+
+
+	/**
+	 * Removes trailing index from minimized title or link token, if any.
+	 * More specifically, removes a sequence of "-N" substrings from the end of string,
+	 * where "N" can be any number of characters in 0-9 range, until first non-numeric
+	 * character is encountered.
+	 * Examples: "some-track-title-10" -> "some-track-title", "title123-1" -> "title123",
+	 * "other-title-4-3-16" -> "other-title".
+	 * 
+	 * If there is an index at the end of link token and this index does not
+	 * belong to track title, it must be removed to ensure the correctness of
+	 * link token vs minimized title comparison.
+	 * Such index sometimes added by Bandcamp to make track URLs unique when there
+	 * are different tracks on same domain whose titles yield identical link tokens.
+	 * 
+	 * Sometimes non-minimized track title contains a series of characters that will
+	 * be turned into index-like sequence during title minimization. In that case
+	 * such sequence also gets removed despite it being a legitimate part of track title.
+	 * Since same is made for link token too, this should not affect the result of 
+	 * link token vs minimized title comparison.
+	 * 
+	 * @param title minimized track title or title link token
+	 * @return title without trailing index
+	 */
+	private static String removeTrailingIndex(String title) {
+		if (title.length() < 2)
+			return title;
+
+		// Check if title actually contains index sequence;
+		// if not, return unaltered title
+		int h = title.lastIndexOf('-');
+		if (h == -1 || h == title.length() - 1)
+			return title;
+		for (int i = h + 1; i < title.length(); i++)
+			if (!isAsciiDigit(title.charAt(i)))
+				return title;
+
+		// Search for first non-numeric character before index sequence
+		// and return everyting from the beginning to found position
+		for (int i = title.length() - 1; i > 0; i--) {
+			if (title.charAt(i) == '-' && !isAsciiDigit(title.charAt(i-1)))
+				return title.substring(0, i);
+		}
+
+		// We reach here if title contains only digits and hyphens.
+		int h1 = title.indexOf('-');
+		return h1 == 0 ? "-" : title.substring(0, h1);
+	}
+
+
+	/**
+	 * Returns true if character is a US-ASCII digit (0-9).
+	 * Unlike {@link Character#isDigit(char)} this is faster and
+	 * less complicated version that checks for ASCII digits only.
+	 */
+	private static boolean isAsciiDigit(char c) {
+		return c >= '0' && c <= '9';
 	}
 
 
@@ -975,7 +1045,7 @@ public final class Release {
 	 * Returns a URI of a discography page on this release's parent domain.
 	 */
 	public URI discographyURI() {
-		return URI.create(domainForURI(uri.get()) + "/music");
+		return URI.create(domainFromURI(uri.get()) + "/music");
 	}
 
 

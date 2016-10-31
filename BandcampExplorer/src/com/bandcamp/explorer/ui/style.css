@@ -7,3 +7,11 @@
 	-fx-font-size: 14;
 	-fx-max-width: 300;
 }
+
+.tab-pane {
+	-fx-tab-max-width: 250;
+}
+
+.tab {
+	-fx-font-size: 14;
+}
