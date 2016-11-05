@@ -20,7 +20,7 @@ public final class Time implements Comparable<Time> {
 	 * for individual array elements, thus ensuring visibility of updates to those elements
 	 * for all reader threads.
 	 */
-	private static final AtomicReferenceArray<Time> cache = new AtomicReferenceArray<>(CACHE_MAX_VALUE);
+	private static final AtomicReferenceArray<Time> cache = new AtomicReferenceArray<>(CACHE_MAX_VALUE + 1);
 
 
 	private final int seconds;
