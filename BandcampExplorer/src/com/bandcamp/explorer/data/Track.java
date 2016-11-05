@@ -40,7 +40,7 @@ public final class Track {
 		this.number = new ReadOnlyIntegerWrapper(number).getReadOnlyProperty();
 		this.artist = new ReadOnlyStringWrapper(artist).getReadOnlyProperty();
 		this.title = new ReadOnlyStringWrapper(title).getReadOnlyProperty();
-		this.time = new ReadOnlyObjectWrapper<>(new Time(Math.round(seconds))).getReadOnlyProperty();
+		this.time = new ReadOnlyObjectWrapper<>(Time.ofSeconds(Math.round(seconds))).getReadOnlyProperty();
 		this.link = link;
 		this.fileLink = fileLink;
 	}

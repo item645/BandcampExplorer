@@ -444,7 +444,7 @@ public final class Release {
 			credits = Objects.toString(property("current.credits"), "");
 			downloadLink = property("freeDownloadPage");
 			tracks = readTracks(artist.get(), domainFromURI(uri), isMultiArtist(artist.get(), title.get(), tags));
-			time = createObjectProperty(new Time(
+			time = createObjectProperty(Time.ofSeconds(
 					tracks.stream().collect(Collectors.summingInt(track -> track.time().seconds()))));
 		}
 		catch (IOException e) {
@@ -788,10 +788,9 @@ public final class Release {
 
 		// Search for first non-numeric character before index sequence
 		// and return everyting from the beginning to found position
-		for (int i = title.length() - 1; i > 0; i--) {
+		for (int i = title.length() - 1; i > 0; i--)
 			if (title.charAt(i) == '-' && !isAsciiDigit(title.charAt(i-1)))
 				return title.substring(0, i);
-		}
 
 		// We reach here if title contains only digits and hyphens.
 		int h1 = title.indexOf('-');
