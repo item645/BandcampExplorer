@@ -505,16 +505,18 @@ class ReleaseTableView extends AnchorPane {
 		// Setting a callback to display an information about selected
 		// release in text area.
 		releaseTableView.getSelectionModel().selectedItemProperty()
-		.addListener((observable, oldRelease, newRelease) -> {
-			if (newRelease != null) {
+		.addListener((observable, oldRelease, release) -> {
+			if (release != null) {
 				StringBuilder sb = new StringBuilder();
-				if (!newRelease.information().isEmpty())
-					sb.append(newRelease.information()).append('\n').append('\n');
-				if (!newRelease.credits().isEmpty())
-					sb.append(newRelease.credits()).append('\n').append('\n');
-				if (!newRelease.tracks().isEmpty()) {
+				if (release.parentReleaseLink() != null)
+					sb.append("From: ").append(release.parentReleaseLink()).append('\n').append('\n');
+				if (!release.information().isEmpty())
+					sb.append(release.information()).append('\n').append('\n');
+				if (!release.credits().isEmpty())
+					sb.append(release.credits()).append('\n').append('\n');
+				if (!release.tracks().isEmpty()) {
 					sb.append("Tracklist:\n");
-					newRelease.tracks().forEach(track -> sb.append(track).append('\n'));
+					release.tracks().forEach(track -> sb.append(track).append('\n'));
 				}
 				releaseInfo.setText(sb.append('\n').toString());
 			}

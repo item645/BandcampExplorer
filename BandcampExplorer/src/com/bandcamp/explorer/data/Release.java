@@ -151,6 +151,7 @@ public final class Release {
 	private final String information;
 	private final String credits;
 	private final String downloadLink;
+	private final String parentReleaseLink;
 
 
 
@@ -443,7 +444,10 @@ public final class Release {
 			information = Objects.toString(property("current.about"), "");
 			credits = Objects.toString(property("current.credits"), "");
 			downloadLink = property("freeDownloadPage");
-			tracks = readTracks(artist.get(), domainFromURI(uri), isMultiArtist(artist.get(), title.get(), tags));
+			String domain = domainFromURI(uri);
+			String parent = property("album_url");
+			parentReleaseLink = parent != null ? domain + parent : null;
+			tracks = readTracks(artist.get(), domain, isMultiArtist(artist.get(), title.get(), tags));
 			time = createObjectProperty(Time.ofSeconds(
 					tracks.stream().collect(Collectors.summingInt(track -> track.time().seconds()))));
 		}
@@ -1083,7 +1087,7 @@ public final class Release {
 
 
 	/**
-	 * Returns a string URL to album artwork 350x350 image.
+	 * Returns a URL string of album artwork 350x350 image.
 	 * If this release has no artwork, returns null.
 	 */
 	public String artworkLink() {
@@ -1118,6 +1122,16 @@ public final class Release {
 	 */
 	public String downloadLink() {
 		return downloadLink;
+	}
+
+
+	/**
+	 * Returns a URL string of Bandcamp release that contains this release.
+	 * The link is available only if this release is a single track which is a
+	 * part of album, otherwise this method returns null.
+	 */
+	public String parentReleaseLink() {
+		return parentReleaseLink;
 	}
 
 }

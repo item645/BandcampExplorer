@@ -1011,17 +1011,23 @@ class ReleasePlayerForm extends SplitPane {
 	 * @param release a release to create info for
 	 */
 	private static String createReleaseInfo(Release release) {
+		StringBuilder info = new StringBuilder();
+
+		info.append(release.artist()).append(" - ").append(release.title()).append('\n').append('\n');
+		if (release.parentReleaseLink() != null)
+			info.append("FROM: ").append(release.parentReleaseLink()).append('\n');
+		info.append("PUBLISHED: ").append(release.publishDate()).append('\n');
 		LocalDate releaseDate = release.releaseDate();
-		return new StringBuilder()
-		.append(release.artist()).append(" - ").append(release.title()).append('\n').append('\n')
-		.append("PUBLISHED: ").append(release.publishDate()).append('\n')
-		.append("RELEASED: ").append(releaseDate.equals(LocalDate.MIN) ? "-" : releaseDate).append('\n')
-		.append("DOWNLOAD TYPE: ").append(release.downloadType()).append('\n')
-		.append("TIME: ").append(release.time()).append('\n')
-		.append("TAGS: ").append(release.tagsString()).append('\n')
-		.append('\n').append(release.information()).append('\n')
-		.append('\n').append(release.credits())
-		.toString();
+		info.append("RELEASED: ").append(releaseDate.equals(LocalDate.MIN) ? "-" : releaseDate).append('\n');
+		info.append("DOWNLOAD TYPE: ").append(release.downloadType()).append('\n');
+		info.append("TIME: ").append(release.time()).append('\n');
+		info.append("TAGS: ").append(release.tagsString()).append('\n');
+		if (!release.information().isEmpty())
+			info.append('\n').append(release.information()).append('\n');
+		if (!release.credits().isEmpty())
+			info.append('\n').append(release.credits());
+
+		return info.toString();
 	}
 
 
