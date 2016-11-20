@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashSet;
@@ -66,12 +65,8 @@ class Resource {
 		if (parentTask.isCancelled())
 			return;
 
-		URLConnection connection = url.openConnection();
-		// 60 seconds timeout for both connect and read
-		connection.setConnectTimeout(60000);
-		connection.setReadTimeout(60000);
-
-		try (Scanner input = new Scanner(connection.getInputStream(), StandardCharsets.UTF_8.name())) {
+		try (Scanner input = new Scanner(URLConnectionHelper.getConnection(url).getInputStream(),
+				StandardCharsets.UTF_8.name())) {
 			boolean isFile = url.getProtocol().toLowerCase(Locale.ROOT).equals("file");
 			Set<String> links = new HashSet<>();
 

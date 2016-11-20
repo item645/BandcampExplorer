@@ -413,23 +413,23 @@ public final class Release {
 	private Release(URI uri) throws ReleaseLoadingException {
 		HttpURLConnection connection;
 		try {
-			connection = (HttpURLConnection)uri.toURL().openConnection();
+			connection = URLConnectionHelper.getConnection(uri);
 		}
 		catch (Exception e) {
 			throw new ReleaseLoadingException(e);
 		}
-		// 60 seconds timeout for both connect and read
-		connection.setConnectTimeout(60000);
-		connection.setReadTimeout(60000);
 
 		try (Scanner input = new Scanner(connection.getInputStream(), StandardCharsets.UTF_8.name())) {
 			// Finding a variable containing release data and feeding it to JS engine so that we could
 			// then handily read any property values we need.
+			String releaseData = input.findWithinHorizon(RELEASE_DATA, 0);
+			if (releaseData == null)
+				throw new ReleaseLoadingException("Release data not found");
 			try {
-				JS.eval(input.findWithinHorizon(RELEASE_DATA, 0));
+				JS.eval(releaseData);
 			}
-			catch (Exception e) {
-				throw new ReleaseLoadingException("Release data is not valid or cannot be located", e);
+			catch (ScriptException e) {
+				throw new ReleaseLoadingException("Release data is not valid", e);
 			}
 
 			this.uri = createObjectProperty(uri);

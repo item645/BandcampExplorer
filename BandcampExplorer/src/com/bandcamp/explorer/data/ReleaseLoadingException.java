@@ -15,15 +15,12 @@ public class ReleaseLoadingException extends Exception {
 
 
 	/**
-	 * Constructs new ReleaseLoadingException with the specified detail message
-	 * and cause.
+	 * Constructs new ReleaseLoadingException with the specified detail message.
 	 * 
 	 * @param message the detail message
-	 * @param cause the cause of this exception
 	 */
-	public ReleaseLoadingException(String message, Throwable cause) {
-		super(message, cause);
-		this.httpResponseCode = 0;
+	public ReleaseLoadingException(String message) {
+		this(message, null);
 	}
 
 
@@ -33,8 +30,19 @@ public class ReleaseLoadingException extends Exception {
 	 * @param cause the cause of this exception
 	 */
 	public ReleaseLoadingException(Throwable cause) {
-		super(cause);
-		this.httpResponseCode = 0;
+		this(cause, 0);
+	}
+
+
+	/**
+	 * Constructs new ReleaseLoadingException with the specified detail message
+	 * and cause.
+	 * 
+	 * @param message the detail message
+	 * @param cause the cause of this exception
+	 */
+	public ReleaseLoadingException(String message, Throwable cause) {
+		this(message, cause, 0);
 	}
 
 
@@ -47,7 +55,21 @@ public class ReleaseLoadingException extends Exception {
 	 *        in case there was an error on the server side
 	 */
 	public ReleaseLoadingException(Throwable cause, int httpResponseCode) {
-		super(cause);
+		this(cause == null ? null : cause.toString(), cause, httpResponseCode);
+	}
+
+
+	/**
+	 * Constructs new ReleaseLoadingException with the specified detail message,
+	 * cause and HTTP server response code.
+	 * 
+	 * @param message the detail message
+	 * @param cause the cause of this exception
+	 * @param httpResponseCode the response code returned by HTTP server
+	 *        in case there was an error on the server side
+	 */
+	public ReleaseLoadingException(String message, Throwable cause, int httpResponseCode) {
+		super(message, cause);
 		this.httpResponseCode = httpResponseCode;
 	}
 
