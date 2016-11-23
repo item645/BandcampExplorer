@@ -60,10 +60,4 @@ public enum ReleaseSortOrder implements Comparator<Release> {
 		}
 	};
 
-
-	/**
-	 * Implements comparison operation. Each sort option has its own implementation.
-	 */
-	@Override
-	public abstract int compare(Release r1, Release r2);
 }

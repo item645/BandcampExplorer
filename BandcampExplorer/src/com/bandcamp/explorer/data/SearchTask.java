@@ -1,6 +1,8 @@
 package com.bandcamp.explorer.data;
 
-import java.net.HttpURLConnection;
+import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static java.net.HttpURLConnection.HTTP_UNAVAILABLE;
+import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -156,19 +158,21 @@ public final class SearchTask extends Task<SearchResult> {
 			ReleaseLoader.Result result = completionService.take().get();
 			if (result != null) {
 				try {
-					releases.add(result.release());
+					releases.add(result.get());
 				}
 				catch (Exception exception) {
 					ReleaseLoader loader = result.loader();
-					String message = "Error loading release: " + loader.uri() + " (" + exception.getMessage() + ")";
+					URI uri = loader.uri();
+					String message = "Error loading release: %1$s (%2$s)";
 					int responseCode = exception instanceof ReleaseLoadingException
 							? ((ReleaseLoadingException)exception).getHttpResponseCode()
 							: 0;
-					if (responseCode == HttpURLConnection.HTTP_UNAVAILABLE) {
+					switch (responseCode) {
+					case HTTP_UNAVAILABLE:
 						// Here we do a special treatment for HTTP 503 (Service Unavailable)
 						// errors which arise due to the high load that we have probably
 						// imposed on Bandcamp server.
-						LOGGER.warning(message); // don't log exception for HTTP 503, only message
+						LOGGER.warning(String.format(message, uri, "HTTP 503: Service Unavailable"));						
 						pause(PAUSE_MLS_ON_503); // let Bandcamp server cool down a bit
 						if (loader.attempts() <= MAX_RELEASE_LOAD_ATTEMPTS) {
 							// If we haven't yet exceeded max load attempts for this release loader,
@@ -176,9 +180,14 @@ public final class SearchTask extends Task<SearchResult> {
 							repeat = true;
 							completionService.submit(loader);
 						}
+						break;
+					case HTTP_NOT_FOUND:
+						LOGGER.warning(String.format(message, uri, "HTTP 404: Not Found"));
+						break;
+					default:
+						// For other errors log both exception and message
+						LOGGER.log(Level.WARNING, String.format(message, uri, exception.getMessage()), exception);
 					}
-					else
-						LOGGER.log(Level.WARNING, message, exception);
 					if (!repeat)
 						failed++;
 				}
@@ -217,7 +226,7 @@ public final class SearchTask extends Task<SearchResult> {
 		
 		paused = true;
 		try {
-			LOGGER.info("Search paused for " + millis + " milliseconds");
+			LOGGER.fine("Search paused for " + millis + " milliseconds");
 			Thread.sleep(millis);
 		}
 		catch (InterruptedException e) {

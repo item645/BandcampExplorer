@@ -166,7 +166,7 @@ public class EventLog extends AnchorPane {
 	private void clear() {
 		eventsTextArea.clear();
 		exceptionsTextArea.clear();
-		Logger.getLogger(EventLog.class.getName()).info("Event Log cleared");
+		Logger.getLogger(EventLog.class.getName()).fine("Event Log cleared");
 	}
 
 

@@ -232,7 +232,7 @@ public final class Release {
 								try {
 									if (valueTask.get() == staleValue) {
 										cache.remove(staleValue.id, valueTask);
-										LOGGER.finer("Purged from cache: " + staleValue.id);
+										LOGGER.finer(() -> "Purged from cache: " + staleValue.id);
 									}
 								}
 								catch (ExecutionException ignored) {}
@@ -354,7 +354,7 @@ public final class Release {
 	 * @throws NullPointerException if uri is null
 	 */
 	public static Release forURI(URI uri) throws ReleaseLoadingException {
-		return forURI(uri, 0);
+		return forURI(uri, 0, createID(uri));
 	}
 
 
@@ -370,13 +370,14 @@ public final class Release {
 	 *        intended to be used by ReleaseLoader tasks when they perform repeated
 	 *        attempts to load the release in case the server was unavailable
 	 *        on the first try
+	 * @param releaseID release identifier; must be derived from the URI
 	 * @return a release object
 	 * @throws ReleaseLoadingException if there was an error during instantiation
 	 *         of Release object
 	 * @throws NullPointerException if uri is null
 	 */
-	static Release forURI(URI uri, int attempt) throws ReleaseLoadingException {
-		return RELEASE_CACHE.getRelease(createID(uri), () -> {
+	static Release forURI(URI uri, int attempt, String releaseID) throws ReleaseLoadingException {
+		return RELEASE_CACHE.getRelease(releaseID, () -> {
 			String message;
 			if (attempt > 0)
 				message = new StringBuilder("Loading release: ").append(uri).append(" (")

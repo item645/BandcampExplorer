@@ -70,7 +70,7 @@ class ReleaseLoader implements Callable<ReleaseLoader.Result> {
 		 * @return loaded release
 		 * @throws Exception if release load failed with exception
 		 */
-		Release release() throws Exception {
+		Release get() throws Exception {
 			if (exception != null)
 				throw exception;
 			else
@@ -125,7 +125,7 @@ class ReleaseLoader implements Callable<ReleaseLoader.Result> {
 
 
 	/**
-	 * Returns current number of attempts happened to load the release
+	 * Returns current number of attempts made to load the release
 	 * using this loader.
 	 */
 	int attempts() {
@@ -134,8 +134,8 @@ class ReleaseLoader implements Callable<ReleaseLoader.Result> {
 
 
 	/** 
-	 * Returns a ReleaseLoader.Result object encapsulating the release corresponding to 
-	 * this loader's URL string. If release loading has failed, the returned result
+	 * Returns a {@link ReleaseLoader.Result} object encapsulating the release corresponding to 
+	 * this loader's URI. If release loading has failed, the returned result
 	 * contains a reference to relevant exception object.
 	 * If this loader's parent task has been cancelled prior to attempting the release load,
 	 * the method returns null.
@@ -149,7 +149,7 @@ class ReleaseLoader implements Callable<ReleaseLoader.Result> {
 		
 		try {
 			int i = attempts.incrementAndGet();
-			return new Result(Release.forURI(uri, i > 1 ? i : 0));
+			return new Result(Release.forURI(uri, i > 1 ? i : 0, releaseID));
 		}
 		catch (Exception e) {
 			return new Result(e);

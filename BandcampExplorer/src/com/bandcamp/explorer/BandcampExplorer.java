@@ -1,5 +1,7 @@
 package com.bandcamp.explorer;
 
+import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Handler;
@@ -108,7 +110,7 @@ public final class BandcampExplorer extends Application {
 	 */
 	private void configureLogging(Handler eventLogHandler) {
 		LOGGER.setUseParentHandlers(false);
-		LOGGER.setLevel(Level.ALL);
+		LOGGER.setLevel(getLoggingLevel());
 		LOGGER.addHandler(eventLogHandler);
 
 		// Make sure to log any uncaught exceptions in JavaFX thread
@@ -117,6 +119,30 @@ public final class BandcampExplorer extends Application {
 			Dialogs.messageBox("Unexpected Error: " + exception.getMessage() + 
 					"\n\nSee Event Log for details (Ctrl+E)", "Error", primaryStage);
 		});
+	}
+
+
+	/**
+	 * Returns the default logging level to use for all loggers in the application.
+	 * If valid level name was specified in the application command line parameters,
+	 * this level will be used. Otherwise {@link Level#ALL} will be returned.
+	 */
+	private Level getLoggingLevel() {
+		Level defaultLevel = Level.ALL;
+		return getParameters().getNamed().entrySet().stream()
+				.filter(e -> e.getKey().toLowerCase(Locale.ROOT).equals("log_level"))
+				.findFirst()
+				.map(Map.Entry::getValue)
+				.map(String::toUpperCase)
+				.map(name -> {
+					try {
+						return Level.parse(name);
+					}
+					catch (IllegalArgumentException e) {
+						return defaultLevel;
+					}
+				})
+				.orElse(defaultLevel);
 	}
 
 }
