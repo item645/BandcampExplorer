@@ -437,10 +437,10 @@ class ResultsView extends AnchorPane {
 	 * Returns currently selected tab.
 	 */
 	private Tab getSelectedTab() {
-		for (Tab t : tabs)
-			if (t.isSelected())
-				return t;
-		throw new AssertionError();
+		return tabs.stream()
+				.filter(Tab::isSelected)
+				.findFirst()
+				.orElseThrow(AssertionError::new);
 	}
 
 

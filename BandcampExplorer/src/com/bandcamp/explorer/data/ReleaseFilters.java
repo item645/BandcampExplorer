@@ -2,8 +2,8 @@ package com.bandcamp.explorer.data;
 
 import java.time.LocalDate;
 import java.util.Collection;
-import java.util.EnumSet;
 import java.util.Locale;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /**
@@ -80,7 +80,7 @@ public class ReleaseFilters {
 	 * @param downloadTypes a set, containing download types to match
 	 * @throws NullPointerException if downloadTypes is null
 	 */
-	public static Predicate<Release> byDownloadType(EnumSet<Release.DownloadType> downloadTypes) {
+	public static Predicate<Release> byDownloadType(Set<Release.DownloadType> downloadTypes) {
 		return release -> downloadTypes.contains(release.downloadType());
 	}
 
@@ -92,14 +92,14 @@ public class ReleaseFilters {
 	 * if to date is null, then only from >= releaseDate condition is checked.
 	 * If both from and to dates are null, then this filter will match any release.
 	 * If from is greater than to, then this filter won't match anything.
-	 * Note that some releases don't have release date (in that case their release
-	 * date is LocalDate.MIN). Such releases will be matched only if from = LocalDate.MIN.
+	 * Note that some releases don't have release date. Such releases will be matched
+	 * only if from = LocalDate.MIN.
 	 * 
 	 * @param from date value that release date must be less than or equal to
 	 * @param to date value that release date must be greater than or equal to
 	 */
 	public static Predicate<Release> byReleaseDate(LocalDate from, LocalDate to) {
-		return release -> isWithinDates(release.releaseDate(), from, to);
+		return release -> isWithinDates(release.releaseDate().orElse(LocalDate.MIN), from, to);
 	}
 
 

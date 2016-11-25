@@ -275,6 +275,19 @@ class ReleasePlayerForm extends SplitPane {
 
 
 		/**
+		 * If tracklist view has selected track, peformes the specified action
+		 * on this track, otherwise does nothing.
+		 * 
+		 * @param action a consumer action, accepting the selected track
+		 */
+		void ifTrackSelected(Consumer<Track> action) {
+			Track track = selectedTrack();
+			if (track != null)
+				action.accept(track);
+		}
+
+
+		/**
 		 * Removes all items from this track list view.
 		 */
 		void clear() {
@@ -317,11 +330,8 @@ class ReleasePlayerForm extends SplitPane {
 			LabeledMenuItem searchArtist = new LabeledMenuItem(true);
 
 			LabeledMenuItem viewOnBandcamp = new LabeledMenuItem("View on Bandcamp");
-			viewOnBandcamp.setOnAction(event -> {
-				Track track = trackListView.selectedTrack();
-				if (track != null)
-					Utils.browse(track.link());
-			});
+			viewOnBandcamp.setOnAction(event -> trackListView
+					.ifTrackSelected(track -> Utils.browse(track.link())));
 
 			LabeledMenuItem copyText = new LabeledMenuItem("Copy Text");
 			copyText.setOnAction(event -> {
@@ -331,25 +341,20 @@ class ReleasePlayerForm extends SplitPane {
 			});
 
 			LabeledMenuItem copyTrackText = new LabeledMenuItem("Copy Track as Text");
-			copyTrackText.setOnAction(event -> Utils.toClipboardAsString(trackListView.selectedTrack()));
+			copyTrackText.setOnAction(event -> trackListView
+					.ifTrackSelected(Utils::toClipboardAsString));
 
 			LabeledMenuItem copyAllTracksText = new LabeledMenuItem("Copy All Tracks as Text");
 			copyAllTracksText.setOnAction(event -> Utils.toClipboardAsString(
 					trackListView.sortedTracks, Track::toString, "\n"));
 
 			LabeledMenuItem copyArtistTitle = new LabeledMenuItem("Copy Artist and Title");
-			copyArtistTitle.setOnAction(event -> {
-				Track track = trackListView.selectedTrack();
-				if (track != null)
-					Utils.toClipboardAsString(track.artist() + " - " + track.title());
-			});
+			copyArtistTitle.setOnAction(event -> trackListView
+					.ifTrackSelected(track -> Utils.toClipboardAsString(track.artist() + " - " + track.title())));
 
 			LabeledMenuItem copyAudioURL = new LabeledMenuItem("Copy Audio URL");
-			copyAudioURL.setOnAction(event -> {
-				Track track = trackListView.selectedTrack();
-				if (track != null)
-					Utils.toClipboardAsString(track.fileLink());
-			});
+			copyAudioURL.setOnAction(event -> trackListView
+					.ifTrackSelected(track -> Utils.toClipboardAsString(track.fileLink())));
 
 			ObservableList<MenuItem> menuItems = getItems();
 
@@ -968,9 +973,8 @@ class ReleasePlayerForm extends SplitPane {
 
 		if (release != null) {
 			// Loading artwork
-			String artworkLink = release.artworkLink();
-			artworkView.setImage(artworkLink != null ? new Image(artworkLink, true) : null);
-
+			artworkView.setImage(release.artworkLink().map(link -> new Image(link, true)).orElse(null));
+			
 			// Setting release info
 			releaseInfo.setText(createReleaseInfo(release));
 
@@ -1014,18 +1018,14 @@ class ReleasePlayerForm extends SplitPane {
 		StringBuilder info = new StringBuilder();
 
 		info.append(release.artist()).append(" - ").append(release.title()).append('\n').append('\n');
-		if (release.parentReleaseLink() != null)
-			info.append("FROM: ").append(release.parentReleaseLink()).append('\n');
+		release.parentReleaseLink().ifPresent(link -> info.append("FROM: ").append(link).append('\n'));
 		info.append("PUBLISHED: ").append(release.publishDate()).append('\n');
-		LocalDate releaseDate = release.releaseDate();
-		info.append("RELEASED: ").append(releaseDate.equals(LocalDate.MIN) ? "-" : releaseDate).append('\n');
+		info.append("RELEASED: ").append(release.releaseDate().map(LocalDate::toString).orElse("-")).append('\n');
 		info.append("DOWNLOAD TYPE: ").append(release.downloadType()).append('\n');
 		info.append("TIME: ").append(release.time()).append('\n');
 		info.append("TAGS: ").append(release.tagsString()).append('\n');
-		if (!release.information().isEmpty())
-			info.append('\n').append(release.information()).append('\n');
-		if (!release.credits().isEmpty())
-			info.append('\n').append(release.credits());
+		release.information().ifPresent(information -> info.append('\n').append(information).append('\n'));
+		release.credits().ifPresent(credits -> info.append('\n').append(credits));
 
 		return info.toString();
 	}
@@ -1035,11 +1035,12 @@ class ReleasePlayerForm extends SplitPane {
 	 * Plays a track selected in track list view.
 	 */
 	private void playSelectedTrack() {
-		Track track = trackListView.selectedTrack();
-		if (track != null && track.isPlayable()) {
-			audioPlayer.setTrack(track);
-			audioPlayer.play();
-		}
+		trackListView.ifTrackSelected(track -> {
+			if (track.isPlayable()) {
+				audioPlayer.setTrack(track);
+				audioPlayer.play();
+			}
+		});
 	}
 
 
@@ -1142,11 +1143,7 @@ class ReleasePlayerForm extends SplitPane {
 	 */
 	@FXML
 	private void openDownloadPage() {
-		release.ifPresent(release -> {
-			String link = release.downloadLink();
-			if (link != null)
-				Utils.browse(link);
-		});
+		release.ifPresent(release -> release.downloadLink().ifPresent(Utils::browse));
 	}
 
 
@@ -1221,7 +1218,7 @@ class ReleasePlayerForm extends SplitPane {
 
 		downloadLink.visibleProperty().bind(
 				Bindings.createBooleanBinding(
-						() -> release.isPresent() && release.get().downloadLink() != null, release));
+						() -> release.isPresent() && release.get().downloadLink().isPresent(), release));
 
 		// Prevent links from being styled as "visited"
 		BooleanProperty alwaysFalse = new SimpleBooleanProperty(false);

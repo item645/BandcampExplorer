@@ -14,6 +14,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -163,19 +164,13 @@ class ReleaseTableView extends AnchorPane {
 			LabeledMenuItem searchArtist = new LabeledMenuItem(true);
 			LabeledMenuItem moreFromDomain = new LabeledMenuItem(true);
 
-			LabeledMenuItem viewOnBandcamp = new LabeledMenuItem("View on Bandcamp");
-			viewOnBandcamp.setOnAction(event -> {
-				Release release = getSelectedRelease();
-				if (release != null)
-					Utils.browse(release.uri());
-			});
+			LabeledMenuItem viewOnBandcamp = new LabeledMenuItem("View on Bandcamp");			
+			viewOnBandcamp.setOnAction(event -> ifReleaseSelected(
+					release -> Utils.browse(release.uri())));
 
 			LabeledMenuItem viewDiscogOnBandcamp = new LabeledMenuItem("View Discography on Bandcamp");
-			viewDiscogOnBandcamp.setOnAction(event -> {
-				Release release = getSelectedRelease();
-				if (release != null)
-					Utils.browse(release.discographyURI());
-			});
+			viewDiscogOnBandcamp.setOnAction(event -> ifReleaseSelected(
+					release -> Utils.browse(release.discographyURI())));
 
 			LabeledMenuItem copyText = new LabeledMenuItem("Copy Text");
 			copyText.setOnAction(event -> {
@@ -380,9 +375,7 @@ class ReleaseTableView extends AnchorPane {
 	 * Opens a player window to play currently selected release.
 	 */
 	private void playSelectedRelease() {
-		Release release = getSelectedRelease();
-		if (release != null)
-			Platform.runLater(() -> releasePlayer.setRelease(release));
+		ifReleaseSelected(release -> Platform.runLater(() -> releasePlayer.setRelease(release)));
 	}
 
 
@@ -392,6 +385,19 @@ class ReleaseTableView extends AnchorPane {
 	 */
 	private Release getSelectedRelease() {
 		return releaseTableView.getSelectionModel().getSelectedItem();
+	}
+
+
+	/**
+	 * If release table view has selected release, peformes the specified action
+	 * on this release, otherwise does nothing.
+	 * 
+	 * @param action a consumer action, accepting the selected release
+	 */
+	private void ifReleaseSelected(Consumer<Release> action) {
+		Release release = getSelectedRelease();
+		if (release != null)
+			action.accept(release);
 	}
 
 
@@ -471,11 +477,7 @@ class ReleaseTableView extends AnchorPane {
 		dlTypeColumn.setCellValueFactory(cellData -> cellData.getValue().downloadTypeProperty());
 
 		releaseDateColumn.setCellFactory(centered);
-		releaseDateColumn.setCellValueFactory(cellData -> {
-			// display empty cell instead of LocalDate.MIN
-			Release release =  cellData.getValue();
-			return release.releaseDate().equals(LocalDate.MIN) ? null : release.releaseDateProperty();
-		});
+		releaseDateColumn.setCellValueFactory(cellData -> cellData.getValue().releaseDateProperty());
 
 		publishDateColumn.setCellFactory(centered);
 		publishDateColumn.setCellValueFactory(cellData -> cellData.getValue().publishDateProperty());
@@ -508,12 +510,10 @@ class ReleaseTableView extends AnchorPane {
 		.addListener((observable, oldRelease, release) -> {
 			if (release != null) {
 				StringBuilder sb = new StringBuilder();
-				if (release.parentReleaseLink() != null)
-					sb.append("From: ").append(release.parentReleaseLink()).append('\n').append('\n');
-				if (!release.information().isEmpty())
-					sb.append(release.information()).append('\n').append('\n');
-				if (!release.credits().isEmpty())
-					sb.append(release.credits()).append('\n').append('\n');
+				release.parentReleaseLink().ifPresent(
+						link -> sb.append("From: ").append(link).append('\n').append('\n'));
+				release.information().ifPresent(info -> sb.append(info).append('\n').append('\n'));
+				release.credits().ifPresent(credits -> sb.append(credits).append('\n').append('\n'));
 				if (!release.tracks().isEmpty()) {
 					sb.append("Tracklist:\n");
 					release.tracks().forEach(track -> sb.append(track).append('\n'));

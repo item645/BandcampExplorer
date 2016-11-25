@@ -1,5 +1,9 @@
 package com.bandcamp.explorer.data;
 
+import static java.lang.String.CASE_INSENSITIVE_ORDER;
+import static java.util.Comparator.comparing;
+
+import java.time.LocalDate;
 import java.util.Comparator;
 
 /**
@@ -12,52 +16,51 @@ public enum ReleaseSortOrder implements Comparator<Release> {
 	/**
 	 * Sorts releases by publish date in ascending order.
 	 */
-	PUBLISH_DATE_ASC {
-		@Override
-		public int compare(Release r1, Release r2) {
-			return r1.publishDate().compareTo(r2.publishDate());
-		}
-	},
+	PUBLISH_DATE_ASC(comparing(Release::publishDate)),
+
 
 	/**
 	 * Sorts releases by publish date in descending order.
 	 */
-	PUBLISH_DATE_DESC {
-		@Override
-		public int compare(Release r1, Release r2) {
-			return r2.publishDate().compareTo(r1.publishDate());
-		}
-	},
+	PUBLISH_DATE_DESC(PUBLISH_DATE_ASC.reversed()),
+
 
 	/**
 	 * Sorts releases by release date in ascending order.
 	 */
-	RELEASE_DATE_ASC {
-		@Override
-		public int compare(Release r1, Release r2) {
-			return r1.releaseDate().compareTo(r2.releaseDate());
-		}
-	},
+	RELEASE_DATE_ASC(comparing(release -> release.releaseDate().orElse(LocalDate.MIN))),
+
 
 	/**
 	 * Sorts releases by release date in descending order.
 	 */
-	RELEASE_DATE_DESC {
-		@Override
-		public int compare(Release r1, Release r2) {
-			return r2.releaseDate().compareTo(r1.releaseDate());
-		}
-	},
+	RELEASE_DATE_DESC(RELEASE_DATE_ASC.reversed()),
+
 
 	/**
-	 * Sorts releases by artist name and title in ascending order.
+	 * Sorts releases by artist and title in ascending order, ignoring case differences.
 	 */
-	ARTIST_AND_TITLE {
-		@Override
-		public int compare(Release r1, Release r2) {
-			int result = r1.artist().compareToIgnoreCase(r2.artist());
-			return result != 0 ? result : r1.title().compareToIgnoreCase(r2.title());
-		}
-	};
+	ARTIST_AND_TITLE(comparing(Release::artist, CASE_INSENSITIVE_ORDER)
+			.thenComparing(comparing(Release::title, CASE_INSENSITIVE_ORDER)));
+
+
+	private final Comparator<Release> comparator;
+
+
+	ReleaseSortOrder(Comparator<Release> comparator) {
+		this.comparator = comparator;
+	}
+
+
+	/** 
+	 * Compares two releases for order.
+	 * Returns a negative integer, zero, or a positive integer as the first release
+	 * is less than, equal to, or greater than the second.
+	 * Each enum constant uses its own way for comparison.
+	 */
+	@Override
+	public int compare(Release r1, Release r2) {
+		return comparator.compare(r1, r2);
+	}
 
 }

@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -141,7 +142,8 @@ public final class Release {
 	private final ReadOnlyStringProperty title;
 	private final ReadOnlyObjectProperty<DownloadType> downloadType;
 	private final ReadOnlyObjectProperty<Time> time;
-	private final ReadOnlyObjectProperty<LocalDate> releaseDate;
+	private final Optional<LocalDate> releaseDate;
+	private final ReadOnlyObjectProperty<LocalDate> releaseDateProperty;
 	private final ReadOnlyObjectProperty<LocalDate> publishDate;
 	private final ReadOnlyStringProperty tagsString;
 	private final ReadOnlyObjectProperty<URI> uri;
@@ -434,21 +436,31 @@ public final class Release {
 			}
 
 			this.uri = createObjectProperty(uri);
+
 			artist = createStringProperty(Objects.toString(property("artist")).trim());
 			title = createStringProperty(Objects.toString(property("current.title")).trim());
+
 			downloadType = createObjectProperty(readDownloadType());
-			releaseDate = createObjectProperty(propertyDate("album_release_date"));
-			publishDate = createObjectProperty(propertyDate("current.publish_date"));
+
+			releaseDate = Optional.ofNullable(propertyDate("album_release_date", null));
+			releaseDateProperty = createObjectProperty(releaseDate.orElse(null));
+			publishDate = createObjectProperty(propertyDate("current.publish_date", LocalDate.MIN));
+
 			artworkLink = readArtworkLink(input); // this must precede call to readTags()
+
 			tags = readTags(input);
 			tagsString = createStringProperty(tags.stream().collect(Collectors.joining(", ")));
-			information = Objects.toString(property("current.about"), "");
-			credits = Objects.toString(property("current.credits"), "");
+
+			information = Objects.toString(property("current.about"), "").trim();
+			credits = Objects.toString(property("current.credits"), "").trim();
+
 			downloadLink = property("freeDownloadPage");
 			String domain = domainFromURI(uri);
 			String parent = property("album_url");
 			parentReleaseLink = parent != null ? domain + parent : null;
+
 			tracks = readTracks(artist.get(), domain, isMultiArtist(artist.get(), title.get(), tags));
+
 			time = createObjectProperty(Time.ofSeconds(
 					tracks.stream().collect(Collectors.summingInt(track -> track.time().seconds()))));
 		}
@@ -837,21 +849,27 @@ public final class Release {
 
 
 	/**
-	 * Helper method for reading dates from JSON data.
-	 * Returns LocalDate.MIN if date is invalid or absent.
+	 * Reads a date from the specified JSON property.
+	 * If property value is absent, null, or has incompatible type (non-string),
+	 * returns the default value.
+	 * If date value obtained from JSON in string form cannot be interpreted
+	 * as date, this method returns LocalDate.MIN.
+	 * 
+	 * @param name a name of JSON property to read from
+	 * @param defaultVal default value to return if property value is absent
+	 * @return a LocalDate instance containing the date value
 	 */
-	private LocalDate propertyDate(String name) {
-		LocalDate result = LocalDate.MIN;
+	private LocalDate propertyDate(String name, LocalDate defaultVal) {
 		String dateStr = property(name);
-		if (dateStr != null) {
-			try {
-				result = LocalDate.parse(dateStr, DateTimeFormatter.RFC_1123_DATE_TIME);
-			}
-			catch (DateTimeParseException e) {
-				logError(e);
-			}
+		if (dateStr == null)
+			return defaultVal;
+		try {
+			return LocalDate.parse(dateStr, DateTimeFormatter.RFC_1123_DATE_TIME);
 		}
-		return result;
+		catch (DateTimeParseException e) {
+			logError(e);
+			return LocalDate.MIN;
+		}
 	}
 
 
@@ -917,13 +935,13 @@ public final class Release {
 		String artist_ = artist.get();
 		String title_ = title.get();
 		Time time_ = time.get();
-		LocalDate releaseDate_ = releaseDate.get();
+		LocalDate releaseDate_ = releaseDateProperty.get();
 		LocalDate publishDate_ = publishDate.get();
 		DownloadType downloadType_ = downloadType.get();
 		String tagsString_ = tagsString.get();
 		URI uri_ = uri.get();
 		return new StringBuilder(artist_).append(" - ").append(title_).append(" (")
-				.append(time_).append(") [").append(releaseDate_.equals(LocalDate.MIN) ? "-" : releaseDate_)
+				.append(time_).append(") [").append(Objects.toString(releaseDate_, "-"))
 				.append(", ").append(publishDate_).append(", ").append(downloadType_)
 				.append("] [").append(tagsString_).append("] (").append(uri_).append(")")
 				.toString();
@@ -996,19 +1014,21 @@ public final class Release {
 
 
 	/**
-	 * Returns a release date.
-	 * On some releases the date is not specified, in that case LocalDate.MIN is returned.
+	 * Returns an Optional with the release date.
+	 * On some releases the date is not specified, in that case empty Optional is returned.
 	 */
-	public LocalDate releaseDate() {
-		return releaseDate.get();
+	public Optional<LocalDate> releaseDate() {
+		return releaseDate;
 	}
 
 
 	/**
 	 * Returns a release date as read-only JavaFX property.
+	 * On some releases the date is not specified, in that case property wrapper
+	 * returns null on attempt to get the value.
 	 */
 	public ReadOnlyObjectProperty<LocalDate> releaseDateProperty() {
-		return releaseDate;
+		return releaseDateProperty;
 	}
 
 
@@ -1088,51 +1108,51 @@ public final class Release {
 
 
 	/**
-	 * Returns a URL string of album artwork 350x350 image.
-	 * If this release has no artwork, returns null.
+	 * Returns an Optional with the URL string of album artwork 350x350 image.
+	 * If this release has no artwork, returns empty Optional.
 	 */
-	public String artworkLink() {
-		return artworkLink;
+	public Optional<String> artworkLink() {
+		return Optional.ofNullable(artworkLink);
 	}
 
 
 	/**
-	 * Returns an information about this release.
-	 * If there's no information provided, returns empty string.
+	 * Returns an Optional with the information about this release.
+	 * If there's no information provided, returns empty Optional.
 	 */
-	public String information() {
-		return information;
+	public Optional<String> information() {
+		return information.isEmpty() ? Optional.empty() : Optional.of(information);
 	}
 
 
 	/**
-	 * Returns the credits for this release.
-	 * If there are no credits provided, returns empty string.
+	 * Returns an Optional with the credits for this release.
+	 * If there are no credits provided, returns empty Optional.
 	 */
-	public String credits() {
-		return credits;
+	public Optional<String> credits() {
+		return credits.isEmpty() ? Optional.empty() : Optional.of(credits);
 	}
 
 
 	/**
-	 * Returns the download link for this release, if available.
-	 * If there's no download link, returns null.
+	 * Returns an Optional with the download link for this release, if available.
+	 * If there's no download link, returns empty Optional.
 	 * Usually download link is available for releases whose download type is {@link DownloadType#FREE}
 	 * or {@link DownloadType#NAME_YOUR_PRICE} where users are not required to enter their
 	 * email for receiving download link.
 	 */
-	public String downloadLink() {
-		return downloadLink;
+	public Optional<String> downloadLink() {
+		return Optional.ofNullable(downloadLink);
 	}
 
 
 	/**
-	 * Returns a URL string of Bandcamp release that contains this release.
-	 * The link is available only if this release is a single track which is a
-	 * part of album, otherwise this method returns null.
+	 * Returns an Optional with the URL string of Bandcamp release that contains
+	 * this release. The link is available only if this release is a single track which is a
+	 * part of album, otherwise this method returns empty Optional.
 	 */
-	public String parentReleaseLink() {
-		return parentReleaseLink;
+	public Optional<String> parentReleaseLink() {
+		return Optional.ofNullable(parentReleaseLink);
 	}
 
 }

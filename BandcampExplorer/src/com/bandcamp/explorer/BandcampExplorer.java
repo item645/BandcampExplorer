@@ -133,7 +133,7 @@ public final class BandcampExplorer extends Application {
 				.filter(e -> e.getKey().toLowerCase(Locale.ROOT).equals("log_level"))
 				.findFirst()
 				.map(Map.Entry::getValue)
-				.map(String::toUpperCase)
+				.map(name -> name.toUpperCase(Locale.ROOT))
 				.map(name -> {
 					try {
 						return Level.parse(name);
