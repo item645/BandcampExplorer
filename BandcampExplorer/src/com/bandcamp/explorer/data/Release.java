@@ -1,5 +1,8 @@
 package com.bandcamp.explorer.data;
 
+import static java.util.regex.Pattern.CASE_INSENSITIVE;
+import static java.util.regex.Pattern.DOTALL;
+
 import java.io.IOException;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
@@ -60,12 +63,12 @@ public final class Release {
 	 * Pattern to locate a release data within HTML page. The data is defined in JSON format
 	 * and assigned to JavaScript variable.
 	 */
-	private static final Pattern RELEASE_DATA = Pattern.compile("var TralbumData = \\{.+?\\};", Pattern.DOTALL);
+	private static final Pattern RELEASE_DATA = Pattern.compile("var TralbumData = \\{.+?\\};", DOTALL);
 
 	/**
 	 * Pattern for locating tags.
 	 */
-	private static final Pattern TAG_DATA = Pattern.compile("<a class=\"tag\".+?>.+?(?=(</a>))", Pattern.DOTALL);
+	private static final Pattern TAG_DATA = Pattern.compile("<a class=\"tag\".+?>.+?(?=(</a>))", DOTALL);
 
 	/**
 	 * Pattern for splitting the value of "title" JSON property when it contains
@@ -94,7 +97,7 @@ public final class Release {
 		regex.append("beatspace(-|\\.).+|.+(\\.|-)beatspace|"); // "beatspace" (starting or ending)
 		regex.append("vv\\.?aa\\.?|aa\\.?vv\\.?");              // "VV.AA.", "AA.VV." and dotless variants 
 
-		VA_ARTIST_PATTERN = Pattern.compile(regex.toString(), Pattern.CASE_INSENSITIVE);
+		VA_ARTIST_PATTERN = Pattern.compile(regex.toString(), CASE_INSENSITIVE);
 	}
 
 	/**
@@ -102,7 +105,7 @@ public final class Release {
 	 */
 	private static final Pattern VA_TITLE_PATTERN = 
 			// Matches titles ending with "Split", "Compilation", "Comp.", "Comp" or "Sampler"
-			Pattern.compile("(.+\\s)*+(split|comp(ilation|\\.)?|sampler)", Pattern.CASE_INSENSITIVE);
+			Pattern.compile("(.+\\s)*+(split|comp(ilation|\\.)?|sampler)", CASE_INSENSITIVE);
 
 	/**
 	 * Pattern for numeric HTML escape codes.
@@ -142,8 +145,7 @@ public final class Release {
 	private final ReadOnlyStringProperty title;
 	private final ReadOnlyObjectProperty<DownloadType> downloadType;
 	private final ReadOnlyObjectProperty<Time> time;
-	private final Optional<LocalDate> releaseDate;
-	private final ReadOnlyObjectProperty<LocalDate> releaseDateProperty;
+	private final ReadOnlyObjectProperty<LocalDate> releaseDate;
 	private final ReadOnlyObjectProperty<LocalDate> publishDate;
 	private final ReadOnlyStringProperty tagsString;
 	private final ReadOnlyObjectProperty<URI> uri;
@@ -442,8 +444,7 @@ public final class Release {
 
 			downloadType = createObjectProperty(readDownloadType());
 
-			releaseDate = Optional.ofNullable(propertyDate("album_release_date", null));
-			releaseDateProperty = createObjectProperty(releaseDate.orElse(null));
+			releaseDate = createObjectProperty(propertyDate("album_release_date", null));
 			publishDate = createObjectProperty(propertyDate("current.publish_date", LocalDate.MIN));
 
 			artworkLink = readArtworkLink(input); // this must precede call to readTags()
@@ -835,7 +836,7 @@ public final class Release {
 			return null;
 
 		String link = input.findWithinHorizon(
-				Pattern.compile("https?://.+/a0*" + artId + "_\\d{1,2}\\.jpe?g"), 0);
+				Pattern.compile("https?://.+/a0*" + artId + "_\\d{1,2}\\.jpe?g", CASE_INSENSITIVE), 0);
 		if (link == null)
 			return null;
 
@@ -935,7 +936,7 @@ public final class Release {
 		String artist_ = artist.get();
 		String title_ = title.get();
 		Time time_ = time.get();
-		LocalDate releaseDate_ = releaseDateProperty.get();
+		LocalDate releaseDate_ = releaseDate.get();
 		LocalDate publishDate_ = publishDate.get();
 		DownloadType downloadType_ = downloadType.get();
 		String tagsString_ = tagsString.get();
@@ -1018,7 +1019,7 @@ public final class Release {
 	 * On some releases the date is not specified, in that case empty Optional is returned.
 	 */
 	public Optional<LocalDate> releaseDate() {
-		return releaseDate;
+		return Optional.ofNullable(releaseDate.get());
 	}
 
 
@@ -1028,7 +1029,7 @@ public final class Release {
 	 * returns null on attempt to get the value.
 	 */
 	public ReadOnlyObjectProperty<LocalDate> releaseDateProperty() {
-		return releaseDateProperty;
+		return releaseDate;
 	}
 
 
