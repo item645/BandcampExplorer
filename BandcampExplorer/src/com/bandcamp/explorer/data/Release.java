@@ -63,12 +63,12 @@ public final class Release {
 	 * Pattern to locate a release data within HTML page. The data is defined in JSON format
 	 * and assigned to JavaScript variable.
 	 */
-	private static final Pattern RELEASE_DATA = Pattern.compile("var TralbumData = \\{.+?\\};", DOTALL);
+	private static final Pattern RELEASE_DATA_PATTERN = Pattern.compile("var TralbumData = \\{.+?\\};", DOTALL);
 
 	/**
 	 * Pattern for locating tags.
 	 */
-	private static final Pattern TAG_DATA = Pattern.compile("<a class=\"tag\".+?>.+?(?=(</a>))", DOTALL);
+	private static final Pattern TAG_DATA_PATTERN = Pattern.compile("<a class=\"tag\".+?>.+?(?=(</a>))", DOTALL);
 
 	/**
 	 * Pattern for splitting the value of "title" JSON property when it contains
@@ -125,21 +125,6 @@ public final class Release {
 		HTML_SPECIALS = Collections.unmodifiableMap(specials);
 	}
 
-	/**
-	 * A factory for JavaScript engines allowing to reuse instantiated engines on per-thread basis.
-	 */
-	private static final ThreadLocal<ScriptEngine> JS_ENGINES = new ThreadLocal<ScriptEngine>() {
-		@Override
-		protected ScriptEngine initialValue() {
-			return new ScriptEngineManager().getEngineByName("JavaScript");
-		}
-	};
-
-
-	/**
-	 * An instance of JavaScript engine is used to extract necessary stuff from JSON data.
-	 */
-	private final ScriptEngine JS = JS_ENGINES.get();
 
 	private final ReadOnlyStringProperty artist;
 	private final ReadOnlyStringProperty title;
@@ -346,6 +331,152 @@ public final class Release {
 
 
 	/**
+	 * Encapsulates raw release data values obtained from JSON source.
+	 */
+	private static class ReleaseData {
+
+		private static final ScriptEngine JS = new ScriptEngineManager().getEngineByName("JavaScript");
+
+		private final URI releaseURI;
+		final String artist;
+		final String title;
+		final String about;
+		final String credits;
+		final String freeDownloadPage;
+		final String albumURL;
+		final Number artId;
+		final Number downloadPref;
+		final Number minPrice;
+		final Number isSetPrice;
+		final LocalDate releaseDate;
+		final LocalDate publishDate;
+		final TrackInfo[] tracks;
+
+
+		/**
+		 * Performs the processing of input release data in JSON format and instantiates
+		 * a ReleaseData object containing necessary values obtained from the source.
+		 * 
+		 * A single instance of JavaScript engine is used to process the data, with
+		 * multiple threads access serialized by class intrinsic lock.
+		 * Due to that reason processing does not involve any complex manipulation of
+		 * source input other than reading necessary raw values and converting them to
+		 * appropriate built-in data types. The goal is to execute the body of this
+		 * constructor as quickly as possible to minimize thread contention.
+		 * 
+		 * @param jsonData source release data in JSON format
+		 * @param releaseURI a URI of release page
+		 * @throws ScriptException if there was an unrecoverable error during source data processing
+		 */
+		ReleaseData(String jsonData, URI releaseURI) throws ScriptException {
+			assert jsonData != null;
+			assert releaseURI != null;
+
+			this.releaseURI = releaseURI;
+
+			synchronized (ReleaseData.class) {
+				JS.eval(jsonData);
+
+				artist           = read("artist");
+				title            = read("current.title");
+				about            = read("current.about");
+				credits          = read("current.credits");
+				freeDownloadPage = read("freeDownloadPage");
+				albumURL         = read("album_url");
+				artId            = read("art_id");
+				downloadPref     = read("current.download_pref");
+				minPrice         = read("current.minimum_price");
+				isSetPrice       = read("current.is_set_price");
+				releaseDate      = readDate("album_release_date", null);
+				publishDate      = readDate("current.publish_date", LocalDate.MIN);
+
+				Number length = read("trackinfo.length");
+				int numTracks = length != null ? length.intValue() : 0;
+				tracks = new TrackInfo[numTracks];
+				for (int index = 0; index < numTracks; index++) {
+					String trackDataPath = "trackinfo[" + index + "].";
+					tracks[index] = new TrackInfo(
+							index, 
+							read(trackDataPath + "title"),
+							read(trackDataPath + "title_link"),
+							read(trackDataPath + "duration"),
+							read(trackDataPath + "file") != null 
+								? read(trackDataPath + "file['mp3-128']") : null
+							);
+				}
+			}
+		}
+
+
+		/**
+		 * Reads the value of named JSON property and converts it to a target type.
+		 * Returns null if there was an error during attempt to read or convert a value.  
+		 * 
+		 * @param name property name
+		 * @return a value
+		 */
+		@SuppressWarnings("unchecked")
+		private <T> T read(String name) {
+			try {
+				return (T)JS.eval("TralbumData." + name);
+			} 
+			catch (ScriptException | ClassCastException e) {
+				logReleaseDataError(e, releaseURI);
+				return null;
+			}
+		}
+
+
+		/**
+		 * Reads a date from the specified JSON property.
+		 * If property value is absent, null, or has incompatible type (non-string),
+		 * returns the default value.
+		 * If date value obtained from JSON in string form cannot be interpreted
+		 * as date, this method returns LocalDate.MIN.
+		 * 
+		 * @param name a name of JSON property to read from
+		 * @param defaultVal default value to return if property value is absent
+		 * @return a LocalDate instance containing the date value
+		 */
+		private LocalDate readDate(String name, LocalDate defaultVal) {
+			String dateStr = read(name);
+			if (dateStr == null)
+				return defaultVal;
+			try {
+				return LocalDate.parse(dateStr, DateTimeFormatter.RFC_1123_DATE_TIME);
+			}
+			catch (DateTimeParseException e) {
+				logReleaseDataError(e, releaseURI);
+				return LocalDate.MIN;
+			}
+		}
+
+	}
+
+
+
+	/**
+	 * Simple struct encapsulating raw data values for individual track.
+	 */
+	private static class TrackInfo {
+		final int index;
+		final String title;
+		final String titleLink;
+		final Number duration;
+		final String fileLink;
+
+		TrackInfo(int index, String title, String titleLink, Number duration, String fileLink) {
+			this.index = index;
+			this.title = title;
+			this.titleLink = titleLink;
+			this.duration = duration;
+			this.fileLink = fileLink;
+		}
+	}
+
+
+
+	/**
 	 * Returns the release corresponding to the specified Bandcamp URI.
 	 * If release object for this URI is available in cache,
 	 * then cached version is returned. Otherwise, new release object is
@@ -425,13 +556,15 @@ public final class Release {
 		}
 
 		try (Scanner input = new Scanner(connection.getInputStream(), StandardCharsets.UTF_8.name())) {
-			// Finding a variable containing release data and feeding it to JS engine so that we could
-			// then handily read any property values we need.
-			String releaseData = input.findWithinHorizon(RELEASE_DATA, 0);
-			if (releaseData == null)
+			// Finding a variable containing release data string in JSON format
+			String releaseJson = input.findWithinHorizon(RELEASE_DATA_PATTERN, 0);
+			if (releaseJson == null)
 				throw new ReleaseLoadingException("Release data not found");
+
+			// Parsing JSON data to extract raw values we need
+			ReleaseData releaseData;
 			try {
-				JS.eval(releaseData);
+				releaseData = new ReleaseData(releaseJson, uri);
 			}
 			catch (ScriptException e) {
 				throw new ReleaseLoadingException("Release data is not valid", e);
@@ -439,31 +572,36 @@ public final class Release {
 
 			this.uri = createObjectProperty(uri);
 
-			artist = createStringProperty(Objects.toString(property("artist")).trim());
-			title = createStringProperty(Objects.toString(property("current.title")).trim());
+			artist = createStringProperty(Objects.toString(releaseData.artist).trim());
+			title = createStringProperty(Objects.toString(releaseData.title).trim());
 
-			downloadType = createObjectProperty(readDownloadType());
+			downloadType = createObjectProperty(readDownloadType(releaseData));
 
-			releaseDate = createObjectProperty(propertyDate("album_release_date", null));
-			publishDate = createObjectProperty(propertyDate("current.publish_date", LocalDate.MIN));
+			releaseDate = createObjectProperty(releaseData.releaseDate);
+			publishDate = createObjectProperty(releaseData.publishDate);
 
-			artworkLink = readArtworkLink(input); // this must precede call to readTags()
+			artworkLink = readArtworkLink(releaseData, input); // this must precede call to readTags()
 
 			tags = readTags(input);
 			tagsString = createStringProperty(tags.stream().collect(Collectors.joining(", ")));
 
-			information = Objects.toString(property("current.about"), "").trim();
-			credits = Objects.toString(property("current.credits"), "").trim();
+			information = Objects.toString(releaseData.about, "").trim();
+			credits = Objects.toString(releaseData.credits, "").trim();
 
-			downloadLink = property("freeDownloadPage");
+			downloadLink = releaseData.freeDownloadPage;
 			String domain = domainFromURI(uri);
-			String parent = property("album_url");
+			String parent = releaseData.albumURL;
 			parentReleaseLink = parent != null ? domain + parent : null;
 
-			tracks = readTracks(artist.get(), domain, isMultiArtist(artist.get(), title.get(), tags));
+			String releaseArtist = artist.get();
+			boolean isMultiArtist = isMultiArtist(releaseArtist, title.get(), tags);
+			List<Track> trackList = new ArrayList<>();
+			for (TrackInfo trackInfo : releaseData.tracks)
+				trackList.add(createTrack(trackInfo, releaseArtist, domain, isMultiArtist));
+			tracks = Collections.unmodifiableList(trackList);
 
 			time = createObjectProperty(Time.ofSeconds(
-					tracks.stream().collect(Collectors.summingInt(track -> track.time().seconds()))));
+					trackList.stream().collect(Collectors.summingInt(track -> track.time().seconds()))));
 		}
 		catch (IOException e) {
 			int responseCode = 0;
@@ -510,24 +648,34 @@ public final class Release {
 
 
 	/**
-	 * Determines the download type by reading and interpreting relevant
-	 * values in JSON data.
+	 * Logs errors encountered during the processing of release data.
+	 * 
+	 * @param e relevant exception
+	 * @param uri release URI
 	 */
-	private DownloadType readDownloadType() {
+	private static void logReleaseDataError(Exception e, URI uri) {
+		LOGGER.log(Level.WARNING, "Error processing release data: " + uri + " (" + e.getMessage() + ")", e);
+	}
+
+
+	/**
+	 * Determines the download type by interpreting relevant values in
+	 * raw release data.
+	 * 
+	 * @param releaseData raw release data
+	 */
+	private DownloadType readDownloadType(ReleaseData releaseData) {
 		DownloadType result = DownloadType.UNAVAILABLE;
-		Number dlPref = property("current.download_pref");
-		if (dlPref != null) {
-			switch (dlPref.intValue()) {
+		if (releaseData.downloadPref != null) {
+			switch (releaseData.downloadPref.intValue()) {
 			case 1:
 				result = DownloadType.FREE;
 				break;
 			case 2:
-				Number minPrice = property("current.minimum_price");
-				if (minPrice != null && minPrice.doubleValue() > 0.0)
+				if (releaseData.minPrice != null && releaseData.minPrice.doubleValue() > 0.0)
 					result = DownloadType.PAID;
 				else {
-					Number isSet = property("current.is_set_price");
-					result = isSet != null && isSet.intValue() == 1 
+					result = releaseData.isSetPrice != null && releaseData.isSetPrice.intValue() == 1 
 							? DownloadType.PAID : DownloadType.NAME_YOUR_PRICE;
 				}
 				break;
@@ -541,6 +689,8 @@ public final class Release {
 	/**
 	 * Reads all tags for release from the input source and returns them
 	 * as unmodifiable set of strings.
+	 * 
+	 * @param input input source
 	 */
 	private static Set<String> readTags(Scanner input) {
 		// Tags are not included in JSON data so we need to fetch them from raw HTML.
@@ -550,7 +700,7 @@ public final class Release {
 		// third party soup library for such a simple one-time task would be an overkill.
 		Set<String> tags = new LinkedHashSet<>();
 		String tagData = null;
-		while ((tagData = input.findWithinHorizon(TAG_DATA, 0)) != null) {
+		while ((tagData = input.findWithinHorizon(TAG_DATA_PATTERN, 0)) != null) {
 			int i = tagData.lastIndexOf('>');
 			if (i != -1)
 				tags.add(unescape(tagData.substring(i+1).trim().toLowerCase(Locale.ENGLISH)));
@@ -611,50 +761,25 @@ public final class Release {
 
 
 	/**
-	 * Reads the tracklist information from JSON data and returns tracks as unmodifiable
-	 * list of Track objects.
+	 * Creates a Track object for the specified raw data values. 
 	 * 
+	 * @param trackInfo a structure containing raw data values for the track
 	 * @param releaseArtist the artist of this release
 	 * @param releaseDomain domain URL string of this release
-	 * @param isMultiArtist indicates whether this release is (probably) a multi-artist
-	 *        release (compilation)
-	 */
-	private List<Track> readTracks(String releaseArtist, String releaseDomain, boolean isMultiArtist) {
-		List<Track> result = new ArrayList<>();
-
-		Number numTracks = property("trackinfo.length");
-		if (numTracks != null && numTracks.intValue() > 0) {
-			for (int i = 0; i < numTracks.intValue(); i++)
-				result.add(createTrack(releaseArtist, releaseDomain, i, isMultiArtist));
-		}
-
-		return Collections.unmodifiableList(result);
-	}
-
-
-	/**
-	 * Creates a Track object for the entry with specified index in JSON data. 
-	 * 
-	 * @param releaseArtist the artist of this release
-	 * @param releaseDomain domain URL string of this release
-	 * @param trackIndex index corresponding to the current element of trackinfo
-	 *        array in JSON data
 	 * @param isMultiArtist indicates whether this release is (probably) a multi-artist
 	 *        release (compilation); this serves mostly as a heuristic hint for trackinfo 
-	 *        parsing code to help with determining correct artist and title for each track
+	 *        processing code to help with determining correct artist and title for each track
 	 * @return a Track instance
 	 */
-	private Track createTrack(String releaseArtist, String releaseDomain, 
-			int trackIndex, boolean isMultiArtist) {
+	private Track createTrack(TrackInfo trackInfo, String releaseArtist,
+			String releaseDomain, boolean isMultiArtist) {
+		assert trackInfo != null;
 		assert releaseArtist != null;
 		assert releaseDomain != null;
-		assert trackIndex >= 0;
-
-		String trackDataID = "trackinfo[" + trackIndex + "].";
 
 		// Trying to figure out correct artist and title
-		String artistTitle = property(trackDataID + "title");
-		String titleLink = property(trackDataID + "title_link");
+		String artistTitle = trackInfo.title;
+		String titleLink = trackInfo.titleLink;
 		String artist = releaseArtist;
 		String title = artistTitle;
 		if (artistTitle != null && artistTitle.contains(" - ")) {
@@ -687,33 +812,30 @@ public final class Release {
 		}
 
 		// Track time
-		Number duration = property(trackDataID + "duration");
+		Number duration = trackInfo.duration;
 		float durationValue = duration != null ? duration.floatValue() : 0.0f;
 		if (durationValue < 0.0f || Float.isNaN(durationValue))
 			durationValue = 0.0f;
 
 		// Link to audio file
-		String fileLink = null;
-		if (property(trackDataID + "file") != null) {
-			fileLink = property(trackDataID + "file['mp3-128']");
-			if (fileLink != null) {
-				// occasionally, for some unknown reason, file link is read without protocol from JSON data 
-				if (!fileLink.startsWith("http:") && !fileLink.startsWith("https:"))
-					fileLink = "http:" + fileLink;
-				try {
-					// additional sanity check
-					new URL(fileLink);
-				}
-				catch (MalformedURLException e) {
-					logError(e);
-					fileLink = null;
-				}
+		String fileLink = trackInfo.fileLink;
+		if (fileLink != null) {
+			// occasionally, for some unknown reason, file link is read without protocol from JSON data 
+			if (!fileLink.startsWith("http:") && !fileLink.startsWith("https:"))
+				fileLink = "http:" + fileLink;
+			try {
+				// additional sanity check
+				new URL(fileLink);
+			}
+			catch (MalformedURLException e) {
+				logReleaseDataError(e, uri.get());
+				fileLink = null;
 			}
 		}
 
 		// Create a track
 		return new Track(
-				trackIndex + 1,
+				trackInfo.index + 1,
 				Objects.toString(artist).trim(),
 				Objects.toString(title).trim(),
 				durationValue,
@@ -805,7 +927,7 @@ public final class Release {
 				return title;
 
 		// Search for first non-numeric character before index sequence
-		// and return everyting from the beginning to found position
+		// and return everything from the beginning to found position
 		for (int i = title.length() - 1; i > 0; i--)
 			if (title.charAt(i) == '-' && !isAsciiDigit(title.charAt(i-1)))
 				return title.substring(0, i);
@@ -829,9 +951,12 @@ public final class Release {
 	/**
 	 * Reads a link to release artwork 350x350 image from the input source.
 	 * Returns null if there's no artwork for this release or link cannot be located.
+	 * 
+	 * @param releaseData raw release data
+	 * @param input input source
 	 */
-	private String readArtworkLink(Scanner input) {
-		String artId = Objects.toString(property("art_id"), "");
+	private String readArtworkLink(ReleaseData releaseData, Scanner input) {
+		String artId = Objects.toString(releaseData.artId, "");
 		if (artId.isEmpty())
 			return null;
 
@@ -846,56 +971,6 @@ public final class Release {
 		return new StringBuilder(link)
 		.replace(link.lastIndexOf('_') + 1, link.lastIndexOf('.'), "2")
 		.toString();
-	}
-
-
-	/**
-	 * Reads a date from the specified JSON property.
-	 * If property value is absent, null, or has incompatible type (non-string),
-	 * returns the default value.
-	 * If date value obtained from JSON in string form cannot be interpreted
-	 * as date, this method returns LocalDate.MIN.
-	 * 
-	 * @param name a name of JSON property to read from
-	 * @param defaultVal default value to return if property value is absent
-	 * @return a LocalDate instance containing the date value
-	 */
-	private LocalDate propertyDate(String name, LocalDate defaultVal) {
-		String dateStr = property(name);
-		if (dateStr == null)
-			return defaultVal;
-		try {
-			return LocalDate.parse(dateStr, DateTimeFormatter.RFC_1123_DATE_TIME);
-		}
-		catch (DateTimeParseException e) {
-			logError(e);
-			return LocalDate.MIN;
-		}
-	}
-
-
-	/**
-	 * Helper method for extracting the value of named JSON property in typesafe manner.
-	 * 
-	 * @param name property name
-	 */
-	@SuppressWarnings("unchecked")
-	private <T> T property(String name) {
-		try {
-			return (T)JS.eval("TralbumData." + name);
-		} 
-		catch (ScriptException | ClassCastException e) {
-			logError(e);
-			return null;
-		}
-	}
-
-
-	/**
-	 * To log errors encountered when reading individual properties from JSON.
-	 */
-	private void logError(Exception e) {
-		LOGGER.log(Level.WARNING, "Error processing release data: " + uri.get() + " (" + e.getMessage() + ")", e);
 	}
 
 
