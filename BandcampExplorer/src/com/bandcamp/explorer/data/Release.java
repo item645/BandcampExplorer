@@ -820,11 +820,20 @@ public final class Release {
 		// Link to audio file
 		String fileLink = trackInfo.fileLink;
 		if (fileLink != null) {
-			// occasionally, for some unknown reason, file link is read without protocol from JSON data 
-			if (!fileLink.startsWith("http:") && !fileLink.startsWith("https:"))
-				fileLink = "http:" + fileLink;
+			fileLink = fileLink.toLowerCase(Locale.ROOT);
+			// Enforcing the use of HTTP for file link in case the protocol is HTTPS or absent
+			// to ensure the playback is working for Java versions below 8u72.
+			// See: https://bugs.openjdk.java.net/browse/JDK-8091132
+			if (!fileLink.startsWith("http:")) {
+				if (fileLink.startsWith("https:"))
+					fileLink = new StringBuilder(fileLink).replace(0, 5, "http").toString();					
+				else if (fileLink.startsWith("//"))
+					fileLink = "http:" + fileLink;
+				else 
+					fileLink = "http://" + fileLink;
+			}
 			try {
-				// additional sanity check
+				// Additional sanity check
 				new URL(fileLink);
 			}
 			catch (MalformedURLException e) {

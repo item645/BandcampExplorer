@@ -38,7 +38,7 @@ public final class BandcampExplorer extends Application {
 	/**
 	 * App title with current version number
 	 */
-	private static final String APP_TITLE = "Bandcamp Explorer 0.3.6";
+	private static final String APP_TITLE = "Bandcamp Explorer 0.3.7";
 
 	/**
 	 * A reference to app's top level stage.
@@ -125,18 +125,17 @@ public final class BandcampExplorer extends Application {
 	/**
 	 * Returns the default logging level to use for all loggers in the application.
 	 * If valid level name was specified in the application command line parameters,
-	 * this level will be used. Otherwise {@link Level#ALL} will be returned.
+	 * this level will be used. Otherwise {@link Level#INFO} will be returned.
 	 */
 	private Level getLoggingLevel() {
-		Level defaultLevel = Level.ALL;
+		Level defaultLevel = Level.INFO;
 		return getParameters().getNamed().entrySet().stream()
 				.filter(e -> e.getKey().toLowerCase(Locale.ROOT).equals("log_level"))
 				.findFirst()
 				.map(Map.Entry::getValue)
-				.map(name -> name.toUpperCase(Locale.ROOT))
 				.map(name -> {
 					try {
-						return Level.parse(name);
+						return Level.parse(name.toUpperCase(Locale.ROOT));
 					}
 					catch (IllegalArgumentException e) {
 						return defaultLevel;

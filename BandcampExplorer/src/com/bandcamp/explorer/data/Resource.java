@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashSet;
@@ -65,8 +66,10 @@ class Resource {
 		if (parentTask.isCancelled())
 			return;
 
-		try (Scanner input = new Scanner(URLConnectionHelper.getConnection(url).getInputStream(),
+		URLConnection connection = URLConnectionHelper.getConnection(url);
+		try (Scanner input = new Scanner(connection.getInputStream(),
 				StandardCharsets.UTF_8.name())) {
+			url = connection.getURL(); // effective url
 			boolean isFile = url.getProtocol().toLowerCase(Locale.ROOT).equals("file");
 			Set<String> links = new HashSet<>();
 

@@ -10,7 +10,7 @@ public enum SearchType {
 
 	/**
 	 * This type employs a standard Bandcamp search feature to find releases,
-	 * using http://bandcamp.com/search page to supply a query string
+	 * using https://bandcamp.com/search page to supply a query string
 	 * and collect the results. The pageNum parameter indicates how many result
 	 * pages should be processed.
 	 * Note that for this search type it is not guaranteed that <b>all</b> relevant
@@ -22,7 +22,7 @@ public enum SearchType {
 			if (pageNum < 1)
 				throw new IllegalArgumentException("Page number must be > 0");
 			String query1 = query.toLowerCase(Locale.ENGLISH).replaceAll(" ", "+");
-			String url = String.format("http://bandcamp.com/search?q=%1$s&page=%2$d", query1, pageNum);
+			String url = String.format("https://bandcamp.com/search?q=%1$s&page=%2$d", query1, pageNum);
 			return new Resource(url, parentTask);
 		}
 	},
@@ -30,7 +30,7 @@ public enum SearchType {
 
 	/**
 	 * This search type works by scraping data from Bandcamp tag pages 
-	 * (http://bandcamp.com/tag/your-favorite-tag) and collecting all releases 
+	 * (https://bandcamp.com/tag/your-favorite-tag) and collecting all releases 
 	 * encountered on those pages.
 	 * For this type query string parameter is interpreted as tag while pageNum
 	 * parameter indicates how many subsequent pages should be processed to gather
@@ -48,7 +48,7 @@ public enum SearchType {
 			if (pageNum < 1)
 				throw new IllegalArgumentException("Page number must be > 0");
 			String tag = query.toLowerCase(Locale.ENGLISH).replaceAll(" ", "-");
-			String url = String.format("http://bandcamp.com/tag/%1$s?page=%2$d&sort_field=date", tag, pageNum);
+			String url = String.format("https://bandcamp.com/tag/%1$s?page=%2$d&sort_field=date", tag, pageNum);
 			return new Resource(url, parentTask);
 		}
 	},
