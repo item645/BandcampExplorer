@@ -71,10 +71,16 @@ public final class Release {
 	private static final Pattern TAG_DATA_PATTERN = Pattern.compile("<a class=\"tag\".+?>.+?(?=(</a>))", DOTALL);
 
 	/**
-	 * Pattern for splitting the value of "title" JSON property when it contains
+	 * Pattern for matching and splitting the value of "title" JSON property when it contains
 	 * both artist and title.
+	 * The pattern checks for hyphens and dashes with different Unicode codes that can possibly 
+	 * be used as artist/title separators.
 	 */
-	private static final Pattern TRACK_TITLE_SPLITTER = Pattern.compile(" - ");
+	private static final Pattern ARTIST_TITLE_SEPARATOR;
+	static {
+		String separator = "(-{1,2}|[\u2010-\u2015\u2212])";
+		ARTIST_TITLE_SEPARATOR = Pattern.compile(String.format("\\s+%s\\s*|\\s*%<s\\s+", separator));
+	}
 
 	/**
 	 * Pattern capturing some frequently used artist names for V/A-releases (compilations).
@@ -82,20 +88,36 @@ public final class Release {
 	private static final Pattern VA_ARTIST_PATTERN;
 	static {
 		StringBuilder regex = new StringBuilder();
-		regex.append("various(\\sartists?)?|");                 // "Various", "Various Artist", "Various Artists"
-		regex.append(".+\\s(");                                 // Start of expression: <...> <Pattern>
-		regex.append("rec(ord)?s|");                            // "Recs", "Records"
-		regex.append("rec(ordings|\\.)?|");                     // "Recordings", "Rec.", "Rec"
-		regex.append("music|");                                 // "Music"
-		regex.append("prod(uctions|\\.)?|");                    // "Productions", "Prod.", "Prod"
-		regex.append("(net)?label(\\sgroup)?|");                // "Netlabel", "Label", "Label Group"
-		regex.append("sounds|");                                // "Sounds"
-		regex.append("comp(ilation|\\.)?|");                    // "Compilation", "Comp.", "Comp" 
-		regex.append("sampler");                                // "Sampler"
-		regex.append(")\\)?|");                                 // End of expression (with optional ending bracket) 
-		regex.append("v(/|-|\\\\|\\.)?a\\.?|");                 // "V/A", "V\A", "VA", "V-A", "V.A.", "VA.", "V.A" 
-		regex.append("beatspace(-|\\.).+|.+(\\.|-)beatspace|"); // "beatspace" (starting or ending)
-		regex.append("vv\\.?aa\\.?|aa\\.?vv\\.?");              // "VV.AA.", "AA.VV." and dotless variants 
+		// "Various", "Various Artist", "Various Artists"
+		regex.append("various(\\sartists?)?|");
+		// Start of expression: <...> <Pattern>
+		regex.append(".+\\s(");
+		// "Recs", "Records"
+		regex.append("rec(ord)?s|");
+		// "Recordings", "Rec.", "Rec"
+		regex.append("rec(ordings|\\.)?|");
+		// "Music"
+		regex.append("music|");
+		// "Productions", "Prod.", "Prod"
+		regex.append("prod(uctions|\\.)?|");
+		// "Netlabel", "Label", "Label Group"
+		regex.append("(net)?label(\\sgroup)?|");
+		// "Sounds"
+		regex.append("sounds|");
+		// "Compilation", "Comp.", "Comp"
+		regex.append("comp(ilation|\\.)?|");
+		// "Sampler"
+		regex.append("sampler");
+		// End of expression (with optional ending bracket)
+		regex.append(")\\)?|");
+		// "V/A", "V\A", "VA", "V-A", "V.A.", "VA.", "V.A" (either as full artist name or a part of it)
+		regex.append(String.format("\\(?%s\\)?(:|\\s).*|.*\\s\\(?%<s\\)?|", "v(/|-|\\\\|\\.)?a\\.?"));
+		// "beatspace" (starting or ending)
+		regex.append("beatspace(-|\\.).+|.+(\\.|-)beatspace|");
+		// "VV.AA" with optional dots
+		regex.append("v\\.?v\\.?a\\.?a\\.?|");
+		// "AA.VV" with optional dots
+		regex.append("a\\.?a\\.?v\\.?v\\.?");
 
 		VA_ARTIST_PATTERN = Pattern.compile(regex.toString(), CASE_INSENSITIVE);
 	}
@@ -590,14 +612,13 @@ public final class Release {
 
 			downloadLink = releaseData.freeDownloadPage;
 			String domain = domainFromURI(uri);
-			String parent = releaseData.albumURL;
-			parentReleaseLink = parent != null ? domain + parent : null;
+			parentReleaseLink = releaseData.albumURL != null ? domain + releaseData.albumURL : null;
 
 			String releaseArtist = artist.get();
 			boolean isMultiArtist = isMultiArtist(releaseArtist, title.get(), tags);
 			List<Track> trackList = new ArrayList<>();
 			for (TrackInfo trackInfo : releaseData.tracks)
-				trackList.add(createTrack(trackInfo, releaseArtist, domain, isMultiArtist));
+				trackList.add(createTrack(trackInfo, releaseArtist, domain, isMultiArtist, uri));
 			tracks = Collections.unmodifiableList(trackList);
 
 			time = createObjectProperty(Time.ofSeconds(
@@ -664,7 +685,7 @@ public final class Release {
 	 * 
 	 * @param releaseData raw release data
 	 */
-	private DownloadType readDownloadType(ReleaseData releaseData) {
+	private static DownloadType readDownloadType(ReleaseData releaseData) {
 		DownloadType result = DownloadType.UNAVAILABLE;
 		if (releaseData.downloadPref != null) {
 			switch (releaseData.downloadPref.intValue()) {
@@ -768,44 +789,56 @@ public final class Release {
 	 * @param releaseDomain domain URL string of this release
 	 * @param isMultiArtist indicates whether this release is (probably) a multi-artist
 	 *        release (compilation); this serves mostly as a heuristic hint for trackinfo 
-	 *        processing code to help with determining correct artist and title for each track
+	 *        processing code to help with determining correct artist and title for the track
+	 * @param releaseURI a URI of this release
 	 * @return a Track instance
 	 */
-	private Track createTrack(TrackInfo trackInfo, String releaseArtist,
-			String releaseDomain, boolean isMultiArtist) {
+	private static Track createTrack(TrackInfo trackInfo, String releaseArtist,
+			String releaseDomain, boolean isMultiArtist, URI releaseURI) {
 		assert trackInfo != null;
 		assert releaseArtist != null;
 		assert releaseDomain != null;
+		assert releaseURI != null;
 
 		// Trying to figure out correct artist and title
 		String artistTitle = trackInfo.title;
 		String titleLink = trackInfo.titleLink;
 		String artist = releaseArtist;
 		String title = artistTitle;
-		if (artistTitle != null && artistTitle.contains(" - ")) {
+		if (artistTitle != null && ARTIST_TITLE_SEPARATOR.matcher(artistTitle).find()) {
+			String[] values = ARTIST_TITLE_SEPARATOR.split(artistTitle, 2);
 			if (isMultiArtist) {
-				String[] vals = TRACK_TITLE_SPLITTER.split(artistTitle, 2);
-				artist = vals[0];
-				title = vals[1];
+				artist = values[0];
+				title = values[1];
 			}
 			else {
-				// If this release is most likely not a multi-artist release, we are doing
-				// additional check by examining the value of "title_link" which, in case the
-				// heuristic failed and release is nevertheless a V/A, contains
-				// minimized version of title without artist (while "title" property has both
-				// artist and title).
-				// Note that this approach still won't work if release owner did not add correct
-				// multi-artist tags by specifiying artist separately for each track. But in such
-				// case there's really nothing more we can do.
-				if (titleLink != null) {
+				// Additional checks in case the heuristic hint is wrong.
+				// Split to artist/title if either is true:
+				// a) the part before separator is also a part of release artist (in that case it is
+				//    likely that we deal with a split release and release artist is something like
+				//    "Artist 1 & Artist 2")
+				// b) the part before separator gets completely erased by minimization, which probably
+				//    means that artist name consists solely of illegal characters (this approach may
+				//    produce wrong results on some specific single-artist releases, but this is 
+				//    expected to happen very rarely)
+				if (containsIgnoreCase(releaseArtist, values[0]) || minimizeTitle(values[0]).equals("-")) {
+					artist = values[0];
+					title = values[1];
+				}
+				else if (titleLink != null) {
+					// Examine the value of "title_link" which, in case the heuristic failed and
+					// release is nevertheless a V/A, contains minimized version of title without
+					// artist (while "title" property has both artist and title).
+					// Note that this approach still won't work if release owner did not add correct
+					// multi-artist tags by specifiying artist separately for each track. But in such
+					// case there's really nothing more we can do.
 					String linkToken = removeTrailingIndex(
 							titleLink.substring(titleLink.lastIndexOf('/') + 1)
 							.toLowerCase(Locale.ENGLISH));
 					String minArtistTitle = removeTrailingIndex(minimizeTitle(artistTitle));
 					if (!linkToken.equals(minArtistTitle)) {
-						String[] vals = TRACK_TITLE_SPLITTER.split(artistTitle, 2);
-						artist = vals[0];
-						title = vals[1];
+						artist = values[0];
+						title = values[1];
 					}
 				}
 			}
@@ -837,7 +870,7 @@ public final class Release {
 				new URL(fileLink);
 			}
 			catch (MalformedURLException e) {
-				logReleaseDataError(e, uri.get());
+				logReleaseDataError(e, releaseURI);
 				fileLink = null;
 			}
 		}
@@ -958,13 +991,25 @@ public final class Release {
 
 
 	/**
+	 * Checks if given string contains another, ignoring case differences.
+	 * 
+	 * @param s1 string to search in
+	 * @param s2 string to search for
+	 * @return true, if s1 contains s2 regardless of the case
+	 */
+	private static boolean containsIgnoreCase(String s1, String s2) {
+		return s1.toLowerCase(Locale.ENGLISH).contains(s2.toLowerCase(Locale.ENGLISH));
+	}
+
+
+	/**
 	 * Reads a link to release artwork 350x350 image from the input source.
 	 * Returns null if there's no artwork for this release or link cannot be located.
 	 * 
 	 * @param releaseData raw release data
 	 * @param input input source
 	 */
-	private String readArtworkLink(ReleaseData releaseData, Scanner input) {
+	private static String readArtworkLink(ReleaseData releaseData, Scanner input) {
 		String artId = Objects.toString(releaseData.artId, "");
 		if (artId.isEmpty())
 			return null;
