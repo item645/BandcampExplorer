@@ -1,5 +1,7 @@
 package com.bandcamp.explorer.data;
 
+import java.util.Optional;
+
 import javafx.beans.property.ReadOnlyIntegerProperty;
 import javafx.beans.property.ReadOnlyIntegerWrapper;
 import javafx.beans.property.ReadOnlyObjectProperty;
@@ -35,12 +37,12 @@ public final class Track {
 		assert artist != null;
 		assert title != null;
 		assert seconds >= 0.0;
-		assert link != null;
 
 		this.number = new ReadOnlyIntegerWrapper(number).getReadOnlyProperty();
 		this.artist = new ReadOnlyStringWrapper(artist).getReadOnlyProperty();
 		this.title = new ReadOnlyStringWrapper(title).getReadOnlyProperty();
-		this.time = new ReadOnlyObjectWrapper<>(Time.ofSeconds(Math.round(seconds))).getReadOnlyProperty();
+		this.time = new ReadOnlyObjectWrapper<>(
+				Time.ofSeconds(seconds > 0.0f && seconds < 0.5f ? 1 : Math.round(seconds))).getReadOnlyProperty();
 		this.link = link;
 		this.fileLink = fileLink;
 	}
@@ -122,24 +124,28 @@ public final class Track {
 
 
 	/**
-	 * Returns an URL string of this track's web page on Bandcamp.
+	 * Returns an Optional with the URL string of this track's web page on Bandcamp.
+	 * If this track has no web page link, returns empty Optional. 
 	 */
-	public String link() {
-		return link;
+	public Optional<String> link() {
+		return Optional.ofNullable(link);
 	}
 
 
 	/**
-	 * Returns an URL string that points to this track's actual audio file.
-	 * If no audio file is available, returns null.
+	 * Returns an Optional with the URL string that points to this track's actual audio file.
+	 * If no audio file is available, returns empty Optional.
+	 * The returned Optional is never empty if {@code isPlayable() == true}.
 	 */
-	public String fileLink() {
-		return fileLink;
+	public Optional<String> fileLink() {
+		return Optional.ofNullable(fileLink);
 	}
 
 
 	/**
 	 * Returns true if this track can be played (i.e. if this track has associated audio data).
+	 * This is equivalent to calling {@code track.fileLink().isPresent()}, but cheaper and
+	 * more convenient.
 	 */
 	public boolean isPlayable() {
 		return fileLink != null;

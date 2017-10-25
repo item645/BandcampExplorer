@@ -331,7 +331,7 @@ class ReleasePlayerForm extends SplitPane {
 
 			LabeledMenuItem viewOnBandcamp = new LabeledMenuItem("View on Bandcamp");
 			viewOnBandcamp.setOnAction(event -> trackListView
-					.ifTrackSelected(track -> Utils.browse(track.link())));
+					.ifTrackSelected(track -> track.link().ifPresent(Utils::browse)));
 
 			LabeledMenuItem copyText = new LabeledMenuItem("Copy Text");
 			copyText.setOnAction(event -> {
@@ -354,7 +354,7 @@ class ReleasePlayerForm extends SplitPane {
 
 			LabeledMenuItem copyAudioURL = new LabeledMenuItem("Copy Audio URL");
 			copyAudioURL.setOnAction(event -> trackListView
-					.ifTrackSelected(track -> Utils.toClipboardAsString(track.fileLink())));
+					.ifTrackSelected(track -> track.fileLink().ifPresent(Utils::toClipboardAsString)));
 
 			ObservableList<MenuItem> menuItems = getItems();
 
@@ -393,6 +393,8 @@ class ReleasePlayerForm extends SplitPane {
 					searchArtist.setLabelText(String.format("Search \"%s\"", artist));
 					searchArtist.setOnAction(
 							actionEvent -> mainForm.searchReleases(artist, SearchType.SEARCH));
+
+					viewOnBandcamp.setDisable(!track.link().isPresent());
 				}
 				else {
 					searchArtist.setLabelText(null);
@@ -517,7 +519,7 @@ class ReleasePlayerForm extends SplitPane {
 
 			if (player != null)
 				quit();
-			player = new MediaPlayer(new Media(track.fileLink()));
+			player = new MediaPlayer(track.fileLink().map(Media::new).get());
 			this.track = track;
 			quit = false;
 

@@ -111,7 +111,7 @@ public final class Release {
 		// End of expression (with optional ending bracket)
 		regex.append(")\\)?|");
 		// "V/A", "V\A", "VA", "V-A", "V.A.", "VA.", "V.A" (either as full artist name or a part of it)
-		regex.append(String.format("\\(?%s\\)?(:|\\s).*|.*\\s\\(?%<s\\)?|", "v(/|-|\\\\|\\.)?a\\.?"));
+		regex.append(String.format("%s|\\(?%<s\\)?(:|\\s).*|.*\\s\\(?%<s\\)?|", "v(/|-|\\\\|\\.)?a\\.?"));
 		// "beatspace" (starting or ending)
 		regex.append("beatspace(-|\\.).+|.+(\\.|-)beatspace|");
 		// "VV.AA" with optional dots
@@ -881,7 +881,7 @@ public final class Release {
 				Objects.toString(artist).trim(),
 				Objects.toString(title).trim(),
 				durationValue,
-				releaseDomain + titleLink,
+				titleLink != null ? releaseDomain + titleLink : null,
 				fileLink);
 	}
 
