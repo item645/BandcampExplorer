@@ -6,6 +6,8 @@ import static java.util.regex.Pattern.DOTALL;
 import java.io.IOException;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -31,8 +33,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -55,15 +59,21 @@ public final class Release {
 	private static final Logger LOGGER = Logger.getLogger(Release.class.getName());
 
 	/**
-	 * Thread-safe cache for storing and reusing instantiated Release objects.
-	 */
-	private static final ReleaseCache RELEASE_CACHE = new ReleaseCache();
-
-	/**
 	 * Pattern to locate a release data within HTML page. The data is defined in JSON format
-	 * and assigned to JavaScript variable.
+	 * and assigned to TralbumData JavaScript variable.
 	 */
 	private static final Pattern RELEASE_DATA_PATTERN = Pattern.compile("var TralbumData = \\{.+?\\};", DOTALL);
+
+	/**
+	 * Pattern to locate a currency data within HTML page. The data is defined in JSON format
+	 * and assigned to CurrencyData JavaScript variable.
+	 */
+	private static final Pattern CURRENCY_DATA_PATTERN = Pattern.compile("var CurrencyData = \\{.+?\\};", DOTALL);
+
+	/**
+	 * Pattern for locating currency setting for release in currency data JSON. 
+	 */
+	private static final Pattern CURRENCY_CODE_SETTING_PATTERN = Pattern.compile("\"setting\":\"([a-zA-Z]{3})\"");
 
 	/**
 	 * Pattern for locating tags.
@@ -147,10 +157,22 @@ public final class Release {
 		HTML_SPECIALS = Collections.unmodifiableMap(specials);
 	}
 
+	/**
+	 * Thread-safe cache for storing and reusing instantiated Release objects.
+	 */
+	private static final ReleaseCache releaseCache = new ReleaseCache();
+
+	/**
+	 * Exchange rate data container.
+	 * Used for converting release price to USD.
+	 */
+	private static final ExchangeRate exchangeRate = new ExchangeRate();
+
 
 	private final ReadOnlyStringProperty artist;
 	private final ReadOnlyStringProperty title;
 	private final ReadOnlyObjectProperty<DownloadType> downloadType;
+	private final ReadOnlyObjectProperty<Price> price;
 	private final ReadOnlyObjectProperty<Time> time;
 	private final ReadOnlyObjectProperty<LocalDate> releaseDate;
 	private final ReadOnlyObjectProperty<LocalDate> publishDate;
@@ -194,6 +216,73 @@ public final class Release {
 		 * or preview it from the site as stream-only. 
 		 */
 		UNAVAILABLE
+	}
+
+
+	/**
+	 * Represents a release price in USD.
+	 */
+	public static final class Price implements Comparable<Price> {
+
+		static final Price ZERO = new Price(new BigDecimal("0.00"));
+		static final int SCALE = 2;
+
+		private final BigDecimal value;
+
+
+		/**
+		 * Constructs new instance of Price for the specified value.
+		 */
+		private Price(BigDecimal value) {
+			assert value != null;
+			this.value = value;
+		}
+
+
+		/**
+		 * Returns the value of this price.
+		 */
+		public BigDecimal value() {
+			return value;
+		}
+
+
+		/**
+		 * Returns a hash code for this price.
+		 */
+		@Override
+		public int hashCode() {
+			return value.hashCode();
+		}
+
+
+		/**
+		 * Tests this price for equality with other, using value.
+		 */
+		@Override
+		public boolean equals(Object other) {
+			return this == other || other instanceof Price 
+					&& Objects.equals(value, ((Price)other).value);
+		}
+
+
+		/**
+		 * Compares this price to another by value.
+		 */
+		@Override
+		public int compareTo(Price other) {
+			return value.compareTo(other.value);
+		}
+
+
+		/**
+		 * Returns a string representation of this price.
+		 */
+		@Override
+		public String toString() {
+			return "$" + value;
+		}
+
 	}
 
 
@@ -353,13 +442,111 @@ public final class Release {
 
 
 	/**
+	 * A helper class wrapping the functionality of built-in JavaScript interpreter.
+	 * It is used for processing JSON data obtained from release page source.
+	 * 
+	 * Instances of this class are not thread safe and must be confined to a single
+	 * thread or (in case of multithreaded access) used with proper synchronization.
+	 */
+	private static class JavaScriptHelper {
+
+		private final ScriptEngine JS = new ScriptEngineManager().getEngineByName("JavaScript");
+		private Consumer<Exception> errorHandler = e -> {};
+
+
+		/**
+		 * Executes the specified script.
+		 * 
+		 * @param script a string containing the script
+		 * @throws ScriptException if there was an error during script execution
+		 */
+		void execute(String script) throws ScriptException {
+			JS.eval(script);
+		}
+
+
+		/**
+		 * Executes passed scripts in the order they were specified in vararg param.
+		 * 
+		 * @param scripts strings, each one containing script to be executed 
+		 * @throws ScriptException if there was an error during execution of any script
+		 */
+		void execute(String... scripts) throws ScriptException {
+			for (String script : scripts)
+				execute(script);
+		}
+
+
+		/**
+		 * Executes script and returns resulting value converted to a target type.
+		 * Returns null if there was an error during script execution or value convertion.  
+		 * 
+		 * @param script a string containing the script
+		 * @return resulting value
+		 */
+		@SuppressWarnings("unchecked")
+		<T> T evaluate(String script) {
+			try {
+				return (T)JS.eval(script);
+			} 
+			catch (ScriptException | ClassCastException e) {
+				errorHandler.accept(e);
+				return null;
+			}
+		}
+
+
+		/**
+		 * Executes script to obtain a date value in RFC-1123 string representation
+		 * and converts the result to LocalDate.
+		 * If obtained date value is null or has incompatible type (non-string),
+		 * returns the default value.
+		 * If string representation cannot be interpreted as date, this method   
+		 * returns LocalDate.MIN.
+		 * 
+		 * @param script a string containing the script
+		 * @param defaultVal default value to return if resulting date cannot be obtained
+		 * @return a LocalDate instance containing the date value
+		 */
+		LocalDate evaluateDate(String script, LocalDate defaultVal) {
+			String dateStr = evaluate(script);
+			if (dateStr == null)
+				return defaultVal;
+			try {
+				return LocalDate.parse(dateStr, DateTimeFormatter.RFC_1123_DATE_TIME);
+			}
+			catch (DateTimeParseException e) {
+				errorHandler.accept(e);
+				return LocalDate.MIN;
+			}
+		}
+
+
+		/**
+		 * Sets up a hanlder to process possible exceptions that can occur during
+		 * script evaluations.
+		 * By default error handler is not set and such handling is not performed,
+		 * with script evaluation errors silently ignored.
+		 * 
+		 * @param errorHandler a callback function that handles the exception
+		 */
+		void setErrorHandler(Consumer<Exception> errorHandler) {
+			assert errorHandler != null;
+			this.errorHandler = errorHandler;
+		}
+
+	}
+
+
+
+	/**
 	 * Encapsulates raw release data values obtained from JSON source.
 	 */
 	private static class ReleaseData {
 
-		private static final ScriptEngine JS = new ScriptEngineManager().getEngineByName("JavaScript");
+		private static final String DATA_VARIABLE_PATH = "TralbumData.";
+		private static final JavaScriptHelper JS = new JavaScriptHelper();
 
-		private final URI releaseURI;
 		final String artist;
 		final String title;
 		final String about;
@@ -388,16 +575,21 @@ public final class Release {
 		 * 
 		 * @param jsonData source release data in JSON format
 		 * @param releaseURI a URI of release page
-		 * @throws ScriptException if there was an unrecoverable error during source data processing
+		 * @throws IllegalArgumentException if source data is not valid and its processing
+		 *         has resulted in unrecoverable error
 		 */
-		ReleaseData(String jsonData, URI releaseURI) throws ScriptException {
+		ReleaseData(String jsonData, URI releaseURI) {
 			assert jsonData != null;
 			assert releaseURI != null;
 
-			this.releaseURI = releaseURI;
-
 			synchronized (ReleaseData.class) {
-				JS.eval(jsonData);
+				try {
+					JS.execute(jsonData);
+				}
+				catch (ScriptException e) {
+					throw new IllegalArgumentException(e);
+				}
+				JS.setErrorHandler(exception -> logReleaseDataError(exception, releaseURI));
 
 				artist           = read("artist");
 				title            = read("current.title");
@@ -437,15 +629,8 @@ public final class Release {
 		 * @param name property name
 		 * @return a value
 		 */
-		@SuppressWarnings("unchecked")
 		private <T> T read(String name) {
-			try {
-				return (T)JS.eval("TralbumData." + name);
-			} 
-			catch (ScriptException | ClassCastException e) {
-				logReleaseDataError(e, releaseURI);
-				return null;
-			}
+			return JS.evaluate(DATA_VARIABLE_PATH + name);
 		}
 
 
@@ -461,16 +646,7 @@ public final class Release {
 		 * @return a LocalDate instance containing the date value
 		 */
 		private LocalDate readDate(String name, LocalDate defaultVal) {
-			String dateStr = read(name);
-			if (dateStr == null)
-				return defaultVal;
-			try {
-				return LocalDate.parse(dateStr, DateTimeFormatter.RFC_1123_DATE_TIME);
-			}
-			catch (DateTimeParseException e) {
-				logReleaseDataError(e, releaseURI);
-				return LocalDate.MIN;
-			}
+			return JS.evaluateDate(DATA_VARIABLE_PATH + name, defaultVal);
 		}
 
 	}
@@ -494,6 +670,105 @@ public final class Release {
 			this.duration = duration;
 			this.fileLink = fileLink;
 		}
+	}
+
+
+
+	/**
+	 * Contains exchange rate data obtained from release page source on first release load
+	 * and used for converting release price to USD.
+	 * The data is initialized only once and then reused.
+	 */
+	private static class ExchangeRate {
+
+		private final Map<String, BigDecimal> rates = new HashMap<>();
+		private volatile boolean initialized;
+
+
+		/**
+		 * Returns true if exchange rate data has been already initialized.
+		 */
+		boolean isInitialized() {
+			return initialized;
+		}
+
+
+		/**
+		 * Initializes exchange rates using raw source data in JSON format. 
+		 * 
+		 * @param jsonData source exchange rate data in JSON format
+		 * @param releaseURI a URI of release
+		 * @throws IllegalArgumentException if source data is not valid and its processing
+		 *         has resulted in unrecoverable error
+		 */
+		synchronized void initialize(String jsonData, URI releaseURI) {
+			if (!initialized) {
+				doInitialize(jsonData, releaseURI);
+				initialized = true;
+				LOGGER.fine("Loaded exchange rates for " + rates.size() + " currencies");
+			}
+		}
+
+
+		/**
+		 * Performs the initialization of exchange rates.
+		 * 
+		 * @param jsonData source exchange rate data in JSON format
+		 * @param releaseURI a URI of release
+		 * @throws IllegalArgumentException if source data is not valid and its processing
+		 *         has resulted in unrecoverable error
+		 */
+		private void doInitialize(String jsonData, URI releaseURI) {
+			assert jsonData != null;
+			assert releaseURI != null;
+
+			JavaScriptHelper JS = new JavaScriptHelper();
+			JS.setErrorHandler(exception -> logDataError(exception, releaseURI));
+
+			try {
+				JS.execute(jsonData, "var codes = Object.keys(CurrencyData.rates)");
+				int codesLength = JS.<Number>evaluate("codes.length").intValue();
+				for (int i = 0; i < codesLength; i++) {
+					String code = JS.evaluate("codes[" + i + "]");
+					if (code != null) {						
+						Number rate = JS.evaluate("CurrencyData.rates['" + code + "']");
+						BigDecimal rateValue = BigDecimal.ONE;
+						if (rate != null)
+							rateValue = BigDecimal.valueOf(rate.doubleValue());
+						else
+							LOGGER.warning("Cannot obtain exchage rate value for currency code: " + code);
+						rates.put(code.toUpperCase(Locale.ROOT), rateValue);
+					}
+				}
+			}
+			catch (ScriptException | NullPointerException e) {
+				throw new IllegalArgumentException(e);
+			}
+		}
+
+
+		/**
+		 * Returns an Optional with the exchange rate value for a given currency code.
+		 * If there is no rate value for the specified code, returns empty Optional.
+		 * 
+		 * @param currencyCode currency code
+		 */
+		Optional<BigDecimal> get(String currencyCode) {
+			return Optional.ofNullable(rates.get(currencyCode));
+		}
+
+
+		/**
+		 * Logs errors encountered during the processing of exchange rate data.
+		 * 
+		 * @param e relevant exception
+		 * @param releaseURI release URI
+		 */
+		private static void logDataError(Exception e, URI releaseURI) {
+			LOGGER.log(Level.WARNING, "Error processing exchange rate data for release: " 
+					+ releaseURI + " (" + e.getMessage() + ")", e);
+		}
+
 	}
 
 
@@ -534,7 +809,7 @@ public final class Release {
 	 * @throws NullPointerException if uri is null
 	 */
 	static Release forURI(URI uri, int attempt, String releaseID) throws ReleaseLoadingException {
-		return RELEASE_CACHE.getRelease(releaseID, () -> {
+		return releaseCache.getRelease(releaseID, () -> {
 			String message;
 			if (attempt > 0)
 				message = new StringBuilder("Loading release: ").append(uri).append(" (")
@@ -583,13 +858,30 @@ public final class Release {
 			if (releaseJson == null)
 				throw new ReleaseLoadingException("Release data not found");
 
-			// Parsing JSON data to extract raw values we need
+			// Parsing release JSON data to extract raw values we need
 			ReleaseData releaseData;
 			try {
 				releaseData = new ReleaseData(releaseJson, uri);
 			}
-			catch (ScriptException e) {
+			catch (IllegalArgumentException e) {
 				throw new ReleaseLoadingException("Release data is not valid", e);
+			}
+
+			// Finding a variable containing currency data string in JSON format
+			String currencyDataJson = input.findWithinHorizon(CURRENCY_DATA_PATTERN, 0);
+			if (currencyDataJson == null)
+				throw new ReleaseLoadingException("Currency data not found");
+
+			// One-time initialization of exchange rates using currency data obtained
+			// from the page.
+			// Exchange rate data is the same for all release pages.
+			if (!exchangeRate.isInitialized()) {
+				try {					
+					exchangeRate.initialize(currencyDataJson, uri);
+				}
+				catch (IllegalArgumentException e) {
+					throw new ReleaseLoadingException("Failed to process exchange rate data", e);
+				}
 			}
 
 			this.uri = createObjectProperty(uri);
@@ -598,6 +890,9 @@ public final class Release {
 			title = createStringProperty(Objects.toString(releaseData.title).trim());
 
 			downloadType = createObjectProperty(readDownloadType(releaseData));
+
+			String releaseCurrencyCode = readCurrencyCodeSetting(currencyDataJson, uri);
+			price = createObjectProperty(readPrice(releaseData, downloadType.get(), releaseCurrencyCode));
 
 			releaseDate = createObjectProperty(releaseData.releaseDate);
 			publishDate = createObjectProperty(releaseData.publishDate);
@@ -680,6 +975,26 @@ public final class Release {
 
 
 	/**
+	 * Reads currency code setting for the release from currency data JSON. 
+	 * 
+	 * @param currencyDataJson currency data in JSON format
+	 * @param releaseURI a URI of this release
+	 * @return currency code for the release or "USD", if currency code setting is not found
+	 */
+	private static String readCurrencyCodeSetting(String currencyDataJson, URI releaseURI) {
+		Matcher matcher = CURRENCY_CODE_SETTING_PATTERN.matcher(currencyDataJson);
+		String code = matcher.find() 
+				? Objects.toString(matcher.group(1), "").toUpperCase(Locale.ROOT) 
+				: "";
+		if (code.isEmpty()) {
+			LOGGER.warning("Cannot determine currency setting for release: " + releaseURI);
+			code = "USD";
+		}
+		return code;
+	}
+
+
+	/**
 	 * Determines the download type by interpreting relevant values in
 	 * raw release data.
 	 * 
@@ -704,6 +1019,35 @@ public final class Release {
 			}
 		}
 		return result;
+	}
+
+
+	/**
+	 * Reads release price from the release data in original currency and converts it to USD
+	 * using exchange rate provided by Bandcamp.
+	 * For download types other than {@link DownloadType#PAID} the price is $0.00.
+	 * 
+	 * @param releaseData raw release data
+	 * @param downloadType release download type
+	 * @param currencyCode a code for currency that is used for the release
+	 * @return release price in USD
+	 */
+	private static Price readPrice(ReleaseData releaseData, DownloadType downloadType, String currencyCode) {
+		Price price = Price.ZERO;
+		if (downloadType == DownloadType.PAID) {
+			double priceValue = releaseData.minPrice != null ? releaseData.minPrice.doubleValue() : 0.0;
+			if (!Double.isFinite(priceValue) || priceValue < 0.0)
+				priceValue = 0.0;
+
+			BigDecimal rate = exchangeRate.get(currencyCode).orElseGet(() -> {
+				LOGGER.warning("Cannot obtain exchange rate value for currency code: " + currencyCode);
+				return BigDecimal.ONE;
+			});
+
+			price = new Price(BigDecimal.valueOf(priceValue)
+						.multiply(rate).setScale(Price.SCALE, RoundingMode.HALF_UP));
+		}
+		return price;
 	}
 
 
@@ -847,7 +1191,7 @@ public final class Release {
 		// Track time
 		Number duration = trackInfo.duration;
 		float durationValue = duration != null ? duration.floatValue() : 0.0f;
-		if (durationValue < 0.0f || Float.isNaN(durationValue))
+		if (!Float.isFinite(durationValue) || durationValue < 0.0f)
 			durationValue = 0.0f;
 
 		// Link to audio file
@@ -1068,13 +1412,20 @@ public final class Release {
 		LocalDate releaseDate_ = releaseDate.get();
 		LocalDate publishDate_ = publishDate.get();
 		DownloadType downloadType_ = downloadType.get();
+		Price price_ = price.get();
 		String tagsString_ = tagsString.get();
 		URI uri_ = uri.get();
-		return new StringBuilder(artist_).append(" - ").append(title_).append(" (")
-				.append(time_).append(") [").append(Objects.toString(releaseDate_, "-"))
-				.append(", ").append(publishDate_).append(", ").append(downloadType_)
-				.append("] [").append(tagsString_).append("] (").append(uri_).append(")")
-				.toString();
+
+		return new StringBuilder()
+			.append(artist_).append(" - ").append(title_)
+			.append(" (").append(time_).append(") [")
+			.append(Objects.toString(releaseDate_, "-"))
+			.append(", ").append(publishDate_)
+			.append(", ").append(downloadType_)
+			.append(", ").append(price_)
+			.append("] [").append(tagsString_).append("] (")
+			.append(uri_).append(")")
+			.toString();
 	}
 
 
@@ -1123,6 +1474,26 @@ public final class Release {
 	 */
 	public ReadOnlyObjectProperty<DownloadType> downloadTypeProperty() {
 		return downloadType;
+	}
+
+
+	/**
+	 * Returns a price of this release in USD.
+	 * If original release price is in different currency, then it is converted
+	 * to USD using exchange rate provided by Bandcamp. The price value is always
+	 * scaled to 2 decimal places using "half up" rounding mode.
+	 * For download types other than {@link DownloadType#PAID} the price is $0.00.
+	 */
+	public Price price() {
+		return price.get();
+	}
+
+
+	/**
+	 * Returns release price as read-only JavaFX property.
+	 */
+	public ReadOnlyObjectProperty<Price> priceProperty() {
+		return price;
 	}
 
 
@@ -1269,7 +1640,7 @@ public final class Release {
 	 * If there's no download link, returns empty Optional.
 	 * Usually download link is available for releases whose download type is {@link DownloadType#FREE}
 	 * or {@link DownloadType#NAME_YOUR_PRICE} where users are not required to enter their
-	 * email for receiving download link.
+	 * email for receiving the link.
 	 */
 	public Optional<String> downloadLink() {
 		return Optional.ofNullable(downloadLink);
