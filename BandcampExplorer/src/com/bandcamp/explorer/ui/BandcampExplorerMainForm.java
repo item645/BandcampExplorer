@@ -72,7 +72,7 @@ public class BandcampExplorerMainForm extends BorderPane {
 		this.progressBar = ProgressBarDialog.create(primaryStage);
 		this.progressBar.setExecutor(executorService);
 
-		setCenter(this.resultsView = ResultsView.create(this, releasePlayer));
+		setCenter(this.resultsView = ResultsView.create(primaryStage, this, releasePlayer));
 
 		KeyCombination CTRL_E   = new KeyCodeCombination(KeyCode.E,   KeyCombination.SHORTCUT_DOWN);
 		KeyCombination CTRL_P   = new KeyCodeCombination(KeyCode.P,   KeyCombination.SHORTCUT_DOWN);

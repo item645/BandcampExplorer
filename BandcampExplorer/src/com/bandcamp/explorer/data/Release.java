@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -63,6 +62,18 @@ public final class Release {
 	 * and assigned to TralbumData JavaScript variable.
 	 */
 	private static final Pattern RELEASE_DATA_PATTERN = Pattern.compile("var TralbumData = \\{.+?\\};", DOTALL);
+
+	/**
+	 * Pattern for locating the content of pagedata element.
+	 */
+	private static final Pattern PAGE_DATA_PATTERN = 
+			Pattern.compile("<div id=\"pagedata\"\\sdata-blob=\"\\{.+?\">", DOTALL);
+
+	/**
+	 * Pattern for locating currency code defined in pagedata element.
+	 */
+	private static final Pattern PAGE_DATA_CURRENCY_PATTERN = 
+			Pattern.compile("currency&quot;:&quot;([a-zA-Z]{3})&quot;");
 
 	/**
 	 * Pattern to locate a currency data within HTML page. The data is defined in JSON format
@@ -216,73 +227,6 @@ public final class Release {
 		 * or preview it from the site as stream-only. 
 		 */
 		UNAVAILABLE
-	}
-
-
-	/**
-	 * Represents a release price in USD.
-	 */
-	public static final class Price implements Comparable<Price> {
-
-		static final Price ZERO = new Price(new BigDecimal("0.00"));
-		static final int SCALE = 2;
-
-		private final BigDecimal value;
-
-
-		/**
-		 * Constructs new instance of Price for the specified value.
-		 */
-		private Price(BigDecimal value) {
-			assert value != null;
-			this.value = value;
-		}
-
-
-		/**
-		 * Returns the value of this price.
-		 */
-		public BigDecimal value() {
-			return value;
-		}
-
-
-		/**
-		 * Returns a hash code for this price.
-		 */
-		@Override
-		public int hashCode() {
-			return value.hashCode();
-		}
-
-
-		/**
-		 * Tests this price for equality with other, using value.
-		 */
-		@Override
-		public boolean equals(Object other) {
-			return this == other || other instanceof Price 
-					&& Objects.equals(value, ((Price)other).value);
-		}
-
-
-		/**
-		 * Compares this price to another by value.
-		 */
-		@Override
-		public int compareTo(Price other) {
-			return value.compareTo(other.value);
-		}
-
-
-		/**
-		 * Returns a string representation of this price.
-		 */
-		@Override
-		public String toString() {
-			return "$" + value;
-		}
-
 	}
 
 
@@ -553,9 +497,11 @@ public final class Release {
 		final String credits;
 		final String freeDownloadPage;
 		final String albumURL;
+		final String currency;
 		final Number artId;
 		final Number downloadPref;
 		final Number minPrice;
+		final Number setPrice;
 		final Number isSetPrice;
 		final LocalDate releaseDate;
 		final LocalDate publishDate;
@@ -600,25 +546,44 @@ public final class Release {
 				artId            = read("art_id");
 				downloadPref     = read("current.download_pref");
 				minPrice         = read("current.minimum_price");
+				setPrice         = read("current.set_price");
 				isSetPrice       = read("current.is_set_price");
 				releaseDate      = readDate("album_release_date", null);
 				publishDate      = readDate("current.publish_date", LocalDate.MIN);
 
-				Number length = read("trackinfo.length");
-				int numTracks = length != null ? length.intValue() : 0;
-				tracks = new TrackInfo[numTracks];
-				for (int index = 0; index < numTracks; index++) {
-					String trackDataPath = "trackinfo[" + index + "].";
-					tracks[index] = new TrackInfo(
-							index, 
-							read(trackDataPath + "title"),
-							read(trackDataPath + "title_link"),
-							read(trackDataPath + "duration"),
-							read(trackDataPath + "file") != null 
-								? read(trackDataPath + "file['mp3-128']") : null
-							);
-				}
+				currency = hasPackages() ? read("packages[0].currency") : null;
+
+				tracks = readTracks();
 			}
+		}
+
+
+		/**
+		 * Returns true if JSON contains non-empty packages array. 
+		 */
+		private boolean hasPackages() {
+			return read("packages") != null && asPrimitiveInt(read("packages.length")) > 0;
+		}
+
+
+		/**
+		 * Reads tracks data from trackinfo array in JSON.
+		 */
+		private TrackInfo[] readTracks() {
+			int length = asPrimitiveInt(read("trackinfo.length"));
+			TrackInfo[] tracks = new TrackInfo[length];
+			for (int index = 0; index < length; index++) {
+				String trackDataPath = "trackinfo[" + index + "].";
+				tracks[index] = new TrackInfo(
+						index, 
+						read(trackDataPath + "title"),
+						read(trackDataPath + "title_link"),
+						read(trackDataPath + "duration"),
+						read(trackDataPath + "file") != null
+							? read(trackDataPath + "file['mp3-128']") : null
+						);
+			}
+			return tracks;
 		}
 
 
@@ -853,31 +818,17 @@ public final class Release {
 		}
 
 		try (Scanner input = new Scanner(connection.getInputStream(), StandardCharsets.UTF_8.name())) {
-			// Finding a variable containing release data string in JSON format
-			String releaseJson = input.findWithinHorizon(RELEASE_DATA_PATTERN, 0);
-			if (releaseJson == null)
-				throw new ReleaseLoadingException("Release data not found");
+			String pageDataCurrencyCode = readPageDataCurrencyCode(input);
+			ReleaseData releaseData = readReleaseData(input, uri);
 
-			// Parsing release JSON data to extract raw values we need
-			ReleaseData releaseData;
-			try {
-				releaseData = new ReleaseData(releaseJson, uri);
-			}
-			catch (IllegalArgumentException e) {
-				throw new ReleaseLoadingException("Release data is not valid", e);
-			}
-
-			// Finding a variable containing currency data string in JSON format
-			String currencyDataJson = input.findWithinHorizon(CURRENCY_DATA_PATTERN, 0);
-			if (currencyDataJson == null)
-				throw new ReleaseLoadingException("Currency data not found");
-
+			String currencyDataJSON = null;
 			// One-time initialization of exchange rates using currency data obtained
 			// from the page.
 			// Exchange rate data is the same for all release pages.
 			if (!exchangeRate.isInitialized()) {
-				try {					
-					exchangeRate.initialize(currencyDataJson, uri);
+				currencyDataJSON = readCurrencyDataJSON(input);
+				try {
+					exchangeRate.initialize(currencyDataJSON, uri);
 				}
 				catch (IllegalArgumentException e) {
 					throw new ReleaseLoadingException("Failed to process exchange rate data", e);
@@ -891,7 +842,8 @@ public final class Release {
 
 			downloadType = createObjectProperty(readDownloadType(releaseData));
 
-			String releaseCurrencyCode = readCurrencyCodeSetting(currencyDataJson, uri);
+			String releaseCurrencyCode = readCurrencyCode(input, releaseData, currencyDataJSON,
+					pageDataCurrencyCode, uri);
 			price = createObjectProperty(readPrice(releaseData, downloadType.get(), releaseCurrencyCode));
 
 			releaseDate = createObjectProperty(releaseData.releaseDate);
@@ -975,20 +927,100 @@ public final class Release {
 
 
 	/**
-	 * Reads currency code setting for the release from currency data JSON. 
+	 * Performs reading and parsing of release data from JSON data cotained in page source.
 	 * 
-	 * @param currencyDataJson currency data in JSON format
+	 * @param input input source
 	 * @param releaseURI a URI of this release
-	 * @return currency code for the release or "USD", if currency code setting is not found
+	 * @return ReleaseData instance, containing necessary data obtained from JSON
+	 * @throws ReleaseLoadingException if source JSON data was not found or if there was
+	 *         an unrecoverable error when reading and interpreting the data  
 	 */
-	private static String readCurrencyCodeSetting(String currencyDataJson, URI releaseURI) {
-		Matcher matcher = CURRENCY_CODE_SETTING_PATTERN.matcher(currencyDataJson);
-		String code = matcher.find() 
-				? Objects.toString(matcher.group(1), "").toUpperCase(Locale.ROOT) 
-				: "";
-		if (code.isEmpty()) {
-			LOGGER.warning("Cannot determine currency setting for release: " + releaseURI);
-			code = "USD";
+	private static ReleaseData readReleaseData(Scanner input, URI releaseURI) throws ReleaseLoadingException {
+		String releaseJSON = input.findWithinHorizon(RELEASE_DATA_PATTERN, 0);
+		if (releaseJSON == null)
+			throw new ReleaseLoadingException("Release data not found");
+
+		ReleaseData releaseData;
+		try {
+			releaseData = new ReleaseData(releaseJSON, releaseURI);
+		}
+		catch (IllegalArgumentException e) {
+			throw new ReleaseLoadingException("Release data is not valid", e);
+		}
+		return releaseData;
+	}
+
+
+	/**
+	 * Reads currency code from the content of pagedata element.
+	 * 
+	 * @param input input source
+	 * @return currency code; null, if code (or pagedata element) was not found
+	 */
+	private static String readPageDataCurrencyCode(Scanner input) {
+		String currency = null;
+		String pageData = input.findWithinHorizon(PAGE_DATA_PATTERN, 0);
+		if (pageData != null) {
+			Matcher matcher = PAGE_DATA_CURRENCY_PATTERN.matcher(pageData);
+			if (matcher.find()) {
+				currency = matcher.group(1);
+				if (currency != null)
+					currency = currency.toUpperCase(Locale.ROOT);
+			}
+		}
+		return currency;
+	}
+
+
+	/**
+	 * Reads currency data in JSON format from input source.
+	 * 
+	 * @param input input source
+	 * @return currency data in JSON format
+	 * @throws ReleaseLoadingException if currency data was not found
+	 */
+	private static String readCurrencyDataJSON(Scanner input) throws ReleaseLoadingException {
+		String currencyDataJSON = input.findWithinHorizon(CURRENCY_DATA_PATTERN, 0);
+		if (currencyDataJSON == null)
+			throw new ReleaseLoadingException("Currency data not found");
+		return currencyDataJSON;
+	}
+
+
+	/**
+	 * Determines the currency code for release using different sources.
+	 * If currency code was defined in pagedata element, this code is used. Otherwise, currency
+	 * code is taken from packages list in release data or (if there are no packages) from
+	 * currency data JSON
+	 * 
+	 * @param input input source
+	 * @param releaseData raw release data
+	 * @param currencyDataJSON currency data in JSON format
+	 * @param pageDataCurrencyCode currency code obtained from pagedata element
+	 * @param releaseURI a URI of this release
+	 * @return currency code for the release or "USD", if currency code was not found
+	 * @throws ReleaseLoadingException if currency data JSON parameter was null and on attempt
+	 *         to read the data from input source it was not found
+	 */
+	private static String readCurrencyCode(Scanner input, ReleaseData releaseData, String currencyDataJSON,
+			String pageDataCurrencyCode, URI releaseURI) throws ReleaseLoadingException {
+		String code = pageDataCurrencyCode;
+		if (code == null) {
+			code = Objects.toString(releaseData.currency, "");
+			if (code.isEmpty()) {
+				if (currencyDataJSON == null)
+					currencyDataJSON = readCurrencyDataJSON(input);
+				Matcher matcher = CURRENCY_CODE_SETTING_PATTERN.matcher(currencyDataJSON);
+				code = matcher.find() ? Objects.toString(matcher.group(1), "") : "";
+			}
+
+			if (code.isEmpty()) {
+				LOGGER.warning("Cannot determine currency setting for release: " + releaseURI);
+				code = "USD";
+			}
+			else {
+				code = code.toUpperCase(Locale.ROOT);
+			}
 		}
 		return code;
 	}
@@ -1001,24 +1033,18 @@ public final class Release {
 	 * @param releaseData raw release data
 	 */
 	private static DownloadType readDownloadType(ReleaseData releaseData) {
-		DownloadType result = DownloadType.UNAVAILABLE;
-		if (releaseData.downloadPref != null) {
-			switch (releaseData.downloadPref.intValue()) {
-			case 1:
-				result = DownloadType.FREE;
-				break;
-			case 2:
-				if (releaseData.minPrice != null && releaseData.minPrice.doubleValue() > 0.0)
-					result = DownloadType.PAID;
-				else {
-					result = releaseData.isSetPrice != null && releaseData.isSetPrice.intValue() == 1 
-							? DownloadType.PAID : DownloadType.NAME_YOUR_PRICE;
-				}
-				break;
-			default:
-			}
+		switch (asPrimitiveInt(releaseData.downloadPref)) {
+		case 1:
+			return DownloadType.FREE;
+		case 2:
+			if (asPrimitiveDouble(releaseData.minPrice) > 0.0)
+				return DownloadType.PAID;
+			else
+				return asPrimitiveInt(releaseData.isSetPrice) == 1 
+					? DownloadType.PAID : DownloadType.NAME_YOUR_PRICE;
+		default:
+			return DownloadType.UNAVAILABLE;
 		}
-		return result;
 	}
 
 
@@ -1029,13 +1055,15 @@ public final class Release {
 	 * 
 	 * @param releaseData raw release data
 	 * @param downloadType release download type
-	 * @param currencyCode a code for currency that is used for the release
+	 * @param currencyCode a code for currency that is used for release
 	 * @return release price in USD
 	 */
 	private static Price readPrice(ReleaseData releaseData, DownloadType downloadType, String currencyCode) {
 		Price price = Price.ZERO;
 		if (downloadType == DownloadType.PAID) {
-			double priceValue = releaseData.minPrice != null ? releaseData.minPrice.doubleValue() : 0.0;
+			double priceValue = asPrimitiveInt(releaseData.isSetPrice) == 1
+					? asPrimitiveDouble(releaseData.setPrice)
+					: asPrimitiveDouble(releaseData.minPrice);
 			if (!Double.isFinite(priceValue) || priceValue < 0.0)
 				priceValue = 0.0;
 
@@ -1044,10 +1072,42 @@ public final class Release {
 				return BigDecimal.ONE;
 			});
 
-			price = new Price(BigDecimal.valueOf(priceValue)
-						.multiply(rate).setScale(Price.SCALE, RoundingMode.HALF_UP));
+			price = Price.of(BigDecimal.valueOf(priceValue).multiply(rate));
 		}
 		return price;
+	}
+
+
+	/**
+	 * Converts given number to int, returning 0 if number is null.
+	 * 
+	 * @param number a number
+	 * @return value as int
+	 */
+	private static int asPrimitiveInt(Number number) {
+		return number != null ? number.intValue() : 0;
+	}
+
+
+	/**
+	 * Converts given number to double, returning 0.0 if number is null.
+	 * 
+	 * @param number a number
+	 * @return value as double
+	 */
+	private static double asPrimitiveDouble(Number number) {
+		return number != null ? number.doubleValue() : 0.0;
+	}
+
+
+	/**
+	 * Converts given number to float, returning 0.0f if number is null.
+	 * 
+	 * @param number a number
+	 * @return value as float
+	 */
+	private static float asPrimitiveFloat(Number number) {
+		return number != null ? number.floatValue() : 0.0f;
 	}
 
 
@@ -1088,7 +1148,7 @@ public final class Release {
 			while ((token = scan.findWithinHorizon(HTML_ESCAPE_CODE, 0)) != null) {
 				String code = token.substring(2, token.lastIndexOf(';'));
 				try {
-					// this won't work for anything beyond 0xFFFF, but still suitable
+					// This won't work for anything beyond 0xFFFF, but still suitable
 					// for bandcamp tags
 					s = s.replace(token, String.valueOf((char)Integer.parseInt(code)));
 				}
@@ -1189,10 +1249,9 @@ public final class Release {
 		}
 
 		// Track time
-		Number duration = trackInfo.duration;
-		float durationValue = duration != null ? duration.floatValue() : 0.0f;
-		if (!Float.isFinite(durationValue) || durationValue < 0.0f)
-			durationValue = 0.0f;
+		float duration = asPrimitiveFloat(trackInfo.duration);
+		if (!Float.isFinite(duration) || duration < 0.0f)
+			duration = 0.0f;
 
 		// Link to audio file
 		String fileLink = trackInfo.fileLink;
@@ -1224,7 +1283,7 @@ public final class Release {
 				trackInfo.index + 1,
 				Objects.toString(artist).trim(),
 				Objects.toString(title).trim(),
-				durationValue,
+				duration,
 				titleLink != null ? releaseDomain + titleLink : null,
 				fileLink);
 	}

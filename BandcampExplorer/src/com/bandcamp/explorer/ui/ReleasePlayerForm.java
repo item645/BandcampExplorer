@@ -1024,6 +1024,7 @@ class ReleasePlayerForm extends SplitPane {
 		info.append("PUBLISHED: ").append(release.publishDate()).append('\n');
 		info.append("RELEASED: ").append(release.releaseDate().map(LocalDate::toString).orElse("-")).append('\n');
 		info.append("DOWNLOAD TYPE: ").append(release.downloadType()).append('\n');
+		info.append("PRICE: ").append(release.price()).append('\n');
 		info.append("TIME: ").append(release.time()).append('\n');
 		info.append("TAGS: ").append(release.tagsString()).append('\n');
 		release.information().ifPresent(information -> info.append('\n').append(information).append('\n'));

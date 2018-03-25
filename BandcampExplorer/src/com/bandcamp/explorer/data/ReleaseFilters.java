@@ -86,6 +86,22 @@ public class ReleaseFilters {
 
 
 	/**
+	 * Returns a filter that matches only releases whose price satisfies
+	 * a condition: min >= price <= max.
+	 * If min is null, then only price <= to condition is checked. Likewise,
+	 * if max is null, then only min >= price condition is checked.
+	 * If both min and max values are null, then this filter will match any release.
+	 * If min is greater than max, then this filter won't match anything.
+	 * 
+	 * @param min min price
+	 * @param max max price
+	 */
+	public static Predicate<Release> byPrice(Price min, Price max) {
+		return release -> isBetween(release.price(), min, max);
+	}
+
+
+	/**
 	 * Returns a filter that matches only releases whose release date satisfies
 	 * a condition: from >= releaseDate <= to.
 	 * If from date is null, then only releaseDate <= to condition is checked. Likewise,
@@ -99,7 +115,7 @@ public class ReleaseFilters {
 	 * @param to date value that release date must be greater than or equal to
 	 */
 	public static Predicate<Release> byReleaseDate(LocalDate from, LocalDate to) {
-		return release -> isWithinDates(release.releaseDate().orElse(LocalDate.MIN), from, to);
+		return release -> isBetween(release.releaseDate().orElse(LocalDate.MIN), from, to);
 	}
 
 
@@ -115,17 +131,18 @@ public class ReleaseFilters {
 	 * @param to date value that publish date must be greater than or equal to
 	 */
 	public static Predicate<Release> byPublishDate(LocalDate from, LocalDate to) {
-		return release -> isWithinDates(release.publishDate(), from, to);
+		return release -> isBetween(release.publishDate(), from, to);
 	}
 
 
 	/**
-	 * Helper method to check that given date is contained within from and to date
-	 * on time scale.
+	 * Helper method to check that given comparable value is contained between two other
+	 * comparable values (inclusively).
 	 */
-	private static boolean isWithinDates(LocalDate date, LocalDate from, LocalDate to) {
-		int c1 = from != null ? from.compareTo(date) : 0;
-		int c2 = to != null ? to.compareTo(date) : 0;
+	private static <T extends Comparable<? super T>> boolean isBetween(T value, T from, T to) {
+		assert value != null;
+		int c1 = from != null ? from.compareTo(value) : 0;
+		int c2 = to != null ? to.compareTo(value) : 0;
 		return c1 <= 0 && c2 >= 0;
 	}
 

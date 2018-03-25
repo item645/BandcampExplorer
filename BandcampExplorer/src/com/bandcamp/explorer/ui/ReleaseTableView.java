@@ -4,6 +4,7 @@ import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -14,6 +15,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -43,7 +45,9 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
+import javafx.stage.Stage;
 
+import com.bandcamp.explorer.data.Price;
 import com.bandcamp.explorer.data.Release;
 import com.bandcamp.explorer.data.ReleaseFilters;
 import com.bandcamp.explorer.data.SearchType;
@@ -56,10 +60,13 @@ import com.bandcamp.explorer.util.ExceptionUnchecker;
  */
 class ReleaseTableView extends AnchorPane {
 
+	private final Stage primaryStage;
 	@FXML private TextField artistFilter;
 	@FXML private TextField titleFilter;
 	@FXML private TextField tagsFilter;
 	@FXML private TextField urlFilter;
+	@FXML private TextField minPriceFilter;
+	@FXML private TextField maxPriceFilter;
 	@FXML private DatePicker publishDateFilterFrom;
 	@FXML private DatePicker publishDateFilterTo;
 	@FXML private DatePicker releaseDateFilterFrom;
@@ -77,6 +84,7 @@ class ReleaseTableView extends AnchorPane {
 	@FXML private TableColumn<Release, String> titleColumn;
 	@FXML private TableColumn<Release, Time> timeColumn;
 	@FXML private TableColumn<Release, Release.DownloadType> dlTypeColumn;
+	@FXML private TableColumn<Release, Price> priceColumn;
 	@FXML private TableColumn<Release, LocalDate> releaseDateColumn;
 	@FXML private TableColumn<Release, LocalDate> publishDateColumn;
 	@FXML private TableColumn<Release, String> tagsColumn;
@@ -88,7 +96,7 @@ class ReleaseTableView extends AnchorPane {
 	 * to open resource stream every time when new table view is created to be
 	 * added on ResultsView tab.
 	 */
-	private static final ByteArrayInputStream FXML_STREAM = ExceptionUnchecker.uncheck(() -> {
+	private static final ByteArrayInputStream fxmlStream = ExceptionUnchecker.uncheck(() -> {
 		try (InputStream in = new BufferedInputStream(
 				ReleaseTableView.class.getResourceAsStream("ReleaseTableView.fxml"))) {
 			ByteArrayOutputStream out = new ByteArrayOutputStream(20480);
@@ -236,10 +244,12 @@ class ReleaseTableView extends AnchorPane {
 	/**
 	 * Creates an instance of release table view component.
 	 * 
+	 * @param primaryStage reference to app's primary stage
 	 * @param mainForm reference to app's main form
 	 * @param releasePlayer reference to a release player
 	 */
-	private ReleaseTableView(BandcampExplorerMainForm mainForm, ReleasePlayerForm releasePlayer) {
+	private ReleaseTableView(Stage primaryStage, BandcampExplorerMainForm mainForm, ReleasePlayerForm releasePlayer) {
+		this.primaryStage = primaryStage;
 		this.mainForm = mainForm;
 		this.releasePlayer = releasePlayer;
 	}
@@ -248,14 +258,17 @@ class ReleaseTableView extends AnchorPane {
 	/**
 	 * Creates an instance of release table view component.
 	 * 
+	 * @param primaryStage reference to app's primary stage
 	 * @param mainForm reference to app's main form
 	 * @param releasePlayer reference to a release player
 	 */
-	static ReleaseTableView create(BandcampExplorerMainForm mainForm, ReleasePlayerForm releasePlayer) {
+	static ReleaseTableView create(Stage primaryStage, BandcampExplorerMainForm mainForm, 
+			ReleasePlayerForm releasePlayer) {
+		assert primaryStage != null;
 		assert mainForm != null;
 		assert releasePlayer != null;
-		FXML_STREAM.reset();
-		return Utils.loadFXMLComponent(FXML_STREAM, () -> new ReleaseTableView(mainForm, releasePlayer));
+		fxmlStream.reset();
+		return Utils.loadFXMLComponent(fxmlStream, () -> new ReleaseTableView(primaryStage, mainForm, releasePlayer));
 	}
 
 
@@ -271,10 +284,23 @@ class ReleaseTableView extends AnchorPane {
 	 * Prepares a combined filter using conditions provided by filter fields,
 	 * composed by logical AND.
 	 * 
-	 * @return a filter
+	 * @return an Optional containing combined filter; empty Optional if filter can't be
+	 *         prepared because some filter fields contain illegal values
 	 */
-	private Predicate<Release> prepareFilter() {
+	private Optional<Predicate<Release>> prepareFilter() {
 		List<Predicate<Release>> filters = new ArrayList<>();
+
+		Price minPrice, maxPrice;
+		try {
+			minPrice = readFilterPrice(minPriceFilter, RoundingMode.UP, "Invalid min price");
+			maxPrice = readFilterPrice(maxPriceFilter, RoundingMode.DOWN, "Invalid max price");
+		}
+		catch (IllegalArgumentException e) {
+			// Exception already handled in readFilterPrice()
+			return Optional.empty();
+		}
+		if (minPrice != null || maxPrice != null)
+			filters.add(ReleaseFilters.byPrice(minPrice, maxPrice));
 
 		String artist = artistFilter.getText().trim();
 		if (!artist.isEmpty())
@@ -285,12 +311,12 @@ class ReleaseTableView extends AnchorPane {
 			filters.add(ReleaseFilters.titleContains(title));
 
 		String tags = tagsFilter.getText().trim();
-		if (!tags.isEmpty())
-			filters.add(ReleaseFilters.byTags(
-					Arrays.stream(tags.split(","))
+		if (!tags.isEmpty()) {
+			filters.add(ReleaseFilters.byTags(Arrays.stream(tags.split(","))
 					.map(tag -> tag.trim().toLowerCase(Locale.ENGLISH))
 					.filter(tag -> !tag.isEmpty())
 					.collect(Collectors.toSet())));
+		}
 
 		String url = urlFilter.getText().trim();
 		if (!url.isEmpty())
@@ -301,7 +327,35 @@ class ReleaseTableView extends AnchorPane {
 		filters.add(ReleaseFilters.byPublishDate(publishDateFilterFrom.getValue(), publishDateFilterTo.getValue()));
 		filters.add(ReleaseFilters.byReleaseDate(releaseDateFilterFrom.getValue(), releaseDateFilterTo.getValue()));
 
-		return filters.stream().reduce(ReleaseFilters.any(), (result, filter) -> result.and(filter));
+		return Optional.of(filters.stream().reduce(ReleaseFilters.any(), (result, filter) -> result.and(filter)));
+	}
+
+
+	/**
+	 * Reads the value of price filter from corresponding text field and
+	 * coverts it into an instance of Price.
+	 * This methods handles IllegalArgumentException thrown when string value of
+	 * price cannot be converted by displaying appropriate message dialog and
+	 * selecting field text. Handled exception then gets rethrown from the method.
+	 * 
+	 * @param field a text field containing the value of price filter
+	 * @param roundingMode rounding mode for value scaling
+	 * @param invalidPriceTitle a title for error message dialog when filter value is invalid
+	 * @return a Price instance; null, if value was not specified
+	 * @throws IllegalArgumentException if attempt to parse filter value was unsuccessful
+	 */
+	private Price readFilterPrice(TextField field, RoundingMode roundingMode, String invalidPriceTitle) {
+		String priceText = field.getText().trim();
+		try {
+			return !priceText.isEmpty() ? Price.parse(priceText, roundingMode) : null;
+		}
+		catch (IllegalArgumentException e) {
+			String message = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+			Dialogs.messageBox(message, invalidPriceTitle, primaryStage);
+			field.requestFocus();
+			field.selectAll();
+			throw e;
+		}
 	}
 
 
@@ -311,7 +365,7 @@ class ReleaseTableView extends AnchorPane {
 	 */
 	@FXML
 	private void applyFilter() {
-		filteredItems.setPredicate(prepareFilter());
+		prepareFilter().ifPresent(filteredItems::setPredicate);
 	}
 
 
@@ -325,6 +379,8 @@ class ReleaseTableView extends AnchorPane {
 		titleFilter.clear();
 		tagsFilter.clear();
 		urlFilter.clear();
+		minPriceFilter.clear();
+		maxPriceFilter.clear();
 		dlTypeFree.setSelected(true);
 		dlTypeNameYourPrice.setSelected(true);
 		dlTypePaid.setSelected(true);
@@ -458,7 +514,7 @@ class ReleaseTableView extends AnchorPane {
 		// adds a context menu to cells)
 		CellFactory<Release, String> tooltip = new CellFactory<>(
 				CellCustomizer.tooltip(), releaseTableContextMenu.customizer());
-		CellFactory<Release, LocalDate> centered = new CellFactory<>(
+		CellFactory<Release, LocalDate> centeredDate = new CellFactory<>(
 				CellCustomizer.alignment(Pos.CENTER), releaseTableContextMenu.customizer());
 
 		artistColumn.setComparator(String.CASE_INSENSITIVE_ORDER);
@@ -476,10 +532,14 @@ class ReleaseTableView extends AnchorPane {
 		dlTypeColumn.setCellFactory(new CellFactory<>(releaseTableContextMenu.customizer()));
 		dlTypeColumn.setCellValueFactory(cellData -> cellData.getValue().downloadTypeProperty());
 
-		releaseDateColumn.setCellFactory(centered);
+		priceColumn.setCellFactory(new CellFactory<>(
+				CellCustomizer.alignment(Pos.CENTER_RIGHT), releaseTableContextMenu.customizer()));
+		priceColumn.setCellValueFactory(cellData -> cellData.getValue().priceProperty());
+
+		releaseDateColumn.setCellFactory(centeredDate);
 		releaseDateColumn.setCellValueFactory(cellData -> cellData.getValue().releaseDateProperty());
 
-		publishDateColumn.setCellFactory(centered);
+		publishDateColumn.setCellFactory(centeredDate);
 		publishDateColumn.setCellValueFactory(cellData -> cellData.getValue().publishDateProperty());
 
 		tagsColumn.setCellFactory(tooltip);
@@ -501,7 +561,7 @@ class ReleaseTableView extends AnchorPane {
 			)
 		);
 		urlColumn.setCellValueFactory(cellData -> cellData.getValue().uriProperty());
-		// ignore protocol on sorting
+		// Ignore protocol on sorting
 		urlColumn.setComparator(Comparator.comparing(URI::getSchemeSpecificPart));
 
 		// Setting a callback to display an information about selected
@@ -543,6 +603,7 @@ class ReleaseTableView extends AnchorPane {
 		assert publishDateFilterTo != null : "fx:id=\"publishDateFilterTo\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert tagsColumn != null : "fx:id=\"tagsColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert dlTypeColumn != null : "fx:id=\"dlTypeColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
+		assert priceColumn != null : "fx:id=\"priceColumn\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert tagsFilter != null : "fx:id=\"tagsFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert dlTypePaid != null : "fx:id=\"dlTypePaid\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert urlFilter != null : "fx:id=\"urlFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
@@ -563,6 +624,8 @@ class ReleaseTableView extends AnchorPane {
 		assert artistFilter != null : "fx:id=\"artistFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert dlTypeFree != null : "fx:id=\"dlTypeFree\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 		assert applyFilter != null : "fx:id=\"applyFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
+		assert maxPriceFilter != null : "fx:id=\"maxPriceFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
+		assert minPriceFilter != null : "fx:id=\"minPriceFilter\" was not injected: check your FXML file 'ReleaseTableView.fxml'.";
 	}
 
 }

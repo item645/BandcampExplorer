@@ -22,6 +22,7 @@ import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.AnchorPane;
+import javafx.stage.Stage;
 
 import com.bandcamp.explorer.data.Release;
 import com.bandcamp.explorer.data.ReleaseSortOrder;
@@ -34,6 +35,7 @@ class ResultsView extends AnchorPane {
 
 	private static final Logger LOGGER = Logger.getLogger(ResultsView.class.getName());
 
+	private final Stage primaryStage;
 	private final BandcampExplorerMainForm mainForm;
 	private final ReleasePlayerForm releasePlayer;
 	private final TabPane tabPane = new TabPane();
@@ -51,7 +53,7 @@ class ResultsView extends AnchorPane {
 	 */
 	private class CombinedResultsTab extends Tab {
 
-		private final ReleaseTableView releaseTable = ReleaseTableView.create(mainForm, releasePlayer);
+		private final ReleaseTableView releaseTable = ReleaseTableView.create(primaryStage, mainForm, releasePlayer);
 		private final ObservableList<Release> combinedReleases = releaseTable.releases();
 		private final BooleanProperty visible = new SimpleBooleanProperty(false);
 
@@ -147,7 +149,8 @@ class ResultsView extends AnchorPane {
 	/**
 	 * Creates a results view component and provides its initial setup.
 	 */
-	private ResultsView(BandcampExplorerMainForm mainForm, ReleasePlayerForm releasePlayer) {
+	private ResultsView(Stage primaryStage, BandcampExplorerMainForm mainForm, ReleasePlayerForm releasePlayer) {
+		this.primaryStage = primaryStage;
 		this.mainForm = mainForm;
 		this.releasePlayer = releasePlayer;
 		this.combinedResultsTab = new CombinedResultsTab();
@@ -182,13 +185,15 @@ class ResultsView extends AnchorPane {
 	/**
 	 * Creates an instance of results view component.
 	 * 
+	 * @param primaryStage reference to app's primary stage
 	 * @param mainForm reference to app's main form
 	 * @param releasePlayer reference to a release player
 	 */
-	static ResultsView create(BandcampExplorerMainForm mainForm, ReleasePlayerForm releasePlayer) {
+	static ResultsView create(Stage primaryStage, BandcampExplorerMainForm mainForm, ReleasePlayerForm releasePlayer) {
+		assert primaryStage != null;
 		assert mainForm != null;
 		assert releasePlayer != null;
-		return new ResultsView(mainForm, releasePlayer);
+		return new ResultsView(primaryStage, mainForm, releasePlayer);
 	}
 
 
@@ -202,7 +207,7 @@ class ResultsView extends AnchorPane {
 			return;
 
 		Tab tab = new Tab("New search (" + ++tabIndex + ")");
-		tab.setContent(ReleaseTableView.create(mainForm, releasePlayer));
+		tab.setContent(ReleaseTableView.create(primaryStage, mainForm, releasePlayer));
 		tab.setOnCloseRequest(event -> {
 			if (isLastTab(tab))
 				selectionModel.selectPrevious();
