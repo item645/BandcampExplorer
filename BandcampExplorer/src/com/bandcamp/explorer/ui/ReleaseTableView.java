@@ -197,6 +197,10 @@ class ReleaseTableView extends AnchorPane {
 			// (same goes for copyAllURLs)
 			copyAllReleasesText.setOnAction(event -> Utils.toClipboardAsString(sortedItems, Release::toString, "\n"));
 
+			LabeledMenuItem copyDiscographyURL = new LabeledMenuItem("Copy Discography URL");
+			copyDiscographyURL.setOnAction(event -> ifReleaseSelected(
+					release -> Utils.toClipboardAsString(release.discographyURI())));
+
 			LabeledMenuItem copyAllURLs = new LabeledMenuItem("Copy All URLs");
 			copyAllURLs.setOnAction(event -> Utils.toClipboardAsString(
 					sortedItems, release -> release.uri().toString(), "\n"));
@@ -235,7 +239,7 @@ class ReleaseTableView extends AnchorPane {
 
 			menuItems.addAll(searchArtist, moreFromDomain, new SeparatorMenuItem(), viewOnBandcamp,
 					viewDiscogOnBandcamp, new SeparatorMenuItem(), copyText, copyReleaseText,
-					copyAllReleasesText, copyAllURLs, new SeparatorMenuItem(), playRelease);
+					copyAllReleasesText, copyDiscographyURL, copyAllURLs, new SeparatorMenuItem(), playRelease);
 		}
 
 	}

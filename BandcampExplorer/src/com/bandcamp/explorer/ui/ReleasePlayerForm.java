@@ -352,6 +352,10 @@ class ReleasePlayerForm extends SplitPane {
 			copyArtistTitle.setOnAction(event -> trackListView
 					.ifTrackSelected(track -> Utils.toClipboardAsString(track.artist() + " - " + track.title())));
 
+			LabeledMenuItem copyTrackURL = new LabeledMenuItem("Copy Track URL");
+			copyTrackURL.setOnAction(event -> trackListView
+					.ifTrackSelected(track -> track.link().ifPresent(Utils::toClipboardAsString)));
+
 			LabeledMenuItem copyAudioURL = new LabeledMenuItem("Copy Audio URL");
 			copyAudioURL.setOnAction(event -> trackListView
 					.ifTrackSelected(track -> track.fileLink().ifPresent(Utils::toClipboardAsString)));
@@ -408,7 +412,7 @@ class ReleasePlayerForm extends SplitPane {
 
 			menuItems.addAll(play, pause, stop, previous, next, new SeparatorMenuItem(),
 					searchArtist, new SeparatorMenuItem(), viewOnBandcamp, new SeparatorMenuItem(),
-					copyText, copyTrackText, copyAllTracksText, copyArtistTitle, copyAudioURL);
+					copyText, copyTrackText, copyAllTracksText, copyArtistTitle, copyTrackURL, copyAudioURL);
 		}
 
 
@@ -1179,6 +1183,10 @@ class ReleasePlayerForm extends SplitPane {
 		LabeledMenuItem copyURL = new LabeledMenuItem("Copy URL");
 		copyURL.setOnAction(event -> release.ifPresent(release -> Utils.toClipboardAsString(release.uri())));
 
+		LabeledMenuItem copyDiscographyURL = new LabeledMenuItem("Copy Discography URL");
+		copyDiscographyURL.setOnAction(event -> release.ifPresent(
+				release -> Utils.toClipboardAsString(release.discographyURI())));
+
 		ObservableList<MenuItem> menuItems = moreActionsMenu.getItems();
 
 		moreActionsMenu.showingProperty().addListener((observable, oldValue, newValue) -> {
@@ -1205,7 +1213,7 @@ class ReleasePlayerForm extends SplitPane {
 		});
 
 		menuItems.addAll(searchArtist, moreFromDomain, new SeparatorMenuItem(),
-				copyReleaseText, copyURL);
+				copyReleaseText, copyURL, copyDiscographyURL);
 	}
 
 
