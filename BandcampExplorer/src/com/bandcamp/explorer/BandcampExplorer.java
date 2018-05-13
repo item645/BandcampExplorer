@@ -38,7 +38,7 @@ public final class BandcampExplorer extends Application {
 	/**
 	 * App title with current version number
 	 */
-	private static final String APP_TITLE = "Bandcamp Explorer 0.3.7";
+	private static final String APP_TITLE = "Bandcamp Explorer 0.3.8";
 
 	/**
 	 * A reference to app's top level stage.

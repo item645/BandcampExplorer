@@ -1,6 +1,9 @@
 package com.bandcamp.explorer.data;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URL;
 import java.util.Locale;
 
 /**
@@ -16,7 +19,7 @@ public enum SearchType {
 	 * Note that for this search type it is not guaranteed that <b>all</b> relevant
 	 * results will be returned.
 	 */
-	SEARCH(true) {
+	SEARCH (true) {
 		@Override
 		Resource loadResource(String query, int pageNum, SearchTask parentTask) throws IOException {
 			if (pageNum < 1)
@@ -42,7 +45,7 @@ public enum SearchType {
 	 * maximum number of tag pages Bandcamp will return is 10, so setting pages parameter
 	 * to numbers > 10 makes no sense.
 	 */
-	TAG(true) {
+	TAG (true) {
 		@Override
 		Resource loadResource(String query, int pageNum, SearchTask parentTask) throws IOException {
 			if (pageNum < 1)
@@ -68,14 +71,43 @@ public enum SearchType {
 	 * must be specified. 
 	 * The pageNum parameter is ignored for this search type.
 	 */
-	DIRECT(false) {
+	DIRECT (false) {
 		@Override
 		Resource loadResource(String query, int pageNum, SearchTask parentTask) throws IOException {
-			String url = query.toLowerCase(Locale.ROOT);
-			if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("file://"))
-				url = "http://" + url;
+			int i = query.indexOf(':');
+			String protocol = i > -1 ? query.substring(0, i).toLowerCase(Locale.ROOT) : "";
+
+			String url;
+			if (protocol.equals("https") || protocol.equals("http"))
+				url = query.toLowerCase(Locale.ROOT);
+			else if (protocol.equals("file")) {
+				checkFilePath(new URL(query).getPath());
+				url = query;
+			}
+			else if (protocol.isEmpty())
+				url = "http://" + query;
+			else
+				throw new IllegalArgumentException('"' + protocol + "\" protocol is not supported");
+
 			return new Resource(url, parentTask);
 		}
+
+		/**
+		 * Checks file path for validity. 
+		 * 
+		 * @param filePath file path to check
+		 * @throws IllegalArgumentException if file path is empty or points to a directory
+		 * @throws FileNotFoundException if such file does not exist 
+		 */
+		private void checkFilePath(String filePath) throws FileNotFoundException {
+			if (filePath.isEmpty())
+				throw new IllegalArgumentException("File path is empty");
+			File file = new File(filePath);
+			if (!file.exists())
+				throw new FileNotFoundException("File does not exist: " + filePath);
+			if (file.isDirectory())
+				throw new IllegalArgumentException("File path is a directory: " + filePath);
+		}		
 	};
 
 
@@ -106,8 +138,9 @@ public enum SearchType {
 	 * @param parentTask an instance of SearchTask that requests resource loading
 	 * @return an instantiated Resource object
 	 * @throws IOException if resource cannot be loaded for some reason
-	 * @throws NullPointerException if s or parentTask is null
-	 * @throws IllegalArgumentException if pagesNum <= 0 (not thrown if search type is DIRECT)
+	 * @throws NullPointerException if query or parentTask is null
+	 * @throws IllegalArgumentException generally thrown if some parameters are not
+	 *         valid (the validity is implementation-dependent)
 	 */
 	abstract Resource loadResource(String query, int pageNum, SearchTask parentTask) throws IOException;
 
