@@ -498,6 +498,7 @@ public final class Release {
 		final String freeDownloadPage;
 		final String albumURL;
 		final String currency;
+		final String packageDescription;
 		final Number artId;
 		final Number downloadPref;
 		final Number minPrice;
@@ -551,7 +552,10 @@ public final class Release {
 				releaseDate      = readDate("album_release_date", null);
 				publishDate      = readDate("current.publish_date", LocalDate.MIN);
 
-				currency = hasPackages() ? read("packages[0].currency") : null;
+				boolean hasPackages = read("packages") != null && asPrimitiveInt(read("packages.length")) > 0;
+
+				currency = hasPackages ? read("packages[0].currency") : null;
+				packageDescription = readPackageDescription(hasPackages);
 
 				tracks = readTracks();
 			}
@@ -559,10 +563,18 @@ public final class Release {
 
 
 		/**
-		 * Returns true if JSON contains non-empty packages array. 
+		 * Reads release desription from packages structure.
+		 * 
+		 * @param hasPackages indicates whether JSON contains non-empty packages array
+		 * @return release desription
 		 */
-		private boolean hasPackages() {
-			return read("packages") != null && asPrimitiveInt(read("packages.length")) > 0;
+		private String readPackageDescription(boolean hasPackages) {
+			if (!hasPackages)
+				return null;
+			String description = read("packages[0].description");
+			if (description == null || description.trim().isEmpty())
+				description = read("packages[0].desc_pt1");
+			return description;
 		}
 
 
@@ -854,7 +866,7 @@ public final class Release {
 			tags = readTags(input);
 			tagsString = createStringProperty(tags.stream().collect(Collectors.joining(", ")));
 
-			information = Objects.toString(releaseData.about, "").trim();
+			information = readInformation(releaseData);
 			credits = Objects.toString(releaseData.credits, "").trim();
 
 			downloadLink = releaseData.freeDownloadPage;
@@ -1108,6 +1120,21 @@ public final class Release {
 	 */
 	private static float asPrimitiveFloat(Number number) {
 		return number != null ? number.floatValue() : 0.0f;
+	}
+
+
+	/**
+	 * Reads information about the release from release data.
+	 * 
+	 * @param releaseData raw release data
+	 * @return string with information about the release; if there's no information,
+	 *         returns empty string
+	 */
+	private static String readInformation(ReleaseData releaseData) {
+		String information = Objects.toString(releaseData.about, "").trim();
+		return !information.isEmpty() 
+				? information
+				: Objects.toString(releaseData.packageDescription, "").trim();
 	}
 
 
