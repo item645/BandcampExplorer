@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -82,9 +83,9 @@ public final class Release {
 	private static final Pattern CURRENCY_DATA_PATTERN = Pattern.compile("var CurrencyData = \\{.+?\\};", DOTALL);
 
 	/**
-	 * Pattern for locating currency setting for release in currency data JSON. 
+	 * Pattern for locating currency code setting for release in data-band-currency attribute.
 	 */
-	private static final Pattern CURRENCY_CODE_SETTING_PATTERN = Pattern.compile("\"setting\":\"([a-zA-Z]{3})\"");
+	private static final Pattern CURRENCY_CODE_SETTING_PATTERN = Pattern.compile("data-band-currency=\"([a-zA-Z]{3})\"");
 
 	/**
 	 * Pattern for locating tags.
@@ -652,11 +653,15 @@ public final class Release {
 
 
 	/**
-	 * Contains exchange rate data obtained from release page source on first release load
-	 * and used for converting release price to USD.
+	 * Contains exchange rate data obtained from Bandcamp API on first release load
+	 * and used for converting each release price to USD.
 	 * The data is initialized only once and then reused.
+	 * Exchange rate data is the same for all releases
 	 */
 	private static class ExchangeRate {
+
+		private static final String EXCHANGE_RATE_DATA_API_URL 
+			= "https://bandcamp.com/api/currency_data/1/javascript?when=%d";
 
 		private final Map<String, BigDecimal> rates = new HashMap<>();
 		private volatile boolean initialized;
@@ -671,16 +676,14 @@ public final class Release {
 
 
 		/**
-		 * Initializes exchange rates using raw source data in JSON format. 
+		 * Initializes exchange rates by loading and interpreting raw exchange rate data from Bandcamp API. 
 		 * 
-		 * @param jsonData source exchange rate data in JSON format
-		 * @param releaseURI a URI of release
-		 * @throws IllegalArgumentException if source data is not valid and its processing
+		 * @throws ReleaseLoadingException if source data is not valid and its processing
 		 *         has resulted in unrecoverable error
 		 */
-		synchronized void initialize(String jsonData, URI releaseURI) {
+		synchronized void initialize() throws ReleaseLoadingException {
 			if (!initialized) {
-				doInitialize(jsonData, releaseURI);
+				doInitialize();
 				initialized = true;
 				LOGGER.fine("Loaded exchange rates for " + rates.size() + " currencies");
 			}
@@ -688,22 +691,46 @@ public final class Release {
 
 
 		/**
+		 * Loads raw exchange rate data from Bandcamp API.
+		 * 
+		 * @return raw exchange rate data as string
+		 * @throws ReleaseLoadingException if exchange rate data not found or could not be loaded
+		 */
+		private static String loadExchangeRateData() throws ReleaseLoadingException {
+			String exchangeRateDataURL = String.format(EXCHANGE_RATE_DATA_API_URL, 
+					TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis()));
+			LOGGER.fine("Loading exchange rate data from " + exchangeRateDataURL);
+			try {
+				HttpURLConnection connection = URLConnectionHelper.getConnection(new URL(exchangeRateDataURL));
+				String exchangeRateData;
+				try (Scanner input = new Scanner(connection.getInputStream(), StandardCharsets.UTF_8.name())) {
+					exchangeRateData = input.findWithinHorizon(CURRENCY_DATA_PATTERN, 0);
+					if (exchangeRateData != null)
+						return exchangeRateData;
+					else
+						throw new ReleaseLoadingException("Exchange rate data not found");
+				}
+			}
+			catch (IOException e) {
+				throw new ReleaseLoadingException(e);
+			}
+		}
+
+
+		/**
 		 * Performs the initialization of exchange rates.
 		 * 
-		 * @param jsonData source exchange rate data in JSON format
-		 * @param releaseURI a URI of release
-		 * @throws IllegalArgumentException if source data is not valid and its processing
+		 * @throws ReleaseLoadingException if source data is not valid and its processing
 		 *         has resulted in unrecoverable error
 		 */
-		private void doInitialize(String jsonData, URI releaseURI) {
-			assert jsonData != null;
-			assert releaseURI != null;
+		private void doInitialize() throws ReleaseLoadingException {
+			String exchangeRateData = loadExchangeRateData();
 
 			JavaScriptHelper JS = new JavaScriptHelper();
-			JS.setErrorHandler(exception -> logDataError(exception, releaseURI));
+			JS.setErrorHandler(exception -> logDataError(exception));
 
 			try {
-				JS.execute(jsonData, "var codes = Object.keys(CurrencyData.rates)");
+				JS.execute(exchangeRateData, "var codes = Object.keys(CurrencyData.rates)");
 				int codesLength = JS.<Number>evaluate("codes.length").intValue();
 				for (int i = 0; i < codesLength; i++) {
 					String code = JS.evaluate("codes[" + i + "]");
@@ -719,7 +746,7 @@ public final class Release {
 				}
 			}
 			catch (ScriptException | NullPointerException e) {
-				throw new IllegalArgumentException(e);
+				throw new ReleaseLoadingException(e);
 			}
 		}
 
@@ -739,11 +766,9 @@ public final class Release {
 		 * Logs errors encountered during the processing of exchange rate data.
 		 * 
 		 * @param e relevant exception
-		 * @param releaseURI release URI
 		 */
-		private static void logDataError(Exception e, URI releaseURI) {
-			LOGGER.log(Level.WARNING, "Error processing exchange rate data for release: " 
-					+ releaseURI + " (" + e.getMessage() + ")", e);
+		private static void logDataError(Exception e) {
+			LOGGER.log(Level.WARNING, "Error processing exchange rate data", e);
 		}
 
 	}
@@ -829,23 +854,14 @@ public final class Release {
 			throw new ReleaseLoadingException(e);
 		}
 
+		// One-time static initialization of exchange rates
+		if (!exchangeRate.isInitialized())
+			exchangeRate.initialize();
+
 		try (Scanner input = new Scanner(connection.getInputStream(), StandardCharsets.UTF_8.name())) {
+			String currencyCodeSetting = readCurrencyCodeSetting(input);
 			String pageDataCurrencyCode = readPageDataCurrencyCode(input);
 			ReleaseData releaseData = readReleaseData(input, uri);
-
-			String currencyDataJSON = null;
-			// One-time initialization of exchange rates using currency data obtained
-			// from the page.
-			// Exchange rate data is the same for all release pages.
-			if (!exchangeRate.isInitialized()) {
-				currencyDataJSON = readCurrencyDataJSON(input);
-				try {
-					exchangeRate.initialize(currencyDataJSON, uri);
-				}
-				catch (IllegalArgumentException e) {
-					throw new ReleaseLoadingException("Failed to process exchange rate data", e);
-				}
-			}
 
 			this.uri = createObjectProperty(uri);
 
@@ -854,7 +870,7 @@ public final class Release {
 
 			downloadType = createObjectProperty(readDownloadType(releaseData));
 
-			String releaseCurrencyCode = readCurrencyCode(input, releaseData, currencyDataJSON,
+			String releaseCurrencyCode = readCurrencyCode(input, releaseData, currencyCodeSetting,
 					pageDataCurrencyCode, uri);
 			price = createObjectProperty(readPrice(releaseData, downloadType.get(), releaseCurrencyCode));
 
@@ -985,17 +1001,16 @@ public final class Release {
 
 
 	/**
-	 * Reads currency data in JSON format from input source.
+	 * Reads currency code setting for release from data-band-currency attribute.
 	 * 
 	 * @param input input source
-	 * @return currency data in JSON format
-	 * @throws ReleaseLoadingException if currency data was not found
+	 * @return currency code; null if code was not found
 	 */
-	private static String readCurrencyDataJSON(Scanner input) throws ReleaseLoadingException {
-		String currencyDataJSON = input.findWithinHorizon(CURRENCY_DATA_PATTERN, 0);
-		if (currencyDataJSON == null)
-			throw new ReleaseLoadingException("Currency data not found");
-		return currencyDataJSON;
+	private static String readCurrencyCodeSetting(Scanner input) {
+		String settingAttr = input.findWithinHorizon(CURRENCY_CODE_SETTING_PATTERN, 0);
+		return settingAttr != null 
+				? settingAttr.substring(settingAttr.length() - 4, settingAttr.length() - 1)
+				: null;
 	}
 
 
@@ -1003,31 +1018,24 @@ public final class Release {
 	 * Determines the currency code for release using different sources.
 	 * If currency code was defined in pagedata element, this code is used. Otherwise, currency
 	 * code is taken from packages list in release data or (if there are no packages) from
-	 * currency data JSON
+	 * data-band-currency attribute.
 	 * 
 	 * @param input input source
 	 * @param releaseData raw release data
-	 * @param currencyDataJSON currency data in JSON format
+	 * @param currencyCodeSetting currency code setting for release
 	 * @param pageDataCurrencyCode currency code obtained from pagedata element
 	 * @param releaseURI a URI of this release
 	 * @return currency code for the release or "USD", if currency code was not found
-	 * @throws ReleaseLoadingException if currency data JSON parameter was null and on attempt
-	 *         to read the data from input source it was not found
 	 */
-	private static String readCurrencyCode(Scanner input, ReleaseData releaseData, String currencyDataJSON,
-			String pageDataCurrencyCode, URI releaseURI) throws ReleaseLoadingException {
+	private static String readCurrencyCode(Scanner input, ReleaseData releaseData, String currencyCodeSetting,
+			String pageDataCurrencyCode, URI releaseURI) {
 		String code = pageDataCurrencyCode;
 		if (code == null) {
 			code = Objects.toString(releaseData.currency, "");
+			if (code.isEmpty())
+				code = Objects.toString(currencyCodeSetting, "");
 			if (code.isEmpty()) {
-				if (currencyDataJSON == null)
-					currencyDataJSON = readCurrencyDataJSON(input);
-				Matcher matcher = CURRENCY_CODE_SETTING_PATTERN.matcher(currencyDataJSON);
-				code = matcher.find() ? Objects.toString(matcher.group(1), "") : "";
-			}
-
-			if (code.isEmpty()) {
-				LOGGER.warning("Cannot determine currency setting for release: " + releaseURI);
+				LOGGER.warning("Cannot determine currency code for release: " + releaseURI);
 				code = "USD";
 			}
 			else {
