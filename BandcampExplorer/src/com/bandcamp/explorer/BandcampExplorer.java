@@ -36,9 +36,9 @@ public final class BandcampExplorer extends Application {
 	private static final Logger LOGGER = Logger.getLogger(BandcampExplorer.class.getPackage().getName());
 
 	/**
-	 * App title with current version number
+	 * App title.
 	 */
-	private static final String APP_TITLE = "Bandcamp Explorer 0.3.8";
+	private static final String APP_TITLE = "Bandcamp Explorer";
 
 	/**
 	 * A reference to app's top level stage.
