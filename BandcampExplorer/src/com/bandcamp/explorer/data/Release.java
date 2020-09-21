@@ -1448,7 +1448,7 @@ public final class Release {
 	 * @param input input source
 	 */
 	private static String readArtworkLink(ReleaseData releaseData, Scanner input) {
-		String artId = Objects.toString(releaseData.artId, "");
+		String artId = releaseData.artId != null ? Long.toString(releaseData.artId.longValue()) : "";
 		if (artId.isEmpty())
 			return null;
 
