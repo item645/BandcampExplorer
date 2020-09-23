@@ -848,7 +848,7 @@ public final class Release {
 	private Release(URI uri) throws ReleaseLoadingException {
 		HttpURLConnection connection;
 		try {
-			connection = URLConnectionHelper.getConnection(uri);
+			connection = URLConnectionHelper.getConnection(uri, true);
 		}
 		catch (Exception e) {
 			throw new ReleaseLoadingException(e);

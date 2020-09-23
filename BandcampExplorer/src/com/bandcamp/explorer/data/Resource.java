@@ -66,7 +66,7 @@ class Resource {
 		if (parentTask.isCancelled())
 			return;
 
-		URLConnection connection = URLConnectionHelper.getConnection(url);
+		URLConnection connection = URLConnectionHelper.getConnection(url, true);
 		try (Scanner input = new Scanner(connection.getInputStream(),
 				StandardCharsets.UTF_8.name())) {
 			url = connection.getURL(); // effective url
