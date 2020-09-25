@@ -60,9 +60,9 @@ public final class Release {
 
 	/**
 	 * Pattern to locate a release data within HTML page. The data is defined in JSON format
-	 * and assigned to TralbumData JavaScript variable.
+	 * and assigned to data-tralbum attribute of script HTML element.
 	 */
-	private static final Pattern RELEASE_DATA_PATTERN = Pattern.compile("var TralbumData = \\{.+?\\};", DOTALL);
+	private static final Pattern RELEASE_DATA_PATTERN = Pattern.compile("data-tralbum=\"\\{.+?\\}\"", DOTALL);
 
 	/**
 	 * Pattern for locating the content of pagedata element.
@@ -77,8 +77,8 @@ public final class Release {
 			Pattern.compile("currency&quot;:&quot;([a-zA-Z]{3})&quot;");
 
 	/**
-	 * Pattern to locate a currency data within HTML page. The data is defined in JSON format
-	 * and assigned to CurrencyData JavaScript variable.
+	 * Pattern to locate a currency data within the JS source obtained from Bandcamp API.
+	 * The data is defined in JSON format and assigned to CurrencyData JavaScript variable.
 	 */
 	private static final Pattern CURRENCY_DATA_PATTERN = Pattern.compile("var CurrencyData = \\{.+?\\};", DOTALL);
 
@@ -157,7 +157,7 @@ public final class Release {
 	private static final Pattern HTML_ESCAPE_CODE = Pattern.compile("&#\\d+;");
 
 	/**
-	 * Some mappings for HTML escape chars to use in tags unescaping operation.
+	 * Some mappings for HTML escape chars to use in unescaping operation.
 	 */
 	private static final Map<String, String> HTML_SPECIALS;
 	static {
@@ -388,7 +388,7 @@ public final class Release {
 
 	/**
 	 * A helper class wrapping the functionality of built-in JavaScript interpreter.
-	 * It is used for processing JSON data obtained from release page source.
+	 * It is used for processing chunks of JS and JSON data obtained from release page source.
 	 * 
 	 * Instances of this class are not thread safe and must be confined to a single
 	 * thread or (in case of multithreaded access) used with proper synchronization.
@@ -697,14 +697,13 @@ public final class Release {
 		 * @throws ReleaseLoadingException if exchange rate data not found or could not be loaded
 		 */
 		private static String loadExchangeRateData() throws ReleaseLoadingException {
-			String exchangeRateDataURL = String.format(EXCHANGE_RATE_DATA_API_URL, 
-					TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis()));
+			long now = TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis());
+			String exchangeRateDataURL = String.format(EXCHANGE_RATE_DATA_API_URL, now);
 			LOGGER.fine("Loading exchange rate data from " + exchangeRateDataURL);
 			try {
 				HttpURLConnection connection = URLConnectionHelper.getConnection(new URL(exchangeRateDataURL));
-				String exchangeRateData;
 				try (Scanner input = new Scanner(connection.getInputStream(), StandardCharsets.UTF_8.name())) {
-					exchangeRateData = input.findWithinHorizon(CURRENCY_DATA_PATTERN, 0);
+					String exchangeRateData = input.findWithinHorizon(CURRENCY_DATA_PATTERN, 0);
 					if (exchangeRateData != null)
 						return exchangeRateData;
 					else
@@ -860,13 +859,13 @@ public final class Release {
 
 		try (Scanner input = new Scanner(connection.getInputStream(), StandardCharsets.UTF_8.name())) {
 			String currencyCodeSetting = readCurrencyCodeSetting(input);
-			String pageDataCurrencyCode = readPageDataCurrencyCode(input);
 			ReleaseData releaseData = readReleaseData(input, uri);
+			String pageDataCurrencyCode = readPageDataCurrencyCode(input);
 
 			this.uri = createObjectProperty(uri);
 
-			artist = createStringProperty(Objects.toString(releaseData.artist).trim());
-			title = createStringProperty(Objects.toString(releaseData.title).trim());
+			artist = createStringProperty(unescape(Objects.toString(releaseData.artist).trim()));
+			title = createStringProperty(unescape(Objects.toString(releaseData.title).trim()));
 
 			downloadType = createObjectProperty(readDownloadType(releaseData));
 
@@ -883,7 +882,7 @@ public final class Release {
 			tagsString = createStringProperty(tags.stream().collect(Collectors.joining(", ")));
 
 			information = readInformation(releaseData);
-			credits = Objects.toString(releaseData.credits, "").trim();
+			credits = unescape(Objects.toString(releaseData.credits, "").trim());
 
 			downloadLink = releaseData.freeDownloadPage;
 			String domain = domainFromURI(uri);
@@ -955,7 +954,7 @@ public final class Release {
 
 
 	/**
-	 * Performs reading and parsing of release data from JSON data cotained in page source.
+	 * Performs locating and parsing of release data from JSON cotained in page source.
 	 * 
 	 * @param input input source
 	 * @param releaseURI a URI of this release
@@ -967,6 +966,10 @@ public final class Release {
 		String releaseJSON = input.findWithinHorizon(RELEASE_DATA_PATTERN, 0);
 		if (releaseJSON == null)
 			throw new ReleaseLoadingException("Release data not found");
+
+		releaseJSON = releaseJSON.replace("&quot;", "\"");
+		releaseJSON = releaseJSON.replace("data-tralbum=\"", "var TralbumData=");
+		releaseJSON = releaseJSON.substring(0, releaseJSON.length() - 1);
 
 		ReleaseData releaseData;
 		try {
@@ -1139,10 +1142,10 @@ public final class Release {
 	 *         returns empty string
 	 */
 	private static String readInformation(ReleaseData releaseData) {
-		String information = Objects.toString(releaseData.about, "").trim();
+		String information = unescape(Objects.toString(releaseData.about, "").trim());
 		return !information.isEmpty() 
 				? information
-				: Objects.toString(releaseData.packageDescription, "").trim();
+				: unescape(Objects.toString(releaseData.packageDescription, "").trim());
 	}
 
 
@@ -1183,8 +1186,7 @@ public final class Release {
 			while ((token = scan.findWithinHorizon(HTML_ESCAPE_CODE, 0)) != null) {
 				String code = token.substring(2, token.lastIndexOf(';'));
 				try {
-					// This won't work for anything beyond 0xFFFF, but still suitable
-					// for bandcamp tags
+					// This won't work for anything beyond 0xFFFF, but should be enough for release text data
 					s = s.replace(token, String.valueOf((char)Integer.parseInt(code)));
 				}
 				catch (NumberFormatException ignored) {} // if we can't convert the code, leave it as it is
@@ -1240,7 +1242,7 @@ public final class Release {
 		assert releaseURI != null;
 
 		// Trying to figure out correct artist and title
-		String artistTitle = trackInfo.title;
+		String artistTitle = unescape(trackInfo.title);
 		String titleLink = trackInfo.titleLink;
 		String artist = releaseArtist;
 		String title = artistTitle;
