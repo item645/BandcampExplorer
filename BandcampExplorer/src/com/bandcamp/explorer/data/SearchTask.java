@@ -5,11 +5,8 @@ import static java.net.HttpURLConnection.HTTP_UNAVAILABLE;
 import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorCompletionService;
@@ -37,15 +34,6 @@ public final class SearchTask extends Task<SearchResult> {
 
 	private static final int MAX_RELEASE_LOAD_ATTEMPTS = 4;
 	private static final int PAUSE_MLS_ON_SERVER_OVERLOAD = 5000;
-
-	private static final Map<Integer, String> HTTP_SPECIAL_STATUS;
-	static {
-		Map<Integer, String> specials = new HashMap<>();
-		specials.put(HTTP_NOT_FOUND,         "HTTP 404: Not Found");
-		specials.put(HTTP_TOO_MANY_REQUESTS, "HTTP 429: Too Many Requests");
-		specials.put(HTTP_UNAVAILABLE,       "HTTP 503: Service Unavailable");
-		HTTP_SPECIAL_STATUS = Collections.unmodifiableMap(specials);
-	}
 
 	private final Object pauseLock = new Object();
 	private volatile boolean paused = false;
@@ -188,7 +176,7 @@ public final class SearchTask extends Task<SearchResult> {
 						// high load that we have probably imposed on Bandcamp server.
 						// At the moment Bandcamp does not return Retry-After header
 						// so we use default timeout value to wait.
-						LOGGER.warning(String.format(message, uri, HTTP_SPECIAL_STATUS.get(responseCode)));
+						LOGGER.warning(String.format(message, uri, getSpecialHttpStatus(responseCode)));
 						pause(PAUSE_MLS_ON_SERVER_OVERLOAD); // let Bandcamp server cool down a bit
 						if (loader.attempts() <= MAX_RELEASE_LOAD_ATTEMPTS) {
 							// If we haven't yet exceeded max load attempts for this release loader,
@@ -198,7 +186,7 @@ public final class SearchTask extends Task<SearchResult> {
 						}
 						break;
 					case HTTP_NOT_FOUND:
-						LOGGER.warning(String.format(message, uri, HTTP_SPECIAL_STATUS.get(responseCode)));
+						LOGGER.warning(String.format(message, uri, getSpecialHttpStatus(responseCode)));
 						break;
 					default:
 						// For other errors log both exception and message
@@ -215,6 +203,23 @@ public final class SearchTask extends Task<SearchResult> {
 
 		releases.sort(searchParams.sortOrder());
 		return new SearchResult(releases, failed, searchParams);
+	}
+
+
+	/**
+	 * Returns textual status description for given HTTP error code.
+	 */
+	private static String getSpecialHttpStatus(int statusCode) {
+		switch (statusCode) {
+		case HTTP_NOT_FOUND:
+			return "HTTP 404: Not Found";
+		case HTTP_TOO_MANY_REQUESTS:
+			return "HTTP 429: Too Many Requests";
+		case HTTP_UNAVAILABLE:
+			return "HTTP 503: Service Unavailable";
+		default:
+			return Integer.toString(statusCode);
+		}
 	}
 
 
