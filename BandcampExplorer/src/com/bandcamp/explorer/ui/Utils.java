@@ -5,6 +5,7 @@ import java.net.URI;
 import java.net.URL;
 import java.util.Collection;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.DoubleSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -111,6 +112,15 @@ class Utils {
 	 */
 	static void browse(String urlStr) {
 		BandcampExplorer.hostServices().showDocument(Objects.requireNonNull(urlStr));
+	}
+
+
+	/**
+	 * Returns an Optional with the plain text string from system clipboard
+	 * or empty Optional if clipboard does not contain text data.
+	 */
+	static Optional<String> getClipboardString() {
+		return Optional.ofNullable(Clipboard.getSystemClipboard().getString());
 	}
 
 

@@ -21,7 +21,7 @@
                <children>
                   <HBox spacing="5.0">
                      <children>
-                        <Button fx:id="loadReleaseButton" mnemonicParsing="false" onAction="#loadRelease" onKeyPressed="#runButtonActionOnEnter" text="Load Release...">
+                        <Button fx:id="loadReleaseButton" mnemonicParsing="false" onAction="#loadReleaseFromDialog" onKeyPressed="#runButtonActionOnEnter" text="Load Release...">
                            <font>
                               <Font size="12.0" />
                            </font>

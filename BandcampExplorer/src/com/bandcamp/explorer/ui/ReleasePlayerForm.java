@@ -1,6 +1,8 @@
 package com.bandcamp.explorer.ui;
 
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -9,6 +11,10 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -25,6 +31,8 @@ import javafx.beans.value.ChangeListener;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.SortedList;
+import javafx.concurrent.Task;
+import javafx.event.EventHandler;
 import javafx.event.EventTarget;
 import javafx.fxml.FXML;
 import javafx.scene.Parent;
@@ -47,6 +55,8 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.media.Media;
@@ -112,6 +122,7 @@ class ReleasePlayerForm extends SplitPane {
 	private final TrackListContextMenu trackListContextMenu = new TrackListContextMenu();
 	private final AudioPlayer audioPlayer = new AudioPlayer();
 	private final ReleaseProperty release = new ReleaseProperty();
+	private final ReleaseUrlLoader releaseUrlLoader = new ReleaseUrlLoader();
 
 
 	/**
@@ -163,6 +174,117 @@ class ReleasePlayerForm extends SplitPane {
 		 */
 		boolean valueEquals(Release otherRelease) {
 			return Objects.equals(get(), otherRelease);
+		}
+
+	}
+
+
+	/**
+	 * A loader that performs asynchronous loading of the release from the specified URL 
+	 * and sets it for playback in audio player.
+	 */
+	private class ReleaseUrlLoader {
+
+		private final ExecutorService executor = Executors.newSingleThreadExecutor(task -> {
+			Thread t = new Thread(task);
+			t.setDaemon(true);
+			return t;
+		});
+
+
+		/**
+		 * Prompts user to enter a URL to a release, loads the release using supplied
+		 * URL and sets it to play in audio player.
+		 * If there's an error loading release, displays message box with information
+		 * about error.
+		 * If empty URL was supplied or cancel pressed, does nothing.
+		 * In case supplied URL is malformed, does nothing visually but records an 
+		 * error message in event log. 
+		 */
+		void loadFromDialog() {
+			load(Dialogs.inputBox("Enter a release URL to load:", "Load Release", stage));
+		}
+
+
+		/**
+		 * Obtains release URL from system clipboard, loads the release using supplied
+		 * URL and sets it to play in audio player.
+		 * If there's an error loading release, displays message box with information
+		 * about error.
+		 * If clipboard does not contain text data, does nothing.
+		 * In case supplied URL is malformed, does nothing visually but records an 
+		 * error message in event log. 
+		 */
+		void loadFromClipboard() {
+			load(Utils.getClipboardString());
+		}
+
+
+		/**
+		 * Asynchronously loads the release if supplied Optional contains an URL.
+		 */
+		private void load(Optional<String> maybeURL) {
+			maybeURL.map(this::prepareURL).ifPresent(url -> executor.submit(createReleaseLoaderTask(url)));
+		}
+
+
+		/**
+		 * Prepares an URL, lowercasing and adding protocol if necessary.
+		 */
+		private String prepareURL(String url) {
+			assert url != null;
+			url = url.trim().toLowerCase(Locale.ROOT);
+			if (!url.isEmpty()) {
+				if (!url.startsWith("https://") && !url.startsWith("http://"))
+					url = "http://" + url;
+				return url;
+			}
+			else {
+				return null;
+			}
+		}
+
+
+		/**
+		 * Creates new JavaFX task to load the release from specified URL.
+		 */
+		private Task<Release> createReleaseLoaderTask(String url) {
+			Task<Release> task = new Task<Release>() {
+				@Override
+				protected Release call() throws Exception {
+					return Release.forURI(new URL(url).toURI());
+				}
+			};
+			task.setOnSucceeded(event -> setRelease(task.getValue()));
+			task.setOnFailed(event -> handleException(task.getException()));
+			return task;
+		}
+
+
+		/**
+		 * Handles exception that can possibly occur during release load.
+		 * For exceptions caused by malformed URL records a warning with error 
+		 * message in the event log. For other exceptions additionally displays
+		 * a message box with error message.
+		 */
+		private void handleException(Throwable exception) {
+			if (exception instanceof ExecutionException)
+				exception = exception.getCause();
+			if (exception instanceof MalformedURLException || exception instanceof URISyntaxException) {
+				LOGGER.warning("Invalid release URL: " + exception.getMessage());
+			}
+			else {
+				String errMsg;
+				if (exception != null) {
+					errMsg = "Error loading release: " + exception.getMessage();
+					LOGGER.log(Level.WARNING, errMsg, exception);
+				}
+				else {
+					errMsg = "Error loading release";
+					LOGGER.log(Level.WARNING, errMsg);
+				}
+				Dialogs.messageBox(errMsg, "Error", stage);
+			}
 		}
 
 	}
@@ -888,10 +1010,10 @@ class ReleasePlayerForm extends SplitPane {
 	 */
 	private ReleasePlayerForm(Window owner, BandcampExplorerMainForm mainForm) {
 		this.mainForm = mainForm;
-		
+
 		Scene scene = new Scene(this);
 		scene.getStylesheets().add(getClass().getResource("style.css").toExternalForm());
-		
+
 		stage = new Stage();
 		stage.initOwner(owner);
 		stage.setTitle(NO_RELEASE_TITLE);
@@ -900,11 +1022,56 @@ class ReleasePlayerForm extends SplitPane {
 			stage.hide();
 			event.consume();
 		});
-		stage.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-			if (event.getCode() == KeyCode.ESCAPE)
-				stage.hide();
-		});
+		stage.addEventFilter(KeyEvent.KEY_PRESSED, createHotkeyFilter());
+
 		stage.setScene(scene);
+	}
+
+
+	/**
+	 * Creates a filter for player form hotkeys.
+	 */
+	private EventHandler<KeyEvent> createHotkeyFilter() {
+		KeyCombination CTRL_C = new KeyCodeCombination(KeyCode.C, KeyCombination.SHORTCUT_DOWN);
+		KeyCombination CTRL_V = new KeyCodeCombination(KeyCode.V, KeyCombination.SHORTCUT_DOWN);
+		return keyEvent -> {
+			if (keyEvent.getCode() == KeyCode.B) {
+				focusAndFire(nextButton);
+			}
+			else if (keyEvent.getCode() == KeyCode.Z) {
+				focusAndFire(previousButton);
+			}
+			else if (keyEvent.getCode() == KeyCode.X) {
+				focusAndFire(playButton);
+			}
+			else if (keyEvent.getCode() == KeyCode.C && !CTRL_C.match(keyEvent)) {
+				focusAndFire(playButton);
+			}
+			else if (keyEvent.getCode() == KeyCode.V) {
+				if (CTRL_V.match(keyEvent)) {
+					releaseUrlLoader.loadFromClipboard();
+					keyEvent.consume();
+				}
+				else {
+					focusAndFire(stopButton);
+				}
+			}
+			else if (keyEvent.getCode() == KeyCode.ESCAPE) {
+				stage.hide();
+			}
+		};
+	}
+
+
+	/**
+	 * Requests focus and invokes action installed for the specified button.
+	 * Does notthing is button is disabled.
+	 */
+	private static void focusAndFire(Button button) {
+		if (!button.isDisabled()) {
+			button.requestFocus();
+			button.fire();
+		}
 	}
 
 
@@ -1074,29 +1241,11 @@ class ReleasePlayerForm extends SplitPane {
 
 
 	/**
-	 * Prompts user to enter a URL to a release, loads the release using supplied
-	 * URL and sets it to play in this player.
-	 * If there's an error loading release, displays message box with information
-	 * about error.
-	 * If empty URL was supplied or cancel pressed, does nothing.
+	 * Loads the release from URL supplied via dialog.
 	 */
 	@FXML
-	private void loadRelease() {
-		Dialogs.inputBox("Enter a release URL to load:", "Load Release", stage)
-		.map(url -> url.trim().toLowerCase(Locale.ROOT))
-		.filter(url -> !url.isEmpty())
-		.ifPresent(url -> {
-			try {
-				if (!url.startsWith("http://") && !url.startsWith("https://"))
-					url = "http://" + url;
-				setRelease(Release.forURI(URI.create(url)));
-			} 
-			catch (Exception e) {
-				String errMsg = "Error loading release: " + e.getMessage();
-				LOGGER.log(Level.WARNING, errMsg, e);
-				Dialogs.messageBox(errMsg, "Error", stage);
-			}
-		});
+	private void loadReleaseFromDialog() {
+		releaseUrlLoader.loadFromDialog();
 	}
 
 
