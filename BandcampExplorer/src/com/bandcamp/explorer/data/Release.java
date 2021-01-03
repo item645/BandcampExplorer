@@ -968,6 +968,7 @@ public final class Release {
 			throw new ReleaseLoadingException("Release data not found");
 
 		releaseJSON = releaseJSON.replace("&quot;", "\"");
+		releaseJSON = releaseJSON.replace("\u2028", "\\n");
 		releaseJSON = releaseJSON.replace("data-tralbum=\"", "var TralbumData=");
 		releaseJSON = releaseJSON.substring(0, releaseJSON.length() - 1);
 
