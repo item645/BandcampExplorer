@@ -701,7 +701,8 @@ public final class Release {
 			String exchangeRateDataURL = String.format(EXCHANGE_RATE_DATA_API_URL, now);
 			LOGGER.fine("Loading exchange rate data from " + exchangeRateDataURL);
 			try {
-				HttpURLConnection connection = URLConnectionHelper.getConnection(new URL(exchangeRateDataURL));
+				URL url = new URL(exchangeRateDataURL);
+				HttpURLConnection connection = URLConnectionBuilder.newHttpURLConnection(url).build();
 				try (Scanner input = new Scanner(connection.getInputStream(), StandardCharsets.UTF_8.name())) {
 					String exchangeRateData = input.findWithinHorizon(CURRENCY_DATA_PATTERN, 0);
 					if (exchangeRateData != null)
@@ -847,7 +848,7 @@ public final class Release {
 	private Release(URI uri) throws ReleaseLoadingException {
 		HttpURLConnection connection;
 		try {
-			connection = URLConnectionHelper.getConnection(uri, true);
+			connection = URLConnectionBuilder.newHttpURLConnection(uri).build();
 		}
 		catch (Exception e) {
 			throw new ReleaseLoadingException(e);

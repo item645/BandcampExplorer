@@ -66,11 +66,11 @@ class Resource {
 		if (parentTask.isCancelled())
 			return;
 
-		URLConnection connection = URLConnectionHelper.getConnection(url, true);
-		try (Scanner input = new Scanner(connection.getInputStream(),
-				StandardCharsets.UTF_8.name())) {
+		URLConnection connection = getConnection(url);
+
+		try (Scanner input = new Scanner(connection.getInputStream(), StandardCharsets.UTF_8.name())) {
 			url = connection.getURL(); // effective url
-			boolean isFile = url.getProtocol().toLowerCase(Locale.ROOT).equals("file");
+			boolean isFile = URLConnectionBuilder.getProtocol(url).equals("file");
 			Set<String> links = new HashSet<>();
 
 			for (String link; (link = input.findWithinHorizon(RELEASE_LINK, 0)) != null; ) {
@@ -100,6 +100,24 @@ class Resource {
 				}
 			}
 		}
+	}
+
+
+	/**
+	 * Obtains a specialized type of connection for the given URL depending
+	 * on its protocol.
+	 * 
+	 * @throws IOException if I/O-, network- or protocol-related error occurs while
+	 *         instantiating a connection or if protocol is not supported
+	 */
+	private static URLConnection getConnection(URL url) throws IOException {
+		String protocol = URLConnectionBuilder.getProtocol(url);
+		if (protocol.equals("file"))
+			return URLConnectionBuilder.newFileURLConnection(url).build();
+		else if (protocol.equals("http") || protocol.equals("https"))
+			return URLConnectionBuilder.newHttpURLConnection(url).build();
+		else
+			throw new IOException('"' + protocol + "\" protocol is not supported");
 	}
 
 
