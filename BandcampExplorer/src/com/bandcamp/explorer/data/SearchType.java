@@ -21,12 +21,12 @@ public enum SearchType {
 	 */
 	SEARCH (true) {
 		@Override
-		Resource loadResource(String query, int pageNum, SearchTask parentTask) throws IOException {
+		Resource loadResource(String query, int pageNum, SearchTask searchTask) throws IOException {
 			if (pageNum < 1)
 				throw new IllegalArgumentException("Page number must be > 0");
 			String query1 = query.toLowerCase(Locale.ENGLISH).replaceAll(" ", "+");
 			String url = String.format("https://bandcamp.com/search?q=%1$s&page=%2$d", query1, pageNum);
-			return new Resource(url, parentTask);
+			return Resource.url(url, searchTask);
 		}
 	},
 
@@ -47,12 +47,12 @@ public enum SearchType {
 	 */
 	TAG (true) {
 		@Override
-		Resource loadResource(String query, int pageNum, SearchTask parentTask) throws IOException {
+		Resource loadResource(String query, int pageNum, SearchTask searchTask) throws IOException {
 			if (pageNum < 1)
 				throw new IllegalArgumentException("Page number must be > 0");
 			String tag = query.toLowerCase(Locale.ENGLISH).replaceAll(" ", "-");
 			String url = String.format("https://bandcamp.com/tag/%1$s?page=%2$d&sort_field=date", tag, pageNum);
-			return new Resource(url, parentTask);
+			return Resource.url(url, searchTask);
 		}
 	},
 
@@ -73,7 +73,7 @@ public enum SearchType {
 	 */
 	DIRECT (false) {
 		@Override
-		Resource loadResource(String query, int pageNum, SearchTask parentTask) throws IOException {
+		Resource loadResource(String query, int pageNum, SearchTask searchTask) throws IOException {
 			int i = query.indexOf(':');
 			String protocol = i > -1 ? query.substring(0, i).toLowerCase(Locale.ROOT) : "";
 
@@ -89,7 +89,7 @@ public enum SearchType {
 			else
 				throw new IllegalArgumentException('"' + protocol + "\" protocol is not supported");
 
-			return new Resource(url, parentTask);
+			return Resource.url(url, searchTask);
 		}
 
 		/**
@@ -135,13 +135,13 @@ public enum SearchType {
 	 * 
 	 * @param query a query string
 	 * @param pageNum a number of pages
-	 * @param parentTask an instance of SearchTask that requests resource loading
+	 * @param searchTask an instance of SearchTask that requests resource loading
 	 * @return an instantiated Resource object
 	 * @throws IOException if resource cannot be loaded for some reason
 	 * @throws NullPointerException if query or parentTask is null
 	 * @throws IllegalArgumentException generally thrown if some parameters are not
 	 *         valid (the validity is implementation-dependent)
 	 */
-	abstract Resource loadResource(String query, int pageNum, SearchTask parentTask) throws IOException;
+	abstract Resource loadResource(String query, int pageNum, SearchTask searchTask) throws IOException;
 
 }
