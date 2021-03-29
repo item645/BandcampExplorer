@@ -1,12 +1,21 @@
 package com.bandcamp.explorer.data;
 
+import static com.bandcamp.explorer.data.URLConnectionBuilder.HttpURLConnectionBuilder.Method.POST;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toCollection;
+
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Scanner;
@@ -55,6 +64,17 @@ abstract class Resource {
 	 * finished loading, returns empty set.
 	 */
 	abstract Set<String> releaseLinks();
+
+
+	/**
+	 * Checks the link for missing protocol and adds "http" if there's none.
+	 */
+	private static String addProtocolIfMissing(String link) {
+		if (!link.startsWith("http://") && !link.startsWith("https://"))
+			link = "http://" + link;
+		return link;
+	}
+
 
 
 	/**
@@ -134,8 +154,8 @@ abstract class Resource {
 								}
 							}
 						}
-						else if (!link.startsWith("http://") && !link.startsWith("https://")) {
-							link = "http://" + link;
+						else {
+							link = addProtocolIfMissing(link);
 						}
 						releaseLinks.add(link);
 					}
@@ -169,6 +189,145 @@ abstract class Resource {
 	}
 
 
+
+	/**
+	 * A resource representing Bandcamp's undocumented API endpoint that allows to search
+	 * releases by tags.
+	 */
+	private static class TagAPIResource extends Resource {
+
+		private static final URI TAG_API_URI = URI.create("https://bandcamp.com/api/hub/2/dig_deeper");
+		private static final String REQUEST_BODY_TEMPLATE = 
+				"{\"filters\":{\"format\":\"all\",\"location\":0,\"sort\":\"date\",\"tags\":[%s]},\"page\":%d}";
+
+		private static final Pattern EXCESSIVE_WHITESPACE = Pattern.compile("\\s+");
+		private static final Pattern AMPERSAND_OR_WHITESPACE = Pattern.compile("\\s?[&\\s]\\s?");
+
+		private final Set<String> releaseLinks = new HashSet<>();
+
+
+		/**
+		 * Constructs a TagAPIResource for obtaining releases with specified tags
+		 * and result page, and loads it.
+		 * 
+		 * @param tagsString comma-separated string of tags
+		 * @param pageNum the number of page in the result returned from API
+		 * @param searchTask searchTask an instance of SearchTask that requests the resource
+		 * @throws IOException if there was an I/O-related error while loading the resource
+		 * @throws IllegalArgumentException if page number is < 1
+		 * @throws NullPointerException if tags string or search task is null
+		 */
+		TagAPIResource(String tagsString, int pageNum, SearchTask searchTask) throws IOException {
+			super(searchTask);
+
+			Objects.requireNonNull(tagsString);
+			if (pageNum < 1)
+				throw new IllegalArgumentException("Page number must be > 0");
+
+			load(prepareTags(tagsString), pageNum);
+		}
+
+
+		/**
+		 * Converts comma-separated string of tags to a set, performing some validation and 
+		 * sanitization, as well as removing duplicates and empty entries in the process.
+		 * 
+		 * @param tagsString comma-separated string of tags
+		 * @return tags set
+		 */
+		private static Set<String> prepareTags(String tagsString) {
+			return Arrays.stream(tagsString.split(","))
+					.map(String::trim)
+					.filter(tag -> !tag.isEmpty())
+					.map(TagAPIResource::sanitizeTag)
+					.collect(toCollection(LinkedHashSet::new));
+		}
+
+
+		/**
+		 * Sanitizes the given tag.
+		 */
+		private static String sanitizeTag(String tag) {
+			tag = tag.toLowerCase(Locale.ENGLISH);
+			tag = EXCESSIVE_WHITESPACE.matcher(tag).replaceAll(" ");
+			tag = AMPERSAND_OR_WHITESPACE.matcher(tag).replaceAll("-");
+			return tag;	
+		}
+
+
+		/**
+		 * {@inheritDoc}
+		 * This implementation returns an unmodifiable set of links.
+		 */
+		@Override
+		Set<String> releaseLinks() {
+			return Collections.unmodifiableSet(releaseLinks);
+		}
+
+
+		/**
+		 * Queries the API, loads the response and collects every unique release found there.
+		 */
+		private void load(Set<String> tags, int pageNum) throws IOException {
+			if (tags.isEmpty() || searchTask().isCancelled())
+				return;
+
+			String requestBody = createRequestBody(tags, pageNum);
+			LOGGER.fine("Loading resource: " + String.format("%s (params: %s)", TAG_API_URI, requestBody));
+
+			HttpURLConnection connection = URLConnectionBuilder.newHttpURLConnection(TAG_API_URI)
+					.method(POST)
+					.header("Content-Type", "application/json")
+					.postData(requestBody)
+					.build();
+
+			String response;
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(),
+					StandardCharsets.UTF_8))) {
+				response = reader.lines().collect(joining());
+			}
+			// Some of the tags submitted in request to the API can be discarded as invalid by Bandcamp.
+			// The exact reason for this is unknown, but it's possibly due to the absence of releases 
+			// with such tags in their DB.
+			// In that case the returned result is relevant to the remaining "valid" tags. However, if ALL
+			// tags in the request were invalid, then Bandcamp simply ignores tag filter and returns all
+			// recently added releases regardless of tags.
+			// To avoid confusion we examine the value of tag_id property in response and return empty result
+			// if it is 0. If request had any valid tags, the tag_id property will contain the id of the first
+			// valid tag in supplied tag set.
+			if (!response.contains("\"tag_id\":0")) {
+				try (Scanner input = new Scanner(response)) {
+					for (String link; (link = input.findWithinHorizon(RELEASE_LINK, 0)) != null; ) {
+						if (!searchTask().isCancelled()) {
+							releaseLinks.add(addProtocolIfMissing(link.toLowerCase(Locale.ROOT)));
+						}
+						else {
+							releaseLinks.clear();
+							break;
+						}
+					}
+				}
+			}
+			else {
+				LOGGER.warning("Server returned no relevant results because none of the supplied tags were valid: " 
+						+ tags.stream().collect(joining(", ")));
+			}
+		}
+
+
+		/**
+		 * Creates a body for POST request to the API.
+		 */
+		private static String createRequestBody(Set<String> tags, int pageNum) {
+			String tagsArrayString = tags.stream()
+					.map(tag -> "\"" + tag.replace("\"", "\\\"") + "\"")
+					.collect(joining(","));
+			return String.format(REQUEST_BODY_TEMPLATE, tagsArrayString, pageNum);
+		}
+
+	}
+
+
 	/**
 	 * Returns a generic resource corresponding to the supplied URL.
 	 * The resource can be either an arbitrary web page or a file on local or network drive,
@@ -184,4 +343,25 @@ abstract class Resource {
 		return new URLResource(url, searchTask);
 	}
 
+	
+	/**
+	 * Returns a resource for accessing Bandcamp's undocumented API endpoint that allows to search
+	 * releases by tags.
+	 * The resource will contain links to releases matched by all valid entries in supplied list of tags
+	 * and corresponding to a given page number in the result returned from API, where results are sorted
+	 * by release publish date (newest first).
+	 * If no valid tags were provided, the resource will contain no links.
+	 * 
+	 * @param tagsString comma-separated string of tags
+	 * @param pageNum the number of page in the result returned from API
+	 * @param searchTask searchTask an instance of SearchTask that requests the resource
+	 * @return an instance of TagAPIResource
+	 * @throws IOException if there was an I/O-related error while loading the resource
+	 * @throws IllegalArgumentException if page number is < 1
+	 * @throws NullPointerException if tags string or search task is null
+	 */
+	static Resource tags(String tagsString, int pageNum, SearchTask searchTask) throws IOException {
+		return new TagAPIResource(tagsString, pageNum, searchTask);
+	}
+	
 }

@@ -12,10 +12,9 @@ import java.util.Locale;
 public enum SearchType {
 
 	/**
-	 * This type employs a standard Bandcamp search feature to find releases,
-	 * using https://bandcamp.com/search page to supply a query string
-	 * and collect the results. The pageNum parameter indicates how many result
-	 * pages should be processed.
+	 * This type employs a standard Bandcamp search feature to find releases, using 
+	 * https://bandcamp.com/search page to supply a query string and collect the results.
+	 * The pageNum parameter indicates the number of page to process in the returned result.
 	 * Note that for this search type it is not guaranteed that <b>all</b> relevant
 	 * results will be returned.
 	 */
@@ -32,27 +31,22 @@ public enum SearchType {
 
 
 	/**
-	 * This search type works by scraping data from Bandcamp tag pages 
-	 * (https://bandcamp.com/tag/your-favorite-tag) and collecting all releases 
-	 * encountered on those pages.
-	 * For this type query string parameter is interpreted as tag while pageNum
-	 * parameter indicates how many subsequent pages should be processed to gather
-	 * the releases. When loading tag pages, sort_field=date parameter is passed to URLs,
-	 * which means that Bandcamp will return results sorted by publish date in 
+	 * This search type provides a means to access Bandcamp's undocumented API endpoint that allows 
+	 * to search releases by tags.
+	 * For this type query string parameter is interpreted as comma-separated list of tags,
+	 * while pageNum parameter indicates the number of page to process in the result returned 
+	 * from API.
+	 * A search result obtained using this type will contain releases that match all valid entries 
+	 * in supplied list of tags and corresponding to a given page number, sorted by publish date in 
 	 * descending order.
-	 * Note that it's not yet possible to search for multiple tags at once because
-	 * Bandcamp tag page does not provide such functionality. Also worth noting that
-	 * maximum number of tag pages Bandcamp will return is 10, so setting pages parameter
-	 * to numbers > 10 makes no sense.
+	 * Tags, which Bandcamp's API considers invalid, will be ignored, and returned result will be 
+	 * relevant only to the remaining valid tags. In case all of the tags were invalid, the result 
+	 * will be empty.
 	 */
-	TAG (true) {
+	TAGS (true) {
 		@Override
 		Resource loadResource(String query, int pageNum, SearchTask searchTask) throws IOException {
-			if (pageNum < 1)
-				throw new IllegalArgumentException("Page number must be > 0");
-			String tag = query.toLowerCase(Locale.ENGLISH).replaceAll(" ", "-");
-			String url = String.format("https://bandcamp.com/tag/%1$s?page=%2$d&sort_field=date", tag, pageNum);
-			return Resource.url(url, searchTask);
+			return Resource.tags(query, pageNum, searchTask);
 		}
 	},
 
@@ -78,16 +72,19 @@ public enum SearchType {
 			String protocol = i > -1 ? query.substring(0, i).toLowerCase(Locale.ROOT) : "";
 
 			String url;
-			if (protocol.equals("https") || protocol.equals("http"))
+			if (protocol.equals("https") || protocol.equals("http")) {
 				url = query.toLowerCase(Locale.ROOT);
+			}
 			else if (protocol.equals("file")) {
 				checkFilePath(new URL(query).getPath());
 				url = query;
 			}
-			else if (protocol.isEmpty())
+			else if (protocol.isEmpty()) {
 				url = "http://" + query;
-			else
+			}
+			else {
 				throw new IllegalArgumentException('"' + protocol + "\" protocol is not supported");
+			}
 
 			return Resource.url(url, searchTask);
 		}
@@ -134,7 +131,7 @@ public enum SearchType {
 	 * factories for creating Resource instances.
 	 * 
 	 * @param query a query string
-	 * @param pageNum a number of pages
+	 * @param pageNum a number of page to process
 	 * @param searchTask an instance of SearchTask that requests resource loading
 	 * @return an instantiated Resource object
 	 * @throws IOException if resource cannot be loaded for some reason
