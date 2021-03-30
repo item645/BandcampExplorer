@@ -296,15 +296,14 @@ public final class SearchTask extends Task<SearchResult> {
 			updateMessage(requestingDataMsg);
 
 		ExecutorCompletionService<Set<String>> completionService = new ExecutorCompletionService<>(executor);
-		int pages = searchParams.searchType().isMultiPage() ? searchParams.pages() : 1;
 
-		for (int i = 1; i <= pages; i++) {
+		for (int i = 1; i <= searchParams.pages(); i++) {
 			int pageNum = i;
 			completionService.submit(() -> collectReleaseLinks(pageNum));
 		}
 
 		Set<String> releaseLinks = new HashSet<>();
-		for (int i = 1; i <= pages; i++)
+		for (int i = 1; i <= searchParams.pages(); i++)
 			releaseLinks.addAll(completionService.take().get());
 
 		return releaseLinks.stream().map(this::createReleaseLoader).collect(Collectors.toSet());

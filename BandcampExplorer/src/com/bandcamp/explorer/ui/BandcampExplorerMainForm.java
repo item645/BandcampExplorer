@@ -2,15 +2,23 @@ package com.bandcamp.explorer.ui;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import com.bandcamp.explorer.data.SearchParams;
+import com.bandcamp.explorer.data.SearchResult;
+import com.bandcamp.explorer.data.SearchTask;
+import com.bandcamp.explorer.data.SearchType;
+import com.bandcamp.explorer.util.ExceptionUnchecker;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -24,12 +32,6 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
-
-import com.bandcamp.explorer.data.SearchParams;
-import com.bandcamp.explorer.data.SearchResult;
-import com.bandcamp.explorer.data.SearchTask;
-import com.bandcamp.explorer.data.SearchType;
-import com.bandcamp.explorer.util.ExceptionUnchecker;
 
 
 /**
@@ -350,16 +352,32 @@ public class BandcampExplorerMainForm extends BorderPane {
 
 	/**
 	 * Handler invoked when search type combobox changes its value.
-	 * Disables pages combobox if search type does not support using multiple pages.
 	 */
 	@FXML
 	private void onSearchTypeChange() {
-		if (!searchType.getValue().isMultiPage()) {
+		updatePages();
+	}
+
+
+	/**
+	 * Updates list of choices and selected value of pages combobox according
+	 * to currently selected search type.
+	 */
+	private void updatePages() {
+		Integer oldValue = pages.getValue();
+
+		int maxPages = searchType.getValue().maxPages();
+		List<Integer> pageNums = IntStream.rangeClosed(1, maxPages).boxed().collect(Collectors.toList());
+		pages.setItems(FXCollections.observableList(pageNums));
+
+		if (searchType.getValue().isMultiPage()) {
+			pages.setValue(oldValue != null && oldValue.intValue() <= maxPages ? oldValue : 1);
+			pages.setDisable(false);
+		}
+		else {
 			pages.setValue(1);
 			pages.setDisable(true);
 		}
-		else
-			pages.setDisable(false);
 	}
 
 
@@ -377,17 +395,13 @@ public class BandcampExplorerMainForm extends BorderPane {
 	 * Initialization method invoked by FXML loader, provides initial setup for components.
 	 */
 	@FXML
-	private void initialize() {  	
+	private void initialize() {
 		checkComponents();
 
 		searchType.setItems(FXCollections.observableArrayList(SearchType.values()));
 		searchType.setValue(SearchType.SEARCH);
 
-		ObservableList<Integer> pageNums = FXCollections.observableArrayList();
-		for (int i = 1; i <= 10; i++)
-			pageNums.add(i);
-		pages.setItems(pageNums);
-		pages.setValue(1);
+		updatePages();
 	}
 
 

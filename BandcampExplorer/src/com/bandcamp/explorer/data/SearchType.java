@@ -18,7 +18,7 @@ public enum SearchType {
 	 * Note that for this search type it is not guaranteed that <b>all</b> relevant
 	 * results will be returned.
 	 */
-	SEARCH (true) {
+	SEARCH (6) {
 		@Override
 		Resource loadResource(String query, int pageNum, SearchTask searchTask) throws IOException {
 			if (pageNum < 1)
@@ -43,7 +43,7 @@ public enum SearchType {
 	 * relevant only to the remaining valid tags. In case all of the tags were invalid, the result 
 	 * will be empty.
 	 */
-	TAGS (true) {
+	TAGS (30) {
 		@Override
 		Resource loadResource(String query, int pageNum, SearchTask searchTask) throws IOException {
 			return Resource.tags(query, pageNum, searchTask);
@@ -65,7 +65,7 @@ public enum SearchType {
 	 * must be specified. 
 	 * The pageNum parameter is ignored for this search type.
 	 */
-	DIRECT (false) {
+	DIRECT (1) {
 		@Override
 		Resource loadResource(String query, int pageNum, SearchTask searchTask) throws IOException {
 			int i = query.indexOf(':');
@@ -108,19 +108,28 @@ public enum SearchType {
 	};
 
 
-	private final boolean isMultiPage;
+	private final int maxPages;
 
 
-	private SearchType(boolean isMultiPage) {
-		this.isMultiPage = isMultiPage;
+	SearchType(int maxPages) {
+		this.maxPages = maxPages;
 	}
 
 
 	/**
-	 * Returns true if this search type supports using multiple pages.
+	 * Returns the max number of result pages available for this search type. Always > 0.
+	 * The value of 1 means that this search type does not support multiple pages. 
+	 */
+	public int maxPages() {
+		return maxPages;
+	}
+
+
+	/**
+	 * Returns true if this search type supports multiple pages.
 	 */
 	public boolean isMultiPage() {
-		return isMultiPage;
+		return maxPages > 1;
 	}
 
 

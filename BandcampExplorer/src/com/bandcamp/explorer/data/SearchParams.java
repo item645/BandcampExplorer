@@ -45,8 +45,17 @@ public class SearchParams {
 		 * 
 		 * @param value number of pages
 		 * @return this builder
+		 * @throws IllegalArgumentException if value is < 1 or exceeds max number of pages 
+		 *         supported by search type
 		 */
 		public Builder pages(int value) {
+			if (value < 1)
+				throw new IllegalArgumentException("Number of pages cannot be < 1");
+			if (value > searchType.maxPages()) {
+				throw new IllegalArgumentException(String.format(
+						"Number of pages cannot exceed max number supported by SearchType.%s (%d)",
+						searchType, searchType.maxPages()));
+			}
 			this.pages = value;
 			return this;
 		}
