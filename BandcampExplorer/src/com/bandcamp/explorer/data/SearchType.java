@@ -12,7 +12,7 @@ import java.util.Locale;
 public enum SearchType {
 
 	/**
-	 * This type employs a standard Bandcamp search feature to find releases, using 
+	 * This type employs a standard Bandcamp search feature to find album releases, using 
 	 * https://bandcamp.com/search page to supply a query string and collect the results.
 	 * The pageNum parameter indicates the number of page to process in the returned result.
 	 * Note that for this search type it is not guaranteed that <b>all</b> relevant
@@ -24,7 +24,7 @@ public enum SearchType {
 			if (pageNum < 1)
 				throw new IllegalArgumentException("Page number must be > 0");
 			String query1 = query.toLowerCase(Locale.ENGLISH).replaceAll(" ", "+");
-			String url = String.format("https://bandcamp.com/search?q=%1$s&page=%2$d", query1, pageNum);
+			String url = String.format("https://bandcamp.com/search?q=%1$s&page=%2$d&item_type=a", query1, pageNum);
 			return Resource.url(url, searchTask);
 		}
 	},
